@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PinDrop Pro — Pinterest Affiliate Bot</title>
+<style>
+  :root{
+    --bg:#141416; --panel:#1e1e22; --panel2:#26262c; --line:#333340;
+    --red:#E60023; --red2:#ff5247; --text:#f3f3f5; --muted:#9b9ba5;
+    --green:#2ecc71; --amber:#f5a623; --blue:#4aa3ff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,-apple-system,sans-serif; min-height:100vh;}
+  header{display:flex; align-items:center; gap:14px; padding:18px 28px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10;}
+  .logo{width:38px;height:38px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;}
+  header h1{font-size:20px; font-weight:700;}
+  header h1 span{color:var(--red2); font-weight:800;}
+  .pill{margin-left:auto; padding:6px 14px; border-radius:999px; font-size:12.5px; font-weight:600; background:#2a2a31; border:1px solid var(--line);}
+  .pill.ok{color:var(--green); border-color:#1e4d33;}
+  .pill.bad{color:var(--red2); border-color:#5c2126;}
+  main{max-width:1180px; margin:0 auto; padding:26px 22px 80px;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:24px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px;}
+  .card .num{font-size:32px; font-weight:800;}
+  .card .lbl{color:var(--muted); font-size:13px; margin-top:4px; text-transform:uppercase; letter-spacing:.6px;}
+  .card.red .num{color:var(--red2);} .card.green .num{color:var(--green);}
+  .card.amber .num{color:var(--amber);} .card.blue .num{color:var(--blue);}
+  .tabs{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
+  .tab{padding:10px 20px; border-radius:10px; background:var(--panel); border:1px solid var(--line); color:var(--muted); cursor:pointer; font-weight:600; font-size:14px; user-select:none;}
+  .tab.active{background:var(--red); color:#fff; border-color:var(--red);}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px;}
+  textarea{width:100%; min-height:130px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:12px; font-family:ui-monospace,monospace; font-size:13px; resize:vertical;}
+  button.btn{background:var(--red); color:#fff; border:none; border-radius:10px; padding:12px 22px; font-size:14.5px; font-weight:700; cursor:pointer; margin-top:12px;}
+  button.btn:hover{background:var(--red2);}
+  button.btn.ghost{background:var(--panel2); border:1px solid var(--line);}
+  button.btn:disabled{opacity:.5; cursor:not-allowed;}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th{color:var(--muted); text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.8px; padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:10px; border-bottom:1px solid #2a2a31; vertical-align:middle;}
+  tr:hover td{background:#222228;}
+  .thumb{width:52px;height:70px;object-fit:cover;border-radius:8px;background:#333;}
+  .badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:700;}
+  .b-queued{background:#2c3550;color:#8ab4ff;} .b-posted{background:#1e4d33;color:var(--green);}
+  .b-failed{background:#5c2126;color:var(--red2);} .b-skipped{background:#3a3a40;color:var(--muted);}
+  .b-amazon{background:#3d2f13;color:#ffb84d;} .b-meesho{background:#4a2040;color:#f98bc9;}
+  .b-flipkart{background:#1c3a55;color:#7cc4ff;} .b-other{background:#333;color:#bbb;}
+  a{color:var(--blue); text-decoration:none;} a:hover{text-decoration:underline;}
+  .console{background:#0d0d10; border-radius:10px; padding:14px; max-height:420px; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; line-height:1.75;}
+  .console .ERROR{color:var(--red2);} .console .WARN{color:var(--amber);} .console .INFO{color:#8f8f9a;}
+  .hint{color:var(--muted); font-size:13px; margin-top:10px; line-height:1.6;}
+  .toast{position:fixed; bottom:22px; right:22px; background:var(--panel2); border:1px solid var(--line); border-left:4px solid var(--green); padding:14px 20px; border-radius:10px; font-size:14px; max-width:420px; display:none; z-index:99; box-shadow:0 8px 30px rgba(0,0,0,.5);}
+  .toast.err{border-left-color:var(--red);}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .row-actions button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;margin-right:6px;}
+  .row-actions button:hover{color:#fff;border-color:#666;}
+  .empty{color:var(--muted); text-align:center; padding:40px 0; font-size:14px;}
+  .inp{width:100%; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:11px 13px; font-size:13.5px;}
+  .inp:focus, textarea:focus{outline:none; border-color:var(--red);}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">P</div>
+  <h1>PinDrop <span>Pro</span> <small style="color:var(--muted);font-weight:400;font-size:12px">— Pinterest Affiliate Bot</small></h1>
+  <div class="pill" id="credPill">checking…</div>
+</header>
+<main>
+  <div class="cards">
+    <div class="card blue"><div class="num" id="stTotal">–</div><div class="lbl">Total Products</div></div>
+    <div class="card amber"><div class="num" id="stQueued">–</div><div class="lbl">In Queue</div></div>
+    <div class="card green"><div class="num" id="stPosted">–</div><div class="lbl">Posted to Pinterest</div></div>
+    <div class="card red"><div class="num" id="stFailed">–</div><div class="lbl">Failed</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="add">➕ Add Products</div>
+    <div class="tab" data-tab="queue">📋 Queue</div>
+    <div class="tab" data-tab="posted">📌 Posted</div>
+    <div class="tab" data-tab="logs">🧾 Logs</div>
+  </div>
+
+  <div class="panel" id="tab-add">
+    <h3 style="margin-bottom:10px">Paste product links (one per line)</h3>
+    <textarea id="urls" placeholder="https://www.amazon.in/dp/B0XXXXXXX&#10;https://www.meesho.com/product-name/p/abc123&#10;https://www.flipkart.com/product/p/itmx&#10;https://anyshop.com/product/xyz"></textarea>
+    <button class="btn" id="addBtn" onclick="addProducts()">🔍 Scrape & Add to Queue</button>
+    <button class="btn ghost" onclick="postNow(1)">⚡ Post 1 Now</button>
+    <button class="btn ghost" onclick="postNow(5)">🚀 Post 5 Now</button>
+    <div class="hint">Bot scrapes title/price/image → converts to YOUR affiliate link (Amazon tag / Meesho affid / EarnKaro / Cuelinks) → designs a 1000×1500 pin → posts to Pinterest. Amazon can sometimes block scrapers — if a link fails, use the manual form below.</div>
+    <div id="addResults" style="margin-top:14px"></div>
+
+    <h3 style="margin:26px 0 12px">✍️ Manual add (when scrape is blocked)</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <input id="mTitle" placeholder="Product title *" class="inp">
+      <input id="mPrice" placeholder="Price (e.g. 1099)" class="inp">
+      <input id="mUrl" placeholder="Product page URL *" class="inp" style="grid-column:1/-1">
+      <input id="mImg" placeholder="Product image URL *" class="inp" style="grid-column:1/-1">
+      <input id="mVideo" placeholder="Video URL (optional, for video pins)" class="inp" style="grid-column:1/-1">
+    </div>
+    <button class="btn" onclick="addManual()">➕ Add to Queue (Manual)</button>
+  </div>
+
+  <div class="panel" id="tab-queue" style="display:none">
+    <table><thead><tr><th></th><th>Product</th><th>Source</th><th>Price</th><th>Status</th><th></th></tr></thead>
+    <tbody id="queueBody"></tbody></table>
+    <div class="empty" id="queueEmpty" style="display:none">Queue is empty — add product links above.</div>
+  </div>
+
+  <div class="panel" id="tab-posted" style="display:none">
+    <table><thead><tr><th></th><th>Pin</th><th>Pin ID</th><th>When</th></tr></thead>
+    <tbody id="postedBody"></tbody></table>
+    <div class="empty" id="postedEmpty" style="display:none">Nothing posted yet.</div>
+  </div>
+
+  <div class="panel" id="tab-logs" style="display:none">
+    <div class="console" id="console"></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let toastTimer;
+function toast(msg, isErr){
+  const t = $('#toast'); t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : ''); t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=> t.style.display='none', 4200);
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  ['add','queue','posted','logs'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
+  refresh();
+});
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  return r.json();
+}
+async function refresh(){
+  try{
+    const st = await api('/api/status');
+    const pill = $('#credPill');
+    if(st.credentials_ok && st.account && !st.account.error){
+      pill.textContent = `✔ Pinterest: @${st.account.username}`; pill.className='pill ok';
+    } else if (st.credentials_ok){
+      pill.textContent = '⚠ credentials set — check token'; pill.className='pill bad';
+    } else {
+      pill.textContent = '✖ Pinterest not connected (run: python -m bot auth)'; pill.className='pill bad';
+    }
+    $('#stTotal').textContent = st.stats.total;
+    $('#stQueued').textContent = st.stats.queued;
+    $('#stPosted').textContent = st.stats.posted;
+    $('#stFailed').textContent = st.stats.failed;
+
+    const active = document.querySelector('.tab.active').dataset.tab;
+    if(active==='queue'){
+      const prods = await api('/api/products');
+      const rows = prods.map(p => `<tr>
+        <td>${p.pin_image ? `<img class="thumb" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
+        <td><a href="${p.url}" target="_blank">${esc(p.title.slice(0,70))}</a><br><span style="color:var(--muted);font-size:11.5px">${esc(p.affiliate_url.slice(0,80))}</span></td>
+        <td><span class="badge b-${p.source}">${p.source}</span></td>
+        <td>${esc(p.price)}</td>
+        <td><span class="badge b-${p.status}">${p.status}</span></td>
+        <td class="row-actions">${p.status==='queued'?`<button onclick="skipP(${p.id})">skip</button>`:''}</td>
+      </tr>`).join('');
+      $('#queueBody').innerHTML = rows;
+      $('#queueEmpty').style.display = prods.length ? 'none':'block';
+    }
+    if(active==='posted'){
+      const posts = await api('/api/posts');
+      $('#postedBody').innerHTML = posts.map(p => `<tr>
+        <td>${p.pin_image ? `<img class="thumb" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
+        <td><a href="https://www.pinterest.com/pin/${p.pin_id}/" target="_blank">${esc(p.title.slice(0,70))}</a><br>
+            <span class="badge b-${p.status}">${p.status}</span> ${p.error?`<span style="color:var(--red2);font-size:11.5px">${esc(p.error.slice(0,90))}</span>`:''}</td>
+        <td>${p.pin_id||'—'}</td>
+        <td>${(p.posted_at||p.scheduled_for||'').replace('T',' ').slice(0,19)}</td>
+      </tr>`).join('');
+      $('#postedEmpty').style.display = posts.length ? 'none':'block';
+    }
+    if(active==='logs'){
+      const logs = await api('/api/logs');
+      $('#console').innerHTML = logs.map(l =>
+        `<div class="${l.level}">[${l.ts.slice(11,19)}] ${l.level.padEnd(5)} ${esc(l.message)}</div>`).join('');
+    }
+  }catch(e){ console.error(e); }
+}
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function addProducts(){
+  const urls = $('#urls').value.trim();
+  if(!urls) return toast('Paste at least one product link', true);
+  const btn = $('#addBtn'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Scraping…';
+  $('#addResults').innerHTML = '';
+  try{
+    const r = await api('/api/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({urls})});
+    $('#addResults').innerHTML = r.results.map(x =>
+      `<div class="hint">${x.ok?'✅':'❌'} <a href="${esc(x.url)}" target="_blank">${esc(x.url.slice(0,70))}</a> — ${esc(x.note || x.error || '')}</div>`).join('');
+    $('#urls').value = '';
+    toast(`${r.results.filter(x=>x.ok).length} product(s) added to queue`);
+    refresh();
+  }catch(e){ toast('Failed: '+e, true); }
+  btn.disabled = false; btn.innerHTML = '🔍 Scrape & Add to Queue';
+}
+async function postNow(count){
+  try{
+    toast(`Posting ${count} pin(s)… this can take a while`);
+    const r = await api('/api/post', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});
+    if(r.ok) toast(`🎉 ${r.posted} pin(s) posted to Pinterest!`);
+    else toast(r.error, true);
+    refresh();
+  }catch(e){ toast('Failed: '+e.message, true); }
+}
+async function skipP(id){
+  await api(`/api/products/${id}/skip`, {method:'POST'}); refresh();
+}
+async function addManual(){
+  const body = {title: $('#mTitle').value.trim(), price: $('#mPrice').value.trim(),
+    product_url: $('#mUrl').value.trim(), image_url: $('#mImg').value.trim(),
+    video_url: $('#mVideo').value.trim()};
+  if(!body.product_url || !body.title || !body.image_url) return toast('Fill title, product URL and image URL', true);
+  try{
+    const r = await api('/api/add-manual', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(r.ok){ toast('✅ Added to queue (id '+r.id+')'); ['mTitle','mPrice','mUrl','mImg','mVideo'].forEach(i=>$('#'+i).value=''); refresh(); }
+    else toast(r.error, true);
+  }catch(e){ toast('Failed: '+e, true); }
+}
+refresh(); setInterval(refresh, 10000);
+</script>
+</body>
+</html>

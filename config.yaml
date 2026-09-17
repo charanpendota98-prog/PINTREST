@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════
+#  PinDrop Pro — behavior config (SECRETS go in .env, not here)
+# ═══════════════════════════════════════════════════════════════
+
+pinterest:
+  board_name: "Best Deals"            # pins go into this board (auto-created)
+  redirect_uri: "http://localhost:8888/callback"
+
+posting:
+  pins_per_day: 8          # how many pins per day
+  start_hour: 9            # posting window start (IST)
+  end_hour: 22             # posting window end (IST)
+  min_gap_minutes: 40      # minimum gap between pins (human-like)
+  jitter_minutes: 25       # extra random delay added on top
+  schedule_days_ahead: 0   # 0 = post instantly, 1..14 = schedule ahead
+
+scraping:
+  delay_seconds: 4         # pause between scrapes (be polite, avoid blocks)
+  timeout_seconds: 25
+  max_retries: 2
+
+design:
+  width: 1000
+  height: 1500             # Pinterest's ideal 2:3 vertical ratio
+  accent_color: "#E60023"
+  brand_name: "Deal Drops" # your page/brand strip on every pin ("" = off)
+  cta_text: "Shop Now ➜"
+
+affiliate:
+  amazon_tag: ""           # Amazon Associates tag, e.g. mydeals-21 (or set AMAZON_TAG in .env)
+  meesho_affid: ""         # Meesho affiliate id
+  flipkart_affid: ""       # Flipkart affiliate id (empty = wraps via earnkaro/cuelinks)
+  earnkaro_prefix: ""      # e.g. https://ekaro.in/enkr20240101s123456
+  cuelinks_template: ""    # template with {url} placeholder
+  generic_template: ""     # fallback wrapper with {url} for any other shop
+  default_wrapper: earnkaro  # wrapper for non-amazon/meesho/flipkart links
+
+seo:
+  hashtags: true
+  max_hashtags: 8
+  extra_hashtags:
+    - "#onlineshopping"
+    - "#bestdeals"
+    - "#dealsindia"
+  description_template: |
+    🔥 {title}
+    💰 Price: {price}
+    ✅ Best price guarantee — tap to grab this deal before it's gone!
+    {hashtags}
+
+storage:
+  db_path: data/pindrop.db
+  media_dir: data/media
+
+dashboard:
+  host: 0.0.0.0
+  port: 5000
+
+timezone: Asia/Kolkata

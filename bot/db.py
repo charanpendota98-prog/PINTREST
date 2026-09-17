@@ -1,0 +1,168 @@
+"""SQLite storage: products queue, posted pins, logs."""
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+_lock = threading.Lock()
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS products (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    source        TEXT NOT NULL,              -- amazon | meesho | flipkart | other
+    url           TEXT NOT NULL,              -- original product url
+    affiliate_url TEXT NOT NULL DEFAULT '',   -- monetized link that goes on the pin
+    title         TEXT NOT NULL,
+    price         TEXT NOT NULL DEFAULT '',
+    currency      TEXT NOT NULL DEFAULT 'INR',
+    image_url     TEXT NOT NULL DEFAULT '',
+    image_path    TEXT NOT NULL DEFAULT '',   -- local downloaded/generated pin image
+    pin_image     TEXT NOT NULL DEFAULT '',   -- generated designed pin graphic
+    video_url     TEXT NOT NULL DEFAULT '',
+    category      TEXT NOT NULL DEFAULT '',
+    seo_text      TEXT NOT NULL DEFAULT '',   -- final description for pinterest
+    status        TEXT NOT NULL DEFAULT 'queued',  -- queued|posted|failed|skipped
+    error         TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS posts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id     INTEGER NOT NULL,
+    pin_id         TEXT NOT NULL DEFAULT '',
+    board_id       TEXT NOT NULL DEFAULT '',
+    scheduled_for  TEXT NOT NULL DEFAULT '',
+    posted_at      TEXT NOT NULL DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'pending', -- pending|posted|failed
+    error          TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS logs (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts      TEXT NOT NULL,
+    level   TEXT NOT NULL,
+    message TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+"""
+
+
+def utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+class DB:
+    def __init__(self, path: str | Path):
+        self.path = str(path)
+        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        with self._conn() as c:
+            c.executescript(SCHEMA)
+
+    def _conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.path, timeout=15)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
+
+    # ------------------------------------------------------------------ logs
+    def log(self, level: str, message: str) -> None:
+        with _lock, self._conn() as c:
+            c.execute(
+                "INSERT INTO logs(ts, level, message) VALUES(?,?,?)",
+                (utcnow(), level.upper(), message),
+            )
+
+    def recent_logs(self, limit: int = 200) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT * FROM logs ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # -------------------------------------------------------------- products
+    def add_product(self, **fields: Any) -> int:
+        fields.setdefault("status", "queued")
+        fields.setdefault("created_at", utcnow())
+        cols = ", ".join(fields)
+        marks = ", ".join("?" for _ in fields)
+        with _lock, self._conn() as c:
+            cur = c.execute(
+                f"INSERT INTO products({cols}) VALUES({marks})", list(fields.values())
+            )
+            return int(cur.lastrowid)
+
+    def url_exists(self, url: str) -> bool:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT 1 FROM products WHERE url=? LIMIT 1", (url,)
+            ).fetchone()
+        return row is not None
+
+    def pending_products(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT * FROM products WHERE status='queued' ORDER BY id LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def all_products(self, limit: int = 500) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT * FROM products ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_product(self, pid: int, **fields: Any) -> None:
+        if not fields:
+            return
+        sets = ", ".join(f"{k}=?" for k in fields)
+        with _lock, self._conn() as c:
+            c.execute(
+                f"UPDATE products SET {sets} WHERE id=?",
+                [*fields.values(), pid],
+            )
+
+    def stats(self) -> dict[str, Any]:
+        with self._conn() as c:
+            q = c.execute(
+                "SELECT status, COUNT(*) n FROM products GROUP BY status"
+            ).fetchall()
+            total = sum(r["n"] for r in q)
+            by_status = {r["status"]: r["n"] for r in q}
+        return {
+            "total": total,
+            "queued": by_status.get("queued", 0),
+            "posted": by_status.get("posted", 0),
+            "failed": by_status.get("failed", 0),
+            "skipped": by_status.get("skipped", 0),
+        }
+
+    # ----------------------------------------------------------------- posts
+    def add_post(self, **fields: Any) -> int:
+        cols = ", ".join(fields)
+        marks = ", ".join("?" for _ in fields)
+        with _lock, self._conn() as c:
+            cur = c.execute(
+                f"INSERT INTO posts({cols}) VALUES({marks})", list(fields.values())
+            )
+            return int(cur.lastrowid)
+
+    def update_post(self, post_id: int, **fields: Any) -> None:
+        if not fields:
+            return
+        sets = ", ".join(f"{k}=?" for k in fields)
+        with _lock, self._conn() as c:
+            c.execute(f"UPDATE posts SET {sets} WHERE id=?", [*fields.values(), post_id])
+
+    def recent_posts(self, limit: int = 200) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute(
+                """SELECT p.*, pr.title, pr.source, pr.affiliate_url, pr.pin_image
+                   FROM posts p JOIN products pr ON pr.id=p.product_id
+                   ORDER BY p.id DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]

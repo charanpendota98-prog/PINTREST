@@ -1,0 +1,334 @@
+"""PinDrop Pro CLI.
+
+Usage:
+  python -m bot auth                     # connect your Pinterest account (local browser)
+  python -m bot auth-url                 # headless step 1: print login URL
+  python -m bot auth --code <CODE>       # headless step 2: finish login with code
+  python -m bot check                    # verify Pinterest connection & board
+  python -m bot add <url> [url ...]      # scrape products & add to queue
+  python -m bot add-csv products.csv     # bulk import (url,title,price,image_url[,video_url])
+  python -m bot queue                    # show current queue
+  python -m bot post [count]             # post N pins right now (default 1)
+  python -m bot run                      # start 24x7 human-like scheduler
+  python -m bot design-test              # generate a sample pin graphic
+  python -m bot dashboard                # web control panel
+"""
+from __future__ import annotations
+
+import csv
+import http.server
+import logging
+import sys
+import threading
+import urllib.parse
+import webbrowser
+
+from . import APP_NAME, __version__
+from .config import load_config
+from .db import DB
+from .engine import Engine
+from .pinterest_api import PinterestAPI, PinterestError
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)-18s %(levelname)-7s %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("pindrop")
+
+
+def _banner() -> None:
+    print(f"""
+╔══════════════════════════════════════════════════╗
+║   📌 {APP_NAME} v{__version__}  — Pinterest Affiliate Bot   ║
+║   scrape → affiliate link → pin design → post    ║
+╚══════════════════════════════════════════════════╝""")
+
+
+# --------------------------------------------------------------------- auth
+def _verifier_path(cfg):
+    return cfg.token_path.parent / "pkce_verifier.txt"
+
+
+def _print_app_hint(api) -> int:
+    print("❌ Set PINTEREST_APP_ID and PINTEREST_APP_SECRET in .env first.")
+    print("   1. Create an app at https://developers.pinterest.com/apps/")
+    print("   2. Scopes: boards:read boards:write pins:read pins:write user_accounts:read")
+    print(f"   3. Redirect URI in app settings: {api.cfg.get('pinterest.redirect_uri')}")
+    return 1
+
+
+class _CallbackHandler(http.server.BaseHTTPRequestHandler):
+    code: str = ""
+
+    def do_GET(self):  # noqa: N802
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        _CallbackHandler.code = qs.get("code", [""])[0]
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.end_headers()
+        self.wfile.write(
+            "<h2 style='font-family:sans-serif'>✅ PinDrop Pro connected! "
+            "You can close this tab and return to the terminal.</h2>".encode("utf-8")
+        )
+
+    def log_message(self, *a):  # silence
+        pass
+
+
+def cmd_auth(cfg) -> int:
+    """Automatic browser flow — works when you can open localhost in a browser."""
+    api = PinterestAPI(cfg)
+    if not (api.app_id and api.app_secret):
+        return _print_app_hint(api)
+    url, verifier = api.auth_url()
+    _verifier_path(cfg).parent.mkdir(parents=True, exist_ok=True)
+    _verifier_path(cfg).write_text(verifier)
+
+    print("\n1) Open this URL in your browser & click ALLOW:\n")
+    print(f"   {url}\n")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
+    redirect = urllib.parse.urlparse(cfg.get("pinterest.redirect_uri"))
+    server = http.server.HTTPServer(("127.0.0.1", redirect.port or 8888), _CallbackHandler)
+    threading.Thread(target=server.handle_request, daemon=True).start()
+    print("2) Waiting for Pinterest callback on", cfg.get("pinterest.redirect_uri"), "…")
+    import time
+    for _ in range(600):  # up to 5 minutes
+        if _CallbackHandler.code:
+            break
+        time.sleep(0.5)
+    if not _CallbackHandler.code:
+        print("\n⏱ Timed out (no local browser?). Use the headless flow instead:")
+        print("   python -m bot auth-url     # prints a URL you open anywhere")
+        print("   python -m bot auth --code <CODE>")
+        return 1
+    try:
+        api.exchange_code(_CallbackHandler.code, verifier)
+        acc = api.user_account()
+        print(f"\n✅ Connected as @{acc.get('username')} — token saved to data/pinterest_token.json")
+        return 0
+    except PinterestError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+
+def cmd_auth_url(cfg) -> int:
+    """Headless step 1 — print the authorization URL & save the PKCE verifier."""
+    api = PinterestAPI(cfg)
+    if not (api.app_id and api.app_secret):
+        return _print_app_hint(api)
+    url, verifier = api.auth_url()
+    _verifier_path(cfg).parent.mkdir(parents=True, exist_ok=True)
+    _verifier_path(cfg).write_text(verifier)
+    print("\nOpen this URL in ANY browser, log in & click ALLOW:\n")
+    print(f"   {url}\n")
+    print("Pinterest will redirect to a page that may fail to load — that's OK.")
+    print("Copy the 'code' from that redirect URL, then run:\n")
+    print("   python -m bot auth --code <CODE>")
+    return 0
+
+
+def cmd_auth_code(cfg, code: str) -> int:
+    """Headless step 2 — exchange the pasted code using the saved verifier."""
+    api = PinterestAPI(cfg)
+    vp = _verifier_path(cfg)
+    if not vp.exists():
+        print("❌ No pending login. Run `python -m bot auth-url` first.")
+        return 1
+    verifier = vp.read_text().strip()
+    try:
+        api.exchange_code(code.strip(), verifier)
+        vp.unlink(missing_ok=True)
+        acc = api.user_account()
+        print(f"✅ Connected as @{acc.get('username')} — token saved to data/pinterest_token.json")
+        return 0
+    except PinterestError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+
+# --------------------------------------------------------------------- cmds
+def cmd_check(cfg) -> int:
+    api = PinterestAPI(cfg)
+    if not api.configured:
+        print("❌ Not configured. Add PINTEREST_APP_ID/SECRET to .env, then `python -m bot auth`.")
+        return 1
+    try:
+        acc = api.user_account()
+        print(f"✅ Pinterest connected: @{acc.get('username')} "
+              f"| followers: {acc.get('follower_count', 0)}")
+        board = api.ensure_board(cfg.get("pinterest.board_name"))
+        print(f"✅ Board ready: '{cfg.get('pinterest.board_name')}' (id={board})")
+        print(f"   Amazon tag: {cfg.amazon_tag or '—'} | EarnKaro: "
+              f"{'yes' if cfg.get('affiliate.earnkaro_prefix') else '—'} | Cuelinks: "
+              f"{'yes' if cfg.get('affiliate.cuelinks_template') else '—'} | Meesho affid: "
+              f"{cfg.get('affiliate.meesho_affid') or '—'}")
+        return 0
+    except PinterestError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+
+def cmd_add(cfg, urls: list[str]) -> int:
+    eng = Engine(cfg)
+    ok = 0
+    for i, url in enumerate(urls):
+        try:
+            pid = eng.ingest_url(url)
+            print(f"{'✅' if pid > 0 else '⏭ '} {url}  (id={pid})")
+            ok += pid > 0
+        except ValueError as exc:
+            print(f"❌ {url}\n   {exc}")
+        if i < len(urls) - 1:
+            eng.scraper.polite_wait()
+    print(f"\n{ok}/{len(urls)} products added to queue.")
+    return 0 if ok else 1
+
+
+def cmd_add_csv(cfg, path: str) -> int:
+    """Bulk import. CSV columns: url, title, price, image_url, video_url(optional).
+    Only `url` is required — missing fields are scraped/derived."""
+    eng = Engine(cfg)
+    db = DB(cfg.db_path)
+    added = 0
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        for row in csv.DictReader(fh):
+            url = (row.get("url") or "").strip()
+            if not url or db.url_exists(url):
+                continue
+            title = (row.get("title") or "").strip()
+            price = (row.get("price") or "").strip()
+            image_url = (row.get("image_url") or "").strip()
+            try:
+                if title and image_url:
+                    # direct row — skip scraping entirely
+                    from .affiliate import AffiliateLinker
+                    from .engine import build_seo_text
+                    from .pin_designer import PinDesigner
+                    from .scraper import detect_source
+                    import time
+                    src = detect_source(url)
+                    linker = AffiliateLinker(cfg)
+                    aff_url, network = linker.convert(url, src)
+                    prod = type("P", (), {"image_url": image_url, "title": title,
+                                          "price": price, "currency": "INR"})()
+                    img_path = eng.scraper.download_image(prod, cfg.media_dir)
+                    if not img_path:
+                        raise ValueError("image download failed")
+                    pin_path = cfg.media_dir / f"pin_{int(time.time()*1000)}.jpg"
+                    PinDesigner(cfg).create(img_path, title, price, pin_path, network)
+                    seo = build_seo_text(cfg, title, price, "INR", network)
+                    db.add_product(source=src, url=url, affiliate_url=aff_url, title=title,
+                                   price=price, image_url=image_url, image_path=img_path,
+                                   pin_image=str(pin_path), video_url=(row.get("video_url") or ""),
+                                   seo_text=seo)
+                    added += 1
+                    print(f"✅ {title[:55]}")
+                else:
+                    pid = eng.ingest_url(url)
+                    added += pid > 0
+            except (ValueError, PinterestError) as exc:
+                print(f"❌ {url} — {exc}")
+            eng.scraper.polite_wait()
+    print(f"\n{added} products imported from {path}")
+    return 0 if added else 1
+
+
+def cmd_queue(cfg) -> int:
+    db = DB(cfg.db_path)
+    stats = db.stats()
+    print(f"📊 total={stats['total']} queued={stats['queued']} "
+          f"posted={stats['posted']} failed={stats['failed']} skipped={stats['skipped']}\n")
+    for p in db.all_products(limit=50):
+        print(f"  #{p['id']:>3} [{p['status']:<7}] ({p['source']:<8}) {p['title'][:62]}")
+    return 0
+
+
+def cmd_post(cfg, count: int) -> int:
+    eng = Engine(cfg)
+    if not eng.api.configured:
+        print("❌ Pinterest not connected. Run: python -m bot auth")
+        return 1
+    posted = eng.post_batch(count)
+    print(f"\n🎉 {len(posted)} pin(s) posted!")
+    return 0 if posted else 1
+
+
+def cmd_design_test(cfg) -> int:
+    """Generate a sample pin so you can preview the design quality."""
+    from PIL import Image
+    from .pin_designer import PinDesigner
+    import random
+
+    # build a fake product photo
+    img = Image.new("RGB", (800, 800), (250, 244, 235))
+    from PIL import ImageDraw
+    d = ImageDraw.Draw(img)
+    for i in range(0, 800, 40):
+        d.line([(i, 0), (i + 200, 800)], fill=(235, 225, 210), width=6)
+    d.rounded_rectangle([150, 150, 650, 650], 40, fill=(30, 90, 200))
+    d.rounded_rectangle([200, 200, 600, 600], 30, fill=(45, 110, 225))
+    d.ellipse([300, 300, 500, 500], fill=(255, 255, 255, 200))
+    sample = cfg.media_dir / "sample_product.jpg"
+    img.save(sample, quality=92)
+
+    out = cfg.media_dir / "sample_pin.jpg"
+    designer = PinDesigner(cfg)
+    path = designer.create(
+        str(sample),
+        "boAt Airdopes 141 Bluetooth Truly Wireless in Ear Earbuds with 42H Playtime",
+        "₹1,099",
+        out,
+        "amazon",
+    )
+    print(f"✅ Sample pin created: {path}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    cfg = load_config()
+    _banner()
+
+    if not argv:
+        print(__doc__)
+        return 0
+    cmd, rest = argv[0], argv[1:]
+
+    if cmd == "auth":
+        if "--code" in rest:
+            return cmd_auth_code(cfg, rest[rest.index("--code") + 1])
+        return cmd_auth(cfg)
+    if cmd == "auth-url":
+        return cmd_auth_url(cfg)
+    if cmd == "check":
+        return cmd_check(cfg)
+    if cmd == "add" and rest:
+        return cmd_add(cfg, rest)
+    if cmd == "add-csv" and rest:
+        return cmd_add_csv(cfg, rest[0])
+    if cmd == "queue":
+        return cmd_queue(cfg)
+    if cmd == "post":
+        return cmd_post(cfg, int(rest[0]) if rest else 1)
+    if cmd == "run":
+        Engine(cfg).run_forever()
+        return 0
+    if cmd == "design-test":
+        return cmd_design_test(cfg)
+    if cmd == "dashboard":
+        from .dashboard import serve
+        serve(cfg)
+        return 0
+
+    print(f"Unknown command: {cmd}\n")
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
