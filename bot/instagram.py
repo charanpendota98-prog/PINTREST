@@ -146,3 +146,29 @@ class InstagramAPI:
         )
         # reels process asynchronously; publish anyway
         return self._publish(c["id"])
+
+    # ------------------------------------------------------- engagement
+    def auto_reply_links(self, reply: str = "🔗 Link in bio! Tap our bio & grab "
+                                             "the deal 😍") -> int:
+        """Auto-answer 'link?' comments — the engagement trick top pages use
+        (boosts reach, drives bio clicks). Needs instagram_manage_comments."""
+        n = 0
+        try:
+            medias = self._get(f"{self.ig_user_id}/media", fields="id").get("data", [])[:8]
+        except InstagramError:
+            return 0
+        for m in medias:
+            try:
+                comments = self._get(f"{m['id']}/comments", fields="id,text").get("data", [])
+            except InstagramError:
+                continue
+            for c in comments:
+                if "link" in (c.get("text") or "").lower():
+                    try:
+                        self._post(f"{m['id']}/comments", message=reply)
+                        n += 1
+                    except InstagramError:
+                        continue
+        if n:
+            log.info("Auto-replied to %d 'link' comments", n)
+        return n

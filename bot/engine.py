@@ -138,11 +138,21 @@ class Engine:
         # …otherwise AUTO-GENERATE a viral reel from the photos (the 2026 trick)
         if not video_path and self.cfg.get("video.auto_reel", True):
             try:
+                from . import voiceover as vo
                 hook = hook_for(label, prod.title, datetime.now(self.tz).day)
+                lang = str(self.cfg.get("video.lang", "en-IN"))
+                script = vo.script_for(lang, prod.title, label)
+                vo_path = vo.generate(script, lang,
+                                      self.cfg.media_dir / f"vo_{int(time.time()*1000)}.mp3")
+                vo_secs = vo.estimate_seconds(script) if vo_path else 0.0
+                music = str(self.cfg.get("video.music", "") or "")
                 reel_path = self.cfg.media_dir / f"reel_{int(time.time()*1000)}.mp4"
                 video_path = self.reel.make(local_imgs[0], hook, prod.title, label,
-                                            reel_path, network)
-                self.db.log("INFO", f"Auto-reel generated: {reel_path.name}")
+                                            reel_path, network,
+                                            voiceover=vo_path or None,
+                                            music=music or None, vo_seconds=vo_secs)
+                self.db.log("INFO", f"Auto-reel {'with voiceover' if vo_path else ''} "
+                                    f"generated: {reel_path.name}")
             except Exception as exc:  # noqa: BLE001 — reel is a bonus, never fatal
                 self.db.log("WARN", f"Reel generation failed: {exc}")
 
@@ -407,7 +417,11 @@ class Engine:
                 gap_s *= 0.6 if hours.get(utc_h, 0) > avg else 1.3
             try:
                 self.post_next()
+                if self.ig.enabled and self.ig.configured:
+                    self.ig.auto_reply_links()  # answer "link?" comments (reach trick)
             except PinterestError:
                 time.sleep(300)  # back off on API errors
                 continue
+            except InstagramError:
+                pass
             time.sleep(max(60, gap_s))

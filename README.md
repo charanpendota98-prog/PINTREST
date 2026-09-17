@@ -200,6 +200,26 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🎬 "Amazon photos/videos tho top vallu em chestunnaru?" — Gap Analysis
+
+How the big faceless channels actually operate, and our coverage:
+
+| They do… | Why | We have it? |
+|---|---|---|
+| Download Amazon gallery photos & brand videos | raw material | ✅ scraper (gallery + video + MRP) |
+| Edit 5-8s reels: hook → zoom → price → CTA | watch-time | ✅ video_maker |
+| **Add voiceover** ("only ₹1099! link in bio!") | voice = trust + retention | ✅ **voiceover.py** (free neural TTS: English/Hindi/**Telugu**) mixed into reel + burned subtitles |
+| Add trending/BGM audio | retention | ✅ mix your own mp3 (`video.music`) — *licensed trending audio can't be added via API; top creators add it in-app or use royalty-free* |
+| Post pin via Pinterest scheduler/API | consistency | ✅ official API + scheduler |
+| Post IG reel + "comment LINK" bait | reach | ✅ IG module + **auto-reply to "link" comments** |
+| Use affiliate tag/links everywhere | money | ✅ 6-network affiliate engine |
+| As Amazon Associates, product images are OK to use for promotion | policy | ✅ that's exactly what the program allows (never claim ownership, add #ad) |
+| Reply to every comment fast | engagement signal | ✅ IG auto-reply loop |
+
+**Nothing big is missing anymore.** The only manual options left are intentional
+(human-only by platform design): clicking ALLOW once, adding licensed trending
+audio in-app if you want it, and replying to DMs.
+
 ## 📡 Ultimate Layer — alerts, buyer list, self-learning, one-command deploy
 
 - **🔔 Telegram alerts** — phone lo notification when pins go live + daily

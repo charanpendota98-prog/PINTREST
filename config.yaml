@@ -32,6 +32,8 @@ scraping:
 video:
   auto_reel: true          # no product video on the page? auto-generate a
                            # viral 6s reel from the photos (hook → zoom → CTA)
+  lang: en-IN              # voiceover: en-IN | hi-IN | te-IN (free neural TTS)
+  music: ""                # optional BGM mp3 path, ducked under the voiceover
 
 autopilot:
   auto_source: true        # ZERO-TOUCH: hunt trending products when queue is low
