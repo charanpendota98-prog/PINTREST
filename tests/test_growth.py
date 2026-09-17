@@ -119,3 +119,15 @@ class TestConversion(unittest.TestCase):
         self.assertIn("63% OFF", txt)
         self.assertIn("Diwali Deals", txt)
         self.assertIn("#ad", txt)
+
+
+class TestMusicMaker(unittest.TestCase):
+    def test_compose(self):
+        import tempfile, wave
+        from pathlib import Path
+        from bot import music_maker
+        with tempfile.TemporaryDirectory() as tmp:
+            out = music_maker.compose(Path(tmp) / "bgm.wav", seconds=4)
+            with wave.open(out) as w:
+                self.assertEqual(w.getnchannels(), 1)
+                self.assertGreater(w.getnframes(), 22050 * 3)  # ~4s audio

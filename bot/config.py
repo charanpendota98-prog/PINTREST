@@ -95,6 +95,7 @@ DEFAULTS: dict[str, Any] = {
         "auto_reel": True,   # no product video on the page? auto-generate a viral reel from photos
         "lang": "en-IN",     # voiceover language: en-IN | hi-IN | te-IN
         "music": "",         # optional BGM mp3 path (ducked under voiceover)
+        "auto_music": True,  # no audio anywhere? compose ORIGINAL copyright-free BGM
     },
     "autopilot": {
         "auto_source": True,    # hunt trending products automatically when queue is low

@@ -74,7 +74,19 @@ def pick_music(cfg) -> str:
     single = str(cfg.get("video.music", "") or "")
     if single and _P(single).exists():
         cands.append(single)
-    return _r.choice(cands) if cands else ""
+    if cands:
+        return _r.choice(cands)
+    # nothing uploaded? compose ORIGINAL royalty-free BGM on the fly
+    if cfg.get("video.auto_music", True):
+        try:
+            from . import music_maker
+            auto = mdir / "auto_bgm.wav"
+            if not auto.exists():
+                music_maker.compose(auto, seconds=14)
+            return str(auto)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Auto-BGM compose failed: %s", exc)
+    return ""
 
 
 class ReelMaker:

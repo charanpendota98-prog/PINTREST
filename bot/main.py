@@ -410,6 +410,17 @@ def cmd_ig_check(cfg) -> int:
         return 1
 
 
+def cmd_music(cfg) -> int:
+    """Compose an ORIGINAL, 100% copyright-free BGM loop (no downloads!)."""
+    from . import music_maker
+    out = cfg.media_dir.parent / "music" / "auto_bgm.wav"
+    music_maker.compose(out, seconds=14)
+    print(f"\n🎼 Original BGM composed (C–G–Am–F lo-fi loop): {out}")
+    print("   Safe on every platform — it's our own music. Reels will use it")
+    print("   automatically. Your uploaded audio (data/music/) always wins.")
+    return 0
+
+
 def cmd_trends(cfg) -> int:
     """Show the winner-niche priority list (what top channels push)."""
     from .trends import describe, WINNER_NICHES
@@ -514,6 +525,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_keywords(cfg, rest)
     if cmd == "trends":
         return cmd_trends(cfg)
+    if cmd == "music":
+        return cmd_music(cfg)
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":
