@@ -18,41 +18,33 @@ from zoneinfo import ZoneInfo
 
 from .affiliate import AffiliateLinker, price_label
 from .db import DB
+from .growth import hashtag_mix, hook_for, peak_window, seo_title
 from .instagram import InstagramAPI, InstagramError
 from .pinterest_api import PinterestAPI, PinterestError
 from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
+from .video_maker import ReelMaker
 
 log = logging.getLogger("pindrop.engine")
 
 
 def build_seo_text(cfg, title: str, price: str, currency: str, source: str) -> str:
-    """SEO-rich Pinterest description with hashtags."""
+    """SEO-rich Pinterest description: hook + benefits + tiered hashtag mix."""
     label = price_label(price, currency) or "Best price"
-    words = re.findall(r"[A-Za-z]{3,}", title.lower())[:6]
-    tags = [f"#{w}" for w in dict.fromkeys(words)]
-    extra = cfg.get("seo.extra_hashtags", []) or []
-    if cfg.get("seo.hashtags", True):
-        tags = (tags + list(extra))[: int(cfg.get("seo.max_hashtags", 8))]
-    hashtags = " ".join(tags)
+    hashtags = hashtag_mix(title, source, int(cfg.get("seo.max_hashtags", 8)))
     template = cfg.get("seo.description_template")
-    return template.format(title=title, price=label, hashtags=hashtags).strip()
+    text = template.format(title=title, price=label, hashtags=hashtags).strip()
+    # FTC / Pinterest policy: always disclose affiliate links
+    if "#ad" not in text:
+        text += "\n#ad #affiliate"
+    return text
 
 
-def _hashtags(cfg, title: str) -> str:
-    words = re.findall(r"[A-Za-z]{3,}", title.lower())[:6]
-    tags = [f"#{w}" for w in dict.fromkeys(words)]
-    extra = cfg.get("seo.extra_hashtags", []) or []
-    if cfg.get("seo.hashtags", True):
-        tags = (tags + list(extra))[: int(cfg.get("seo.max_hashtags", 8))]
-    return " ".join(tags)
-
-
-def build_ig_caption(cfg, title: str, price: str, currency: str) -> str:
-    """Instagram caption — no clickable links exist on IG, so drive to bio."""
+def build_ig_caption(cfg, title: str, price: str, currency: str, source: str = "amazon") -> str:
+    """Instagram caption — no clickable links on IG, drive comments + bio."""
     label = price_label(price, currency) or "Best price"
     return cfg.get("instagram.caption_template").format(
-        title=title, price=label, hashtags=_hashtags(cfg, title)
+        title=title, price=label, hashtags=hashtag_mix(title, source)
     ).strip()
 
 
@@ -63,6 +55,7 @@ class Engine:
         self.scraper = Scraper(cfg)
         self.linker = AffiliateLinker(cfg)
         self.designer = PinDesigner(cfg)
+        self.reel = ReelMaker(cfg)
         self.api = PinterestAPI(cfg)
         self.ig = InstagramAPI(cfg)
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
@@ -91,6 +84,7 @@ class Engine:
             )
 
         aff_url, network = self.linker.convert(url, prod.source)
+        label = price_label(prod.price, prod.currency)
 
         # download full gallery (up to max_images photos)
         max_imgs = max(1, int(self.cfg.get("scraping.max_images", 3)))
@@ -102,18 +96,27 @@ class Engine:
         if not local_imgs:
             raise ValueError("Product found but image download failed.")
 
-        # download product video when the page exposes one
+        # video: prefer the page's real product video…
         video_path = ""
         if prod.video_url:
             video_path = self.scraper.download_video(prod.video_url, self.cfg.media_dir)
             if video_path:
                 self.db.log("INFO", f"Video downloaded for: {prod.title[:50]}")
+        # …otherwise AUTO-GENERATE a viral reel from the photos (the 2026 trick)
+        if not video_path and self.cfg.get("video.auto_reel", True):
+            try:
+                hook = hook_for(label, prod.title, datetime.now(self.tz).day)
+                reel_path = self.cfg.media_dir / f"reel_{int(time.time()*1000)}.mp4"
+                video_path = self.reel.make(local_imgs[0], hook, prod.title, label,
+                                            reel_path, network)
+                self.db.log("INFO", f"Auto-reel generated: {reel_path.name}")
+            except Exception as exc:  # noqa: BLE001 — reel is a bonus, never fatal
+                self.db.log("WARN", f"Reel generation failed: {exc}")
 
         # how many pin variations?
         per_product = max(1, int(self.cfg.get("posting.pins_per_product", 2)))
         n_variants = min(per_product, len(local_imgs)) or 1
 
-        label = price_label(prod.price, prod.currency)
         seo = build_seo_text(self.cfg, prod.title, prod.price, prod.currency, network)
         templates = list(TEMPLATES)
         random.shuffle(templates)
@@ -168,20 +171,25 @@ class Engine:
             scheduled_for=scheduled_for.isoformat() if scheduled_for else "",
         )
         try:
+            # keyword-stuffed SEO title (Pinterest = search engine)
+            seo_t = seo_title(product["title"],
+                              price_label(product["price"], product["currency"]),
+                              product["source"])
             video_file = product.get("video_path", "") or ""
             if video_file and Path(video_file).exists():
-                # video pin path — real video uploaded to Pinterest
+                # video pin path — real / auto-generated reel uploaded to Pinterest
                 media_id = self.api.upload_video(video_file)
                 pin = self.api.create_video_pin(
                     board_id, media_id, product["affiliate_url"],
-                    product["title"], product["seo_text"], scheduled_for,
+                    seo_t, product["seo_text"], scheduled_for,
                 )
             else:
                 pin = self.api.create_image_pin(
                     board_id=board_id,
                     link=product["affiliate_url"],
-                    title=product["title"],
+                    title=seo_t,
                     description=product["seo_text"],
+                    alt_text=product["title"][:500],
                     image_path=product.get("pin_image") or product.get("image_path"),
                     scheduled_for=scheduled_for,
                 )
@@ -268,33 +276,32 @@ class Engine:
         return (mins + random.random() * jitter) * 60
 
     def run_forever(self) -> None:  # pragma: no cover - long loop
-        """Daily scheduler: posts pins_per_day pins between start_hour..end_hour."""
+        """24×7 scheduler: posts inside PEAK traffic windows (or configured hours)."""
         per_day = int(self.cfg.get("posting.pins_per_day", 8))
+        peak = bool(self.cfg.get("posting.peak_mode", True))
         start_h = int(self.cfg.get("posting.start_hour", 9))
         end_h = int(self.cfg.get("posting.end_hour", 22))
-        self.db.log("INFO", f"Scheduler started: {per_day} pins/day, {start_h}:00-{end_h}:00 IST")
-        print(f"\n🤖 Scheduler running — {per_day} pins/day between {start_h}:00 and {end_h}:00 IST. Ctrl+C to stop.\n")
+        self.db.log("INFO", f"Scheduler started: {per_day} pins/day, "
+                            f"{'PEAK windows' if peak else f'{start_h}:00-{end_h}:00'} IST")
+        print(f"\n🤖 Scheduler running 24×7 — {per_day} pins/day in "
+              f"{'peak traffic windows' if peak else f'{start_h}:00-{end_h}:00'} IST. Ctrl+C to stop.\n")
 
         while True:
             now = datetime.now(self.tz)
+            w_start, w_end = peak_window(now) if peak else (start_h, end_h)
             queue = self.db.pending_products(limit=100)
             if not queue:
                 self.db.log("INFO", "Queue empty — sleeping 30 min. Add products via dashboard/CSV.")
                 time.sleep(1800)
                 continue
 
-            if not (start_h <= now.hour < end_h):
-                # sleep until window opens
-                wake = now.replace(hour=start_h, minute=0, second=0, microsecond=0)
-                if wake <= now:
-                    wake += timedelta(days=1)
-                sleep_s = (wake - now).total_seconds()
-                self.db.log("INFO", f"Outside posting window — sleeping {sleep_s/3600:.1f}h")
-                time.sleep(min(sleep_s, 3600))
+            if not (w_start <= now.hour < w_end):
+                self.db.log("INFO", f"Outside peak window ({w_start}:00-{w_end}:00) — napping 20 min")
+                time.sleep(1200)
                 continue
 
             # spread today's pins across remaining window hours
-            remaining_hours = max(1, end_h - now.hour - now.minute / 60)
+            remaining_hours = max(1, w_end - now.hour - now.minute / 60)
             todo = min(per_day, len(queue))
             gap_s = min(self._human_gap(), remaining_hours * 3600 / max(todo, 1))
             try:

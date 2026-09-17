@@ -24,7 +24,8 @@ DEFAULTS: dict[str, Any] = {
         "min_gap_minutes": 40,    # minimum gap between two pins
         "jitter_minutes": 25,     # random extra delay (looks human)
         "schedule_days_ahead": 0, # 0 = post immediately; 1-14 = schedule ahead
-        "pins_per_product": 2,    # pin variations per product (different photos+designs)
+        "pins_per_product": 3,    # pin variations per product (different photos+designs)
+        "peak_mode": True,        # post only in peak IST traffic windows
     },
     "scraping": {
         "delay_seconds": 4.0,
@@ -83,6 +84,9 @@ DEFAULTS: dict[str, Any] = {
             "🔥 {title}\n💰 Price: {price}\n"
             "🛒 Comment 'LINK' — link in bio!\n{hashtags}"
         ),
+    },
+    "video": {
+        "auto_reel": True,   # no product video? auto-generate a viral reel from photos
     },
     "storage": {
         "db_path": "data/pindrop.db",

@@ -1,0 +1,107 @@
+"""Growth / viral-tricks engine.
+
+Everything here is distilled from what top affiliate creators actually do in
+2026 (see README "Viral Tricks Playbook"):
+
+  * curiosity HOOKS in titles/captions ("Wait for the price 👀")
+  * keyword-stuffed SEO titles (Pinterest is a SEARCH engine)
+  * tiered hashtag mix (huge + medium + niche)
+  * posting in PEAK windows (IST)
+  * roundup / "3 finds under ₹X" value pins (convert better than raw product pins)
+  * fresh variations — never the same pin twice
+"""
+from __future__ import annotations
+
+import random
+from datetime import datetime
+
+YEAR = datetime.now().year
+
+# ------------------------------------------------------------- hooks (IG/reels)
+HOOKS = [
+    "Wait for the price 👀",
+    "This looks WAY more expensive than it is 😳",
+    "Amazon didn't want you to find this 🤫",
+    "POV: you found the perfect {kw} 🛍️",
+    "I was today years old when I found this 😭",
+    "Rating viral finds until I go broke — day {n}",
+    "The {kw} upgrade your desk/home needed ✨",
+    "Under {price}?! Take my money 💸",
+    "3 reasons this {kw} is worth it ⬇️",
+    "Don't buy a {kw} until you see this 🚫",
+]
+
+# ------------------------------------------------- keyword bank (Pinterest SEO)
+POWER_KEYWORDS = [
+    "viral find", "budget pick", "amazon find", "must have", "deal alert",
+    "aesthetic", "trending", "gift idea", "home upgrade", "student budget",
+]
+PRICE_KEYWORDS = ["under 500", "under 999", "under 1500", "low price", "best price"]
+SOURCE_KEYWORDS = {
+    "amazon": ["amazon finds", "amazon deals", "amazon india"],
+    "meesho": ["meesho finds", "meesho haul", "meesho fashion"],
+    "flipkart": ["flipkart deals", "flipkart sale"],
+    "other": ["online shopping deals", "best deals india"],
+}
+
+
+def seo_title(title: str, price_label: str, source: str) -> str:
+    """Keyword-rich Pinterest title, ≤100 chars.
+
+    Pattern:  <clean product name> | <source kw> | <price kw> (year)
+    """
+    clean = " ".join(title.split())[:58]
+    src_kw = random.choice(SOURCE_KEYWORDS.get(source, SOURCE_KEYWORDS["other"]))
+    price_kw = random.choice(PRICE_KEYWORDS) if price_label else random.choice(POWER_KEYWORDS)
+    extra = random.choice(POWER_KEYWORDS)
+    cand = f"{clean} | {src_kw} | {price_kw} {extra} {YEAR}"
+    return cand[:100]
+
+
+def hook_for(price_label: str, title: str, day: int) -> str:
+    kw = " ".join(title.split()[:2]).lower() or "find"
+    h = random.choice(HOOKS)
+    return h.format(kw=kw, price=price_label.replace("₹", "₹") or "₹499", n=day)
+
+
+def hashtag_mix(title: str, source: str, max_tags: int = 8) -> str:
+    """Tiered mix: 2 huge + 3 medium + niche words from the title."""
+    huge = ["#viral", "#trending", "#deals"]
+    medium = SOURCE_KEYWORDS.get(source, ["#onlineshopping"]) + ["#budgetfinds", "#musthaves"]
+    niche = [f"#{w}" for w in dict.fromkeys(
+        x.lower() for x in title.split() if len(x) > 4 and x.isalpha())][:4]
+    pool = []
+    for group in (huge, medium, niche):
+        random.shuffle(group)
+    pool += huge[:2]
+    pool += ["#" + t.replace(" ", "") for t in medium[:3]]
+    pool += niche[:3]
+    seen, out = set(), []
+    for t in pool:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return " ".join(out[:max_tags])
+
+
+# ------------------------------------------------------------- peak windows
+def peak_window(now: datetime) -> tuple[int, int]:
+    """Best IST posting window for the given day (weekend mornings run longer)."""
+    if now.weekday() >= 5:           # Sat/Sun
+        return (10, 13) if now.hour < 15 else (18, 22)
+    return (12, 14) if now.hour < 16 else (19, 22)
+
+
+# ------------------------------------------------------------- roundups
+ROUNDUP_TITLES = [
+    "3 Viral Finds Under {price} You Need 😍",
+    "Top 3 Budget {kw} Picks This Week 🔥",
+    "I Tested 3 Viral {kw} Deals — #2 Shocked Me",
+    "{kw} Haul: 3 Deals Under {price} 🛒",
+]
+
+
+def roundup_title(price_label: str, kw: str) -> str:
+    return random.choice(ROUNDUP_TITLES).format(
+        price=price_label or "₹999", kw=kw or "Amazon"
+    ).strip()

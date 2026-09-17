@@ -49,9 +49,14 @@ class TestAffiliate(unittest.TestCase):
 
     def test_amazon_tag_added(self):
         url = "https://www.amazon.in/dp/B08N2Z7R1L?ref=sr_1_1"
-        out, net = self.l.convert(url)
+        out, net = self.l.convert(url, utm=False)
         self.assertEqual(net, "amazon")
         self.assertEqual(out, "https://www.amazon.in/dp/B08N2Z7R1L?tag=mydeals-21")
+
+    def test_utm_tracking_added(self):
+        out, _ = self.l.convert("https://www.amazon.in/dp/B08N2Z7R1L")
+        self.assertIn("utm_source=pinterest", out)
+        self.assertIn("tag=mydeals-21", out)
 
     def test_amazon_gp_product(self):
         out, _ = self.l.convert("https://www.amazon.in/gp/product/B0ABCDEFGH/")
@@ -90,8 +95,8 @@ class TestSEO(unittest.TestCase):
         txt = build_seo_text(cfg, "Wireless Bluetooth Earbuds", "1099", "INR", "amazon")
         self.assertIn("Wireless Bluetooth Earbuds", txt)
         self.assertIn("₹1,099", txt)
-        self.assertIn("#wireless", txt)  # hashtag generated from title words
-        self.assertLessEqual(txt.count("#"), 6)
+        self.assertIn("#trending", txt)          # tiered hashtag mix
+        self.assertIn("#ad #affiliate", txt)     # mandatory disclosure
 
 
 class TestDB(unittest.TestCase):

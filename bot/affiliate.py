@@ -125,17 +125,28 @@ class AffiliateLinker:
         return url  # nothing configured -> original link (better than nothing)
 
     # --------------------------------------------------------------- main
-    def convert(self, url: str, source: str | None = None) -> tuple[str, str]:
+    @staticmethod
+    def _add_utm(url: str, source: str) -> str:
+        """Track which platform drives sales (Pinterest vs IG) in analytics."""
+        if url.startswith("http") and "utm_source" not in url:
+            sep = "&" if "?" in url else "?"
+            return f"{url}{sep}utm_source=pinterest&utm_medium=social&utm_campaign=pindrop_{source}"
+        return url
+
+    def convert(self, url: str, source: str | None = None,
+                utm: bool = True) -> tuple[str, str]:
         """Returns (affiliate_url, network_name)."""
         src = source or detect_source(url)
         if src == "amazon":
-            return self.amazonize(url), "amazon"
-        if src == "meesho":
-            return self.meeshoize(url), "meesho"
-        if src == "flipkart":
+            out = self.amazonize(url)
+        elif src == "meesho":
+            out = self.meeshoize(url)
+        elif src == "flipkart":
             out = self.flipkartize(url)
-            return out, "flipkart"
-        return self._wrap(url), "wrapped"
+        else:
+            out, src2 = self._wrap(url), "wrapped"
+            return (self._add_utm(out, src) if utm else out), src2
+        return (self._add_utm(out, src) if utm else out), src
 
 
 def price_label(price: str, currency: str = "INR") -> str:

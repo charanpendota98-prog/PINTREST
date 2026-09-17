@@ -155,6 +155,33 @@ data/                sqlite db + generated pins (git-ignored)
 
 ---
 
+## 🧠 Viral Tricks Playbook — top creators em chestunnaro, bot lo anni unnai
+
+Deep analysis of how 6-figure affiliate creators post on Pinterest + Instagram
+in 2026, and where each trick lives in this bot:
+
+| # | The trick they use | Why it works | In this bot |
+|---|---|---|---|
+| 1 | **Fresh pins only** — 5–15 NEW pins/day, never repost the same image | Pinterest's 2026 algorithm prioritizes fresh content over repins [1](https://improvado.io/blog/pinterest-marketing-tactics)[2](https://affiliatemarketingforsuccess.com/affiliate-marketing/affiliate-marketing-on-pinterest/) | `pins_per_product: 3` variations, random template each time |
+| 2 | **3–5 designs per product** testing headlines/visuals | More surfaces = more chances to hit a segment [2](https://affiliatemarketingforsuccess.com/affiliate-marketing/affiliate-marketing-on-pinterest/) | 4 templates (`classic/split/overlay/collage`) rotated |
+| 3 | **Video / Idea pins** — up to 9× the reach of static pins | Video stops the scroll [2](https://affiliatemarketingforsuccess.com/affiliate-marketing/affiliate-marketing-on-pinterest/) | `video.auto_reel` — builds a 6s reel (hook → Ken Burns zoom → CTA) from photos when the page has no video; real product videos downloaded when they exist |
+| 4 | **Hook in first 1–3 seconds** ("Wait for the price 👀") | Curiosity = watch time = distribution | `bot/growth.py` HOOKS in reel intro + captions |
+| 5 | **Keyword-stuffed titles & descriptions** (Pinterest = search engine) | Pins rank in search for months/years [1](https://improvado.io/blog/pinterest-marketing-tactics)[5](https://www.shopify.com/pk/blog/pinterest-affiliate-marketing) | `seo_title()` ≤100 chars + tiered hashtag mix + alt text |
+| 6 | **Text overlay on the image** (price, bold headline) | Pinterest visual search reads text; overlay = CTR | Designer always burns price badge + title + CTA into the pin |
+| 7 | **Post in peak windows**, spread out, human gaps | Consistency + timing beats bursts [1](https://improvado.io/blog/pinterest-marketing-tactics)[4](https://www.clickbank.com/blog/pinterest-affiliate-marketing/) | `peak_mode` scheduler (IST windows) + 40–65 min random gaps |
+| 8 | **Roundups / "3 finds under ₹X"** value content | Converts better than raw product pins [3](https://www.outfy.com/blog/pinterest-affiliate-marketing/)[5](https://www.shopify.com/pk/blog/pinterest-affiliate-marketing) | collage template + `roundup_title()` |
+| 9 | **Niche boards with keyword names** | Boards rank too [2](https://affiliatemarketingforsuccess.com/affiliate-marketing/affiliate-marketing-on-pinterest/) | board auto-create; name it per niche in `config.yaml` |
+| 10 | **Disclose #ad / #affiliate** | Pinterest ToS + FTC; builds trust [2](https://affiliatemarketingforsuccess.com/affiliate-marketing/affiliate-marketing-on-pinterest/)[5](https://www.shopify.com/pk/blog/pinterest-affiliate-marketing) | auto-appended to every description |
+| 11 | **Track everything (UTM)** | Know which pin/platform makes money [2](https://affiliatemarketingforsuccess.com/affiliate-marketing/affiliate-marketing-on-pinterest/) | `utm_source=pinterest` auto-added to links |
+| 12 | **IG: reel + "comment LINK" + link in bio** | IG captions have no clickable links; comment-bait = engagement = reach | Instagram module captions + reel mode |
+
+**How those viral videos are built (analysis):** almost none are "real" shoots —
+they're 5–8s edits: hook text → zooming product photo → price pop → CTA screen.
+That's exactly what `bot/video_maker.py` renders automatically from photos,
+24×7, for every product.
+
+---
+
 ## 💸 Affiliate Programs Guide — anni ivvi join avvandi (2026)
 
 Meeru promote cheyagలిగే programs — commission + join link:
