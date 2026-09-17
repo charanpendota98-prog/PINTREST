@@ -13,11 +13,13 @@ posting:
   min_gap_minutes: 40      # minimum gap between pins (human-like)
   jitter_minutes: 25       # extra random delay added on top
   schedule_days_ahead: 0   # 0 = post instantly, 1..14 = schedule ahead
+  pins_per_product: 2      # pin variations per product (different photo + design)
 
 scraping:
   delay_seconds: 4         # pause between scrapes (be polite, avoid blocks)
   timeout_seconds: 25
   max_retries: 2
+  max_images: 3            # gallery photos to download per product
 
 design:
   width: 1000

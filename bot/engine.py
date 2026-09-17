@@ -13,12 +13,13 @@ import random
 import re
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .affiliate import AffiliateLinker, price_label
 from .db import DB
 from .pinterest_api import PinterestAPI, PinterestError
-from .pin_designer import PinDesigner
+from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
 
 log = logging.getLogger("pindrop.engine")
@@ -49,7 +50,12 @@ class Engine:
 
     # ---------------------------------------------------------- ingestion
     def ingest_url(self, url: str, force: bool = False) -> int:
-        """Scrape + enqueue one product. Returns product id; -1 if duplicate/bad."""
+        """Scrape + enqueue one product as MULTIPLE pin variations.
+
+        Downloads the whole photo gallery (+ video when available), designs a
+        different pin template per photo and queues each as its own pin — all
+        carrying the same affiliate link. Returns first product id.
+        """
         url = url.strip()
         if not url:
             return -1
@@ -62,35 +68,68 @@ class Engine:
             self.db.log("ERROR", f"Scrape failed (blocked or bad page): {url}")
             raise ValueError(
                 f"Could not scrape product from {url}. The site may have blocked "
-                "the request — try again later or add it via CSV."
+                "the request — try again later or add it via CSV / manual add."
             )
 
         aff_url, network = self.linker.convert(url, prod.source)
-        img_path = self.scraper.download_image(prod, self.cfg.media_dir)
-        if not img_path:
+
+        # download full gallery (up to max_images photos)
+        max_imgs = max(1, int(self.cfg.get("scraping.max_images", 3)))
+        local_imgs: list[str] = []
+        for img_url in (prod.images or [prod.image_url])[:max_imgs]:
+            p = self.scraper.download_image_url(img_url, self.cfg.media_dir, prod.title)
+            if p and p not in local_imgs:
+                local_imgs.append(p)
+        if not local_imgs:
             raise ValueError("Product found but image download failed.")
 
-        pin_path = self.cfg.media_dir / f"pin_{int(time.time()*1000)}.jpg"
-        label = price_label(prod.price, prod.currency)
-        self.designer.create(img_path, prod.title, label, pin_path, network)
+        # download product video when the page exposes one
+        video_path = ""
+        if prod.video_url:
+            video_path = self.scraper.download_video(prod.video_url, self.cfg.media_dir)
+            if video_path:
+                self.db.log("INFO", f"Video downloaded for: {prod.title[:50]}")
 
+        # how many pin variations?
+        per_product = max(1, int(self.cfg.get("posting.pins_per_product", 2)))
+        n_variants = min(per_product, len(local_imgs)) or 1
+
+        label = price_label(prod.price, prod.currency)
         seo = build_seo_text(self.cfg, prod.title, prod.price, prod.currency, network)
-        pid = self.db.add_product(
-            source=prod.source,
-            url=url,
-            affiliate_url=aff_url,
-            title=prod.title,
-            price=prod.price,
-            currency=prod.currency,
-            image_url=prod.image_url,
-            image_path=img_path,
-            pin_image=str(pin_path),
-            video_url=prod.video_url,
-            category=prod.category,
-            seo_text=seo,
+        templates = list(TEMPLATES)
+        random.shuffle(templates)
+        first_id = -1
+        for v in range(n_variants):
+            pin_path = self.cfg.media_dir / f"pin_{int(time.time()*1000)}_v{v}.jpg"
+            self.designer.create(
+                local_imgs[v], prod.title, label, pin_path, network,
+                template=templates[v % len(templates)],
+                extra_images=[p for p in local_imgs if p != local_imgs[v]],
+            )
+            pid = self.db.add_product(
+                source=prod.source,
+                url=url,
+                affiliate_url=aff_url,
+                title=prod.title,
+                price=prod.price,
+                currency=prod.currency,
+                image_url=prod.image_url,
+                image_path=local_imgs[v],
+                pin_image=str(pin_path),
+                video_url=prod.video_url,
+                video_path=video_path if v == 0 else "",  # one video pin per product
+                variant=v,
+                category=prod.category,
+                seo_text=seo,
+            )
+            if first_id < 0:
+                first_id = pid
+        self.db.log(
+            "INFO",
+            f"Queued #{first_id}: {prod.title[:50]} [{network}] — "
+            f"{n_variants} pin variation(s){'+ 1 video pin' if video_path else ''}",
         )
-        self.db.log("INFO", f"Queued product #{pid}: {prod.title[:60]} [{network}]")
-        return pid
+        return first_id
 
     # ------------------------------------------------------------- posting
     def post_product(self, product: dict) -> dict:
@@ -110,11 +149,10 @@ class Engine:
             scheduled_for=scheduled_for.isoformat() if scheduled_for else "",
         )
         try:
-            if product.get("video_url") or (
-                product.get("image_path", "").endswith((".mp4", ".mov"))
-            ):
-                # video pin path
-                media_id = self.api.upload_video(product["video_url"] or product["image_path"])
+            video_file = product.get("video_path", "") or ""
+            if video_file and Path(video_file).exists():
+                # video pin path — real video uploaded to Pinterest
+                media_id = self.api.upload_video(video_file)
                 pin = self.api.create_video_pin(
                     board_id, media_id, product["affiliate_url"],
                     product["title"], product["seo_text"], scheduled_for,

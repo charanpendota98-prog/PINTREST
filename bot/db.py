@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS products (
     image_path    TEXT NOT NULL DEFAULT '',   -- local downloaded/generated pin image
     pin_image     TEXT NOT NULL DEFAULT '',   -- generated designed pin graphic
     video_url     TEXT NOT NULL DEFAULT '',
+    video_path    TEXT NOT NULL DEFAULT '',   -- locally downloaded product video
+    variant       INTEGER NOT NULL DEFAULT 0, -- pin variation # for same product
     category      TEXT NOT NULL DEFAULT '',
     seo_text      TEXT NOT NULL DEFAULT '',   -- final description for pinterest
     status        TEXT NOT NULL DEFAULT 'queued',  -- queued|posted|failed|skipped
@@ -48,6 +50,11 @@ CREATE TABLE IF NOT EXISTS logs (
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 """
 
+MIGRATIONS = [
+    "ALTER TABLE products ADD COLUMN variant INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE products ADD COLUMN video_path TEXT NOT NULL DEFAULT ''",
+]
+
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -59,6 +66,11 @@ class DB:
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as c:
             c.executescript(SCHEMA)
+            for stmt in MIGRATIONS:  # upgrade older DBs; ignore if column exists
+                try:
+                    c.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=15)
@@ -96,7 +108,7 @@ class DB:
     def url_exists(self, url: str) -> bool:
         with self._conn() as c:
             row = c.execute(
-                "SELECT 1 FROM products WHERE url=? LIMIT 1", (url,)
+                "SELECT 1 FROM products WHERE url=? AND variant=0 LIMIT 1", (url,)
             ).fetchone()
         return row is not None
 

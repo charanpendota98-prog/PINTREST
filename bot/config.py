@@ -24,11 +24,13 @@ DEFAULTS: dict[str, Any] = {
         "min_gap_minutes": 40,    # minimum gap between two pins
         "jitter_minutes": 25,     # random extra delay (looks human)
         "schedule_days_ahead": 0, # 0 = post immediately; 1-14 = schedule ahead
+        "pins_per_product": 2,    # pin variations per product (different photos+designs)
     },
     "scraping": {
         "delay_seconds": 4.0,
         "timeout_seconds": 25,
         "max_retries": 2,
+        "max_images": 3,          # gallery photos to download per product
         "user_agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"

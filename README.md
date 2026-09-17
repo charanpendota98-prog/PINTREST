@@ -18,9 +18,11 @@ daily automatic ga Pinterest lo post chestundi → **meeru commission earn chest
 
 | Feature | Details |
 |---|---|
-| 🕷 **Smart Scraper** | Amazon.in / Meesho / Flipkart / any shop — JSON-LD → OpenGraph → CSS fallback |
+| 🕷 **Smart Scraper** | Amazon.in / Meesho / Flipkart / any shop — JSON-LD → OpenGraph → CSS fallback; grabs the **full photo gallery + product video** |
 | 💰 **Affiliate Engine** | Amazon `?tag=`, Meesho `affid`, Flipkart `affid`, EarnKaro & Cuelinks deep-link wrapping |
-| 🎨 **Auto Pin Designer** | Pinterest-perfect 1000×1500 graphics: product card, price badge, brand strip, CTA |
+| 🎨 **4 Pin Design Templates** | classic / split / overlay / collage — rotated randomly so no two pins look alike |
+| 🖼 **Multi-variation pins** | Each product posts as N pins (different photo + template) → more reach, no duplicates |
+| 🎬 **Real media upload** | Photos & videos are **downloaded and uploaded** to Pinterest (base64 image pins + 2-step video upload) — not just linked |
 | 📝 **SEO Writer** | Keyword hashtags + deal-style descriptions for every pin |
 | 📌 **Official Pinterest API v5** | OAuth, boards auto-create, image pins, video pins, scheduling up to 14 days |
 | ⏰ **Human-like Scheduler** | N pins/day inside IST posting window, randomized gaps (safe for your account) |
@@ -98,6 +100,9 @@ Priority: Amazon tag → Meesho affid → Flipkart affid → EarnKaro → Cuelin
 # 🤖 run the 24×7 automatic scheduler (8 pins/day, 9am–10pm IST, human gaps)
 .venv/bin/python -m bot run
 
+# 🎨 preview all 4 pin design templates
+.venv/bin/python -m bot design-test
+
 # 🖥 web control panel
 .venv/bin/python -m bot dashboard    # http://localhost:5000
 ```
@@ -106,6 +111,20 @@ Keep `run` alive 24×7 on any cheap VPS/PC, or with `nohup`:
 ```bash
 nohup .venv/bin/python -m bot run > pindrop.log 2>&1 &
 ```
+
+### 🔥 Fully-advanced mode (photos + videos, maximum reach)
+In `config.yaml`:
+```yaml
+posting:
+  pins_per_product: 3   # 1 product → 3 different pins (different photo + template)
+scraping:
+  max_images: 3         # gallery photos downloaded per product
+```
+- Product **photos are downloaded** and designed into pins (uploaded to Pinterest as
+  base64 media — never hot-linked).
+- When a product page exposes a **video**, the bot downloads it and publishes a real
+  **video pin** via Pinterest's 2-step video upload.
+- Every pin carries your **affiliate link** (Amazon tag / Meesho affid / wrappers).
 
 ---
 

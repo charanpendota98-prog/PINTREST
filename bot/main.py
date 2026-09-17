@@ -276,16 +276,15 @@ def cmd_design_test(cfg) -> int:
     sample = cfg.media_dir / "sample_product.jpg"
     img.save(sample, quality=92)
 
-    out = cfg.media_dir / "sample_pin.jpg"
     designer = PinDesigner(cfg)
-    path = designer.create(
-        str(sample),
-        "boAt Airdopes 141 Bluetooth Truly Wireless in Ear Earbuds with 42H Playtime",
-        "₹1,099",
-        out,
-        "amazon",
-    )
-    print(f"✅ Sample pin created: {path}")
+    title = "boAt Airdopes 141 Bluetooth Truly Wireless in Ear Earbuds with 42H Playtime"
+    print("Generating all 4 design templates…")
+    for tpl in ("classic", "split", "overlay", "collage"):
+        out = cfg.media_dir / f"sample_pin_{tpl}.jpg"
+        designer.create(str(sample), title, "₹1,099", out, "amazon",
+                        template=tpl, extra_images=[str(sample)])
+        print(f"   ✅ {tpl:<8} -> {out}")
+    print("\nOpen data/media/sample_pin_*.jpg to preview the designs.")
     return 0
 
 

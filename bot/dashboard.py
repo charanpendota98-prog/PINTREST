@@ -130,12 +130,16 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         img_path = engine.scraper.download_image(prod, cfg.media_dir)
         if not img_path:
             raise ValueError("Could not download the image — check the image URL")
+        video_path = ""
+        if video_url:
+            video_path = engine.scraper.download_video(video_url, cfg.media_dir)
         pin_path = cfg.media_dir / f"pin_{int(time.time()*1000)}.jpg"
         PinDesigner(cfg).create(img_path, title, price_label(price), pin_path, network)
         seo = build_seo_text(cfg, title, price, "INR", network)
         pid = db.add_product(source=src, url=url, affiliate_url=aff_url, title=title,
                              price=price, image_url=image_url, image_path=img_path,
-                             pin_image=str(pin_path), video_url=video_url, seo_text=seo)
+                             pin_image=str(pin_path), video_url=video_url,
+                             video_path=video_path, seo_text=seo)
         db.log("INFO", f"Manually queued product #{pid}: {title[:60]}")
         return jsonify({"ok": True, "id": pid})
 

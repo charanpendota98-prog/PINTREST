@@ -46,6 +46,7 @@ class Product:
     price: str = ""
     currency: str = "INR"
     image_url: str = ""
+    images: list = field(default_factory=list)   # full gallery (multiple pins!)
     video_url: str = ""
     category: str = ""
     description: str = ""
@@ -53,7 +54,7 @@ class Product:
 
     @property
     def ok(self) -> bool:
-        return bool(self.title and self.image_url)
+        return bool(self.title and (self.image_url or self.images))
 
 
 class Scraper:
@@ -105,7 +106,79 @@ class Scraper:
             self._from_opengraph(soup, prod)
         if not prod.title:
             self._site_specific(soup, prod)
+        self._collect_images(soup, prod)
+        self._collect_videos(soup, prod)
         return prod
+
+    # -- gallery images (multiple pins per product) -----------------------
+    def _collect_images(self, soup: BeautifulSoup, prod: Product) -> None:
+        imgs: list[str] = []
+
+        def push(u: str) -> None:
+            u = (u or "").strip()
+            if u.startswith("//"):
+                u = "https:" + u
+            if u.startswith("http") and u not in imgs and ".svg" not in u:
+                imgs.append(u)
+
+        if prod.image_url:
+            push(prod.image_url)
+        # JSON-LD image arrays were captured per node; capture all here too
+        for tag in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(tag.string or "")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for node in self._iter_nodes(data):
+                img = node.get("image")
+                if isinstance(img, list):
+                    for i in img:
+                        push(i if isinstance(i, str) else i.get("url", ""))
+                elif isinstance(img, str):
+                    push(img)
+        # all og:image entries
+        for tag in soup.find_all("meta", attrs={"property": "og:image"}):
+            push(tag.get("content", ""))
+        # schema.org itemprop images
+        for tag in soup.find_all("img", attrs={"itemprop": "image"}):
+            push(tag.get("src") or tag.get("data-src", ""))
+        # Amazon gallery thumbnails → full-size
+        for tag in soup.select("#altImages img, .imageThumbnail img"):
+            src = tag.get("src", "")
+            if src:
+                push(re.sub(r"\._[^_]+_\.", "._SL1500_.", src))
+        # Flipkart gallery
+        for tag in soup.select("._396cs4 img, ._20bN7y img"):
+            push(tag.get("src") or tag.get("data-src", ""))
+        # generic large product-zone images
+        for tag in soup.find_all("img"):
+            try:
+                w = int(tag.get("width", 0) or 0)
+            except ValueError:
+                w = 0
+            if w >= 400:
+                push(tag.get("src") or tag.get("data-src", ""))
+
+        prod.images = imgs[: int(self.cfg.get("scraping.max_images", 3))]
+        if not prod.image_url and prod.images:
+            prod.image_url = prod.images[0]
+
+    # -- product videos -----------------------------------------------------
+    def _collect_videos(self, soup: BeautifulSoup, prod: Product) -> None:
+        if not prod.video_url:
+            for tag in soup.find_all("meta", attrs={"property": re.compile(r"^og:video")}):
+                u = (tag.get("content") or "").strip()
+                if u.startswith("http"):
+                    prod.video_url = u
+                    break
+        if not prod.video_url:
+            v = soup.find("video")
+            if v:
+                prod.video_url = (v.get("src") or "").strip()
+                if not prod.video_url:
+                    s = v.find("source")
+                    if s:
+                        prod.video_url = (s.get("src") or "").strip()
 
     # -- strategy 1: JSON-LD ---------------------------------------------
     def _from_jsonld(self, soup: BeautifulSoup, prod: Product) -> None:
@@ -202,19 +275,53 @@ class Scraper:
     # ------------------------------------------------------------ download
     def download_image(self, prod: Product, dest_dir) -> str:
         """Download product image locally; returns saved path or ''."""
-        if not prod.image_url:
+        return self.download_image_url(prod.image_url, dest_dir, prod.title)
+
+    def download_image_url(self, url: str, dest_dir, name_hint: str = "") -> str:
+        """Download any image url locally; returns saved path or ''."""
+        if not url:
             return ""
         try:
-            resp = self.session.get(prod.image_url, timeout=30)
+            resp = self.session.get(url, timeout=30)
             resp.raise_for_status()
             ctype = resp.headers.get("content-type", "")
-            ext = ".jpg" if "png" not in ctype else ".png"
-            if "webp" in ctype:
-                ext = ".webp"
-            safe = re.sub(r"[^A-Za-z0-9_-]+", "_", prod.title)[:60].strip("_") or "img"
-            path = dest_dir / f"{safe}_{int(time.time())}{ext}"
+            ext = ".png" if "png" in ctype else (".webp" if "webp" in ctype else ".jpg")
+            safe = re.sub(r"[^A-Za-z0-9_-]+", "_", name_hint)[:50].strip("_") or "img"
+            path = dest_dir / f"{safe}_{int(time.time()*1000)}{ext}"
             path.write_bytes(resp.content)
             return str(path)
         except requests.RequestException as exc:
-            log.warning("Image download failed for %s: %s", prod.image_url, exc)
+            log.warning("Image download failed for %s: %s", url, exc)
+            return ""
+
+    def download_video(self, url: str, dest_dir, max_mb: int = 120) -> str:
+        """Stream-download a product video locally; returns saved path or ''."""
+        if not url:
+            return ""
+        try:
+            with self.session.get(url, stream=True, timeout=120) as resp:
+                resp.raise_for_status()
+                ctype = resp.headers.get("content-type", "")
+                if "video" not in ctype and "octet-stream" not in ctype:
+                    log.warning("Not a video content-type: %s", ctype)
+                    return ""
+                ext = ".mp4"
+                if "quicktime" in ctype:
+                    ext = ".mov"
+                elif "webm" in ctype:
+                    ext = ".webm"
+                path = dest_dir / f"video_{int(time.time()*1000)}{ext}"
+                total = 0
+                with open(path, "wb") as fh:
+                    for chunk in resp.iter_content(1 << 20):
+                        total += len(chunk)
+                        if total > max_mb * 1024 * 1024:
+                            log.warning("Video too large (> %dMB), aborted", max_mb)
+                            fh.close()
+                            path.unlink(missing_ok=True)
+                            return ""
+                        fh.write(chunk)
+            return str(path)
+        except requests.RequestException as exc:
+            log.warning("Video download failed for %s: %s", url, exc)
             return ""
