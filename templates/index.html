@@ -149,6 +149,9 @@ async function refresh(){
     } else {
       pill.textContent = '✖ Pinterest not connected (run: python -m bot auth)'; pill.className='pill bad';
     }
+    if(st.instagram && st.instagram.enabled){
+      pill.textContent += st.instagram.configured ? (st.instagram.username?` • IG @${st.instagram.username}`:' • IG ✔') : ' • IG ✖';
+    }
     $('#stTotal').textContent = st.stats.total;
     $('#stQueued').textContent = st.stats.queued;
     $('#stPosted').textContent = st.stats.posted;

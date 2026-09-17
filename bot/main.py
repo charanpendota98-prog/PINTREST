@@ -5,6 +5,7 @@ Usage:
   python -m bot auth-url                 # headless step 1: print login URL
   python -m bot auth --code <CODE>       # headless step 2: finish login with code
   python -m bot check                    # verify Pinterest connection & board
+  python -m bot ig-check                 # verify Instagram connection
   python -m bot add <url> [url ...]      # scrape products & add to queue
   python -m bot add-csv products.csv     # bulk import (url,title,price,image_url[,video_url])
   python -m bot queue                    # show current queue
@@ -27,6 +28,7 @@ from . import APP_NAME, __version__
 from .config import load_config
 from .db import DB
 from .engine import Engine
+from .instagram import InstagramAPI, InstagramError
 from .pinterest_api import PinterestAPI, PinterestError
 
 logging.basicConfig(
@@ -238,6 +240,27 @@ def cmd_add_csv(cfg, path: str) -> int:
     return 0 if added else 1
 
 
+def cmd_ig_check(cfg) -> int:
+    ig = InstagramAPI(cfg)
+    if not ig.configured:
+        print("❌ Instagram not configured. In .env set:")
+        print("   INSTAGRAM_ACCESS_TOKEN=...   IG_USER_ID=...   (optional IMGBB_KEY=...)")
+        print("   Then set instagram.enabled: true in config.yaml")
+        print("\n   Setup guide: README → 'Instagram Automation' section.")
+        return 1
+    try:
+        info = ig.check()
+        print(f"✅ Instagram connected: @{info.get('username')} "
+              f"({info.get('account_type')}) | followers: {info.get('followers_count', 0)} "
+              f"| posts: {info.get('media_count', 0)}")
+        print(f"   Mode: {cfg.get('instagram.mode')} | designed-pin hosting: "
+              f"{'ImgBB' if ig.imgbb_key else 'off (uses product photo URLs)'}")
+        return 0
+    except InstagramError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+
 def cmd_queue(cfg) -> int:
     db = DB(cfg.db_path)
     stats = db.stats()
@@ -306,6 +329,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_auth_url(cfg)
     if cmd == "check":
         return cmd_check(cfg)
+    if cmd == "ig-check":
+        return cmd_ig_check(cfg)
     if cmd == "add" and rest:
         return cmd_add(cfg, rest)
     if cmd == "add-csv" and rest:

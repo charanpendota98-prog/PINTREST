@@ -50,6 +50,18 @@ seo:
     ✅ Best price guarantee — tap to grab this deal before it's gone!
     {hashtags}
 
+instagram:
+  enabled: false            # true → every product also posts to your IG page
+  ig_user_id: ""            # or IG_USER_ID in .env
+  mode: carousel            # single | carousel | reel
+  posts_per_day: 3
+  host_designed_pins: false # true → upload designed pins to ImgBB (IMGBB_KEY in .env)
+  caption_template: |
+    🔥 {title}
+    💰 Price: {price}
+    🛒 Comment 'LINK' — link in bio!
+    {hashtags}
+
 storage:
   db_path: data/pindrop.db
   media_dir: data/media

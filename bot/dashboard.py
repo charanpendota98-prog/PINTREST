@@ -61,6 +61,15 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                 }
             except PinterestError as exc:
                 account = {"error": str(exc)[:200]}
+        from .instagram import InstagramAPI, InstagramError as IGE
+        ig = InstagramAPI(cfg)
+        ig_info = {"enabled": ig.enabled, "configured": ig.configured}
+        if ig.enabled and ig.configured:
+            try:
+                info = ig.check()
+                ig_info["username"] = info.get("username")
+            except IGE as exc:
+                ig_info["error"] = str(exc)[:150]
         return jsonify({
             "ok": True,
             "credentials_ok": api.configured,
@@ -69,6 +78,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
             "cuelinks": bool(cfg.get("affiliate.cuelinks_template")),
             "meesho": bool(cfg.get("affiliate.meesho_affid")),
             "board": cfg.get("pinterest.board_name"),
+            "instagram": ig_info,
             "account": account,
             "stats": stats,
         })

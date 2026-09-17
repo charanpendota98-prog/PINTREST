@@ -53,6 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 MIGRATIONS = [
     "ALTER TABLE products ADD COLUMN variant INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE products ADD COLUMN video_path TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE posts ADD COLUMN ig_post_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE posts ADD COLUMN ig_error TEXT NOT NULL DEFAULT ''",
 ]
 
 

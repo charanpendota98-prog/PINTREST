@@ -73,6 +73,17 @@ DEFAULTS: dict[str, Any] = {
             "this deal before it's gone!\n{hashtags}"
         ),
     },
+    "instagram": {
+        "enabled": False,          # set true once token is ready
+        "ig_user_id": "",          # or IG_USER_ID in .env
+        "mode": "carousel",        # single | carousel | reel
+        "posts_per_day": 3,
+        "host_designed_pins": False,  # upload designed pins to ImgBB (needs IMGBB_KEY)
+        "caption_template": (
+            "🔥 {title}\n💰 Price: {price}\n"
+            "🛒 Comment 'LINK' — link in bio!\n{hashtags}"
+        ),
+    },
     "storage": {
         "db_path": "data/pindrop.db",
         "media_dir": "data/media",

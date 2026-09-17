@@ -26,6 +26,7 @@ daily automatic ga Pinterest lo post chestundi → **meeru commission earn chest
 | 📝 **SEO Writer** | Keyword hashtags + deal-style descriptions for every pin |
 | 📌 **Official Pinterest API v5** | OAuth, boards auto-create, image pins, video pins, scheduling up to 14 days |
 | ⏰ **Human-like Scheduler** | N pins/day inside IST posting window, randomized gaps (safe for your account) |
+| 📸 **Instagram Auto-Post** | Same products cross-posted to your IG page (single / carousel / reels) via Meta Graph API |
 | 🖥 **Web Dashboard** | Add products, manual add, one-click posting, queue, stats, logs — live preview |
 | 🧾 **CSV Bulk Import** | Add 100s of products in one command |
 |  **Safe by default** | Rate limits, retries, dedupe, error logging, graceful fallbacks |
@@ -151,6 +152,72 @@ templates/           dashboard UI
 tests/               unit tests
 data/                sqlite db + generated pins (git-ignored)
 ```
+
+---
+
+## 💸 Affiliate Programs Guide — anni ivvi join avvandi (2026)
+
+Meeru promote cheyagలిగే programs — commission + join link:
+
+| Program | Commission | Ela join avvali | Best for |
+|---|---|---|---|
+| **Amazon Associates** | 1–10% category-wise | [affiliate-program.amazon.in](https://affiliate-program.amazon.in) → signup → get `tag` | Electronics, gadgets |
+| **Meesho Creator Club** (official) | 3–15% | Meesho app/website → Affiliate/Creator Club registration → links from Creator Dashboard [3](https://earnyatra.com/meesho-affiliate-program/) | Fashion, home, beauty — **trending!** |
+| **EarnKaro** | up to 15% Meesho; Flipkart/Myntra/AJIO/Nykaa anni | [earnkaro.com](https://earnkaro.com/blog/meesho-affiliate-program/) app → free signup, **no documents** [4](https://earnkaro.com/blog/meesho-affiliate-program/) | Easiest starter — one app, many stores |
+| **Cuelinks** | store-wise | [cuelinks.com](https://www.cuelinks.com) → any-link converter | Blogs + many Indian stores |
+| **Myntra** | 4–10% | via Admitad / EarnKaro [3](https://earnyatra.com/meesho-affiliate-program/) | Fashion |
+| **Flipkart** | category-wise | via EarnKaro / Cuelinks / Admitad | Mobiles, appliances |
+
+**Pro tip:** EarnKaro lo Meesho new-user orders ki **12%**, old users ki 4% untundi; Meesho Creator Club lo top performers ki **15%** varaku [3](https://earnyatra.com/meesho-affiliate-program/)[4](https://earnkaro.com/blog/meesho-affiliate-program/). Rendu lo join avvandi — same product ki hang link use cheyandi.
+
+Bot config lo pettaledhi:
+```yaml
+affiliate:
+  amazon_tag: "yourtag-21"          # Amazon
+  meesho_affid: "YOURMEESHID"       # Meesho Creator Club id
+  earnkaro_prefix: "https://ekaro.in/enkrXXXX"  # EarnKaro profit links
+```
+
+### 🛍 Meesho strategy (best results kosam)
+- **Categories:** fashion (kurtas, sarees), home & kitchen, beauty, jewellery — ₹199–₹699 range convert avతాయి best.
+- Meesho = mass market, low price → impulse buys ekkuva. Return rate chudandi: fashion 299 @ 12% commission > gadget 1499 @ 4% with 20% returns [3](https://earnyatra.com/meesho-affiliate-program/).
+- Bot lo Meesho links vesthe automatic ga `affid` + `utm_source=affiliate` attach avతundi; Creator Club dashboard lo clicks/commisions track cheskondi.
+- Links **Creator Dashboard nunchi generate** cheyandi (copied app links track avvu) — aa links ni CSV/manual add lo vadandi.
+
+---
+
+## 📸 Instagram Automation (fully automatic cross-posting)
+
+Every product Pinterest lo post avvగానే, same product mee **Instagram page** lo kuda
+post avతుంది — single post / carousel / reel mode.
+
+### One-time setup (~10 min)
+1. Instagram account → **Switch to Professional account** (Settings → Account type).
+2. Instagram ni oka **Facebook Page** ki connect cheyandi.
+3. [developers.facebook.com](https://developers.facebook.com) → create app → add
+   **Instagram API** product; permissions:
+   `instagram_basic, instagram_content_publish, pages_show_list, pages_read_engagement`.
+4. Long-lived token generate cheసి `.env` lo pettandi:
+   ```
+   INSTAGRAM_ACCESS_TOKEN=EAAB...
+   IG_USER_ID=178414XXXXXXXXX
+   IMGBB_KEY=...            # optional — designed pins host cheyadaniki (free, api.imgbb.com)
+   ```
+5. `config.yaml`:
+   ```yaml
+   instagram:
+     enabled: true
+     mode: carousel     # single | carousel | reel
+     host_designed_pins: true   # your designed pin graphics IG lo (needs IMGBB_KEY)
+   ```
+6. Test: `python -m bot ig-check`
+
+### How it posts
+- **Carousel/single**: designed pin (ImgBB hosted) + product photo — caption tho
+  hashtags + "Comment 'LINK' — link in bio!" (IG lo links clickable kaavu — bio lo
+  Linktree/affiliate links pettandi).
+- **Reel**: product page lo video unte aa video URL tho reel.
+- Fail ayina Pinterest post affect avదు — IG best-effort only, logs lo untundi.
 
 ---
 

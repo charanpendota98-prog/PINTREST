@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 from .affiliate import AffiliateLinker, price_label
 from .db import DB
+from .instagram import InstagramAPI, InstagramError
 from .pinterest_api import PinterestAPI, PinterestError
 from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
@@ -38,6 +39,23 @@ def build_seo_text(cfg, title: str, price: str, currency: str, source: str) -> s
     return template.format(title=title, price=label, hashtags=hashtags).strip()
 
 
+def _hashtags(cfg, title: str) -> str:
+    words = re.findall(r"[A-Za-z]{3,}", title.lower())[:6]
+    tags = [f"#{w}" for w in dict.fromkeys(words)]
+    extra = cfg.get("seo.extra_hashtags", []) or []
+    if cfg.get("seo.hashtags", True):
+        tags = (tags + list(extra))[: int(cfg.get("seo.max_hashtags", 8))]
+    return " ".join(tags)
+
+
+def build_ig_caption(cfg, title: str, price: str, currency: str) -> str:
+    """Instagram caption — no clickable links exist on IG, so drive to bio."""
+    label = price_label(price, currency) or "Best price"
+    return cfg.get("instagram.caption_template").format(
+        title=title, price=label, hashtags=_hashtags(cfg, title)
+    ).strip()
+
+
 class Engine:
     def __init__(self, cfg, db: DB | None = None):
         self.cfg = cfg
@@ -46,6 +64,7 @@ class Engine:
         self.linker = AffiliateLinker(cfg)
         self.designer = PinDesigner(cfg)
         self.api = PinterestAPI(cfg)
+        self.ig = InstagramAPI(cfg)
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
 
     # ---------------------------------------------------------- ingestion
@@ -174,12 +193,48 @@ class Engine:
             )
             self.db.update_product(product["id"], status="posted")
             self.db.log("INFO", f"Posted pin {pin.get('id')} — {product['title'][:50]}")
+            self._post_instagram(product, post_id)
             return pin
         except PinterestError as exc:
             self.db.update_post(post_id, status="failed", error=str(exc)[:500])
             self.db.update_product(product["id"], status="failed", error=str(exc)[:500])
             self.db.log("ERROR", f"Post failed for #{product['id']}: {exc}")
             raise
+
+    # ---------------------------------------------------------- instagram
+    def _post_instagram(self, product: dict, post_id: int) -> None:
+        """Cross-post the same product to Instagram (optional, best-effort)."""
+        if not (self.ig.enabled and self.ig.configured):
+            return
+        caption = build_ig_caption(self.cfg, product["title"], product["price"],
+                                   product["currency"])
+        mode = self.cfg.get("instagram.mode", "carousel")
+        try:
+            urls: list[str] = []
+            # 1) designed pin hosted publicly (ImgBB) when configured
+            if self.cfg.get("instagram.host_designed_pins") and self.ig.imgbb_key:
+                hosted = self.ig.upload_imgbb(product["pin_image"])
+                if hosted:
+                    urls.append(hosted)
+            # 2) original product photo(s) from shop CDN
+            if product.get("image_url") and product["image_url"] not in urls:
+                urls.append(product["image_url"])
+
+            media_id = ""
+            if mode == "reel" and str(product.get("video_url", "")).startswith("http"):
+                media_id = self.ig.post_reel(product["video_url"], caption)
+            elif len(urls) > 1 and mode == "carousel":
+                media_id = self.ig.post_carousel(urls, caption)
+            elif urls:
+                media_id = self.ig.post_single(urls[0], caption)
+            else:
+                self.db.log("WARN", "Instagram: no public media available, skipped")
+                return
+            self.db.update_post(post_id, ig_post_id=media_id)
+            self.db.log("INFO", f"Instagram post {media_id} — {product['title'][:40]}")
+        except InstagramError as exc:
+            self.db.update_post(post_id, ig_error=str(exc)[:400])
+            self.db.log("WARN", f"Instagram cross-post failed: {exc}")
 
     def post_next(self) -> dict | None:
         """Post the single oldest queued product. Returns pin dict or None."""
