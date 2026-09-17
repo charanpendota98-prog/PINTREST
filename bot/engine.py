@@ -221,9 +221,14 @@ class Engine:
             self._post_instagram(product, post_id)
             return pin
         except PinterestError as exc:
+            attempts = int(product.get("attempts", 0) or 0) + 1
+            # transient errors retry next cycle; 3 strikes = skip forever
+            status = "queued" if attempts < 3 else "skipped"
             self.db.update_post(post_id, status="failed", error=str(exc)[:500])
-            self.db.update_product(product["id"], status="failed", error=str(exc)[:500])
-            self.db.log("ERROR", f"Post failed for #{product['id']}: {exc}")
+            self.db.update_product(product["id"], status=status,
+                                   error=str(exc)[:500], attempts=attempts)
+            self.db.log("ERROR", f"Post failed for #{product['id']} "
+                                 f"(attempt {attempts}): {exc}")
             raise
 
     # ---------------------------------------------------------- instagram
@@ -286,6 +291,30 @@ class Engine:
                 time.sleep(gap)
         return posted
 
+    # ----------------------------------------------------------- autopilot
+    def auto_source(self) -> int:
+        """ZERO-TOUCH sourcing: hunt trending products by itself."""
+        added = 0
+        limit = int(self.cfg.get("autopilot.discover_limit", 4))
+        for src in ("amazon", "meesho", "flipkart"):
+            try:
+                urls = self.scraper.discover_products(src, limit=limit)
+            except Exception as exc:  # noqa: BLE001
+                self.db.log("WARN", f"Discover {src} failed: {exc}")
+                urls = []
+            for u in urls:
+                if self.db.url_exists(u):
+                    continue
+                try:
+                    pid = self.ingest_url(u)
+                    added += pid > 0
+                except ValueError:
+                    continue
+                self.scraper.polite_wait()
+        if added:
+            self.db.log("INFO", f"🛰 Autopilot sourced {added} new trending product(s)")
+        return added
+
     # ----------------------------------------------------------- scheduler
     def _human_gap(self) -> float:
         mins = float(self.cfg.get("posting.min_gap_minutes", 40))
@@ -307,8 +336,18 @@ class Engine:
             now = datetime.now(self.tz)
             w_start, w_end = peak_window(now) if peak else (start_h, end_h)
             queue = self.db.pending_products(limit=100)
+
+            # ZERO-TOUCH: queue running dry? go hunt trending products itself
+            min_q = int(self.cfg.get("autopilot.min_queue", 5))
+            if len(queue) < min_q and self.cfg.get("autopilot.auto_source", True):
+                self.db.log("INFO", f"Queue low ({len(queue)}) — autopilot hunting "
+                                    "trending products on Amazon/Meesho/Flipkart…")
+                self.auto_source()
+                queue = self.db.pending_products(limit=100)
+
             if not queue:
-                self.db.log("INFO", "Queue empty — sleeping 30 min. Add products via dashboard/CSV.")
+                self.db.log("INFO", "Queue empty & sourcing blocked right now — "
+                                    "retrying in 30 min (normal on some networks).")
                 time.sleep(1800)
                 continue
 

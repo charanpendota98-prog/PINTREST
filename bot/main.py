@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 import http.server
 import logging
+import os
 import sys
 import threading
 import urllib.parse
@@ -240,6 +241,94 @@ def cmd_add_csv(cfg, path: str) -> int:
     return 0 if added else 1
 
 
+def _set_env_line(path, key: str, value: str) -> None:
+    """Upsert KEY=value in .env, keeping the rest intact."""
+    lines = path.read_text().splitlines() if path.exists() else []
+    out, done = [], False
+    for ln in lines:
+        if ln.strip().startswith(f"{key}=") or ln.strip().startswith(f"# {key}="):
+            out.append(f"{key}={value}")
+            done = True
+        else:
+            out.append(ln)
+    if not done:
+        out.append(f"{key}={value}")
+    path.write_text("\n".join(out) + "\n")
+
+
+def cmd_setup(cfg) -> int:
+    """ZERO-TOUCH onboarding: one wizard, then the bot runs everything forever.
+
+    The only things a human must do ONCE (API security — cannot be automated):
+    create the Pinterest app, click ALLOW, and paste your affiliate IDs.
+    """
+    from pathlib import Path as P
+    print("\n🧙 PinDrop Pro setup wizard — one-time, ~5 minutes\n")
+
+    env_path = P(__file__).resolve().parent.parent / ".env"
+    sample = P(__file__).resolve().parent.parent / ".env.example"
+    if not env_path.exists() and sample.exists():
+        env_path.write_text(sample.read_text())
+        print("✔ .env created")
+
+    def ask(label: str, secret: bool = False) -> str:
+        try:
+            return input(f"   {label}: ").strip()
+        except EOFError:
+            return ""
+
+    print("STEP 1/3 — Pinterest (one time)")
+    print("   • developers.pinterest.com/apps → create app")
+    print("   • redirect URI: http://localhost:8888/callback")
+    print("   • scopes: boards:read boards:write pins:read pins:write user_accounts:read")
+    app_id = ask("App ID") or cfg.pinterest_app_id
+    app_secret = ask("App Secret") or cfg.pinterest_app_secret
+    if app_id:
+        _set_env_line(env_path, "PINTEREST_APP_ID", app_id)
+    if app_secret:
+        _set_env_line(env_path, "PINTEREST_APP_SECRET", app_secret)
+
+    print("\nSTEP 2/3 — Affiliate IDs (money! paste whatever you have, Enter = skip)")
+    for key, label in [
+        ("AMAZON_TAG", "Amazon Associates tag (e.g. mydeals-21)"),
+        ("MEESHO_AFFID", "Meesho Creator Club affid"),
+        ("EARNKARO_PREFIX", "EarnKaro link prefix (https://ekaro.in/…)"),
+        ("FLIPKART_AFFID", "Flipkart affid (optional)"),
+    ]:
+        val = ask(label)
+        if val:
+            _set_env_line(env_path, key, val)
+
+    print("\nSTEP 3/3 — Connect Pinterest account")
+    os.environ["PINTEREST_APP_ID"] = app_id or cfg.pinterest_app_id
+    os.environ["PINTEREST_APP_SECRET"] = app_secret or cfg.pinterest_app_secret
+    fresh = load_config()
+    api = PinterestAPI(fresh)
+    if api.configured:
+        url, verifier = api.auth_url()
+        _verifier_path(fresh).parent.mkdir(parents=True, exist_ok=True)
+        _verifier_path(fresh).write_text(verifier)
+        print(f"\n   Open & click ALLOW:\n   {url}\n")
+        code = ask("Paste the code= value from the redirect URL")
+        if code:
+            try:
+                api.exchange_code(code, verifier)
+                acc = api.user_account()
+                print(f"   ✅ Connected as @{acc.get('username')}")
+            except PinterestError as exc:
+                print(f"   ❌ {exc}")
+    else:
+        print("   (skipped — fill PINTEREST_APP_ID/SECRET in .env later, then `python -m bot auth-url`)")
+
+    print("\n" + "=" * 62)
+    print("🎉 SETUP DONE. From now on you do NOTHING:")
+    print("   python -m bot run        # 24×7 autopilot: hunts products, designs")
+    print("                            # pins+reels, posts Pinterest (+IG), tracks clicks")
+    print("   python -m bot dashboard  # watch it work: stats, clicks, logs")
+    print("=" * 62 + "\n")
+    return 0
+
+
 def cmd_ig_check(cfg) -> int:
     ig = InstagramAPI(cfg)
     if not ig.configured:
@@ -355,9 +444,11 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_queue(cfg)
     if cmd == "post":
         return cmd_post(cfg, int(rest[0]) if rest else 1)
-    if cmd == "run":
+    if cmd in ("run", "autopilot"):
         Engine(cfg).run_forever()
         return 0
+    if cmd == "setup":
+        return cmd_setup(cfg)
     if cmd == "design-test":
         return cmd_design_test(cfg)
     if cmd == "dashboard":

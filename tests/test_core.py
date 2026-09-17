@@ -95,8 +95,9 @@ class TestSEO(unittest.TestCase):
         txt = build_seo_text(cfg, "Wireless Bluetooth Earbuds", "1099", "INR", "amazon")
         self.assertIn("Wireless Bluetooth Earbuds", txt)
         self.assertIn("₹1,099", txt)
-        self.assertIn("#trending", txt)          # tiered hashtag mix
+        self.assertTrue(any(h in txt for h in ("#viral", "#trending", "#deals")))
         self.assertIn("#ad #affiliate", txt)     # mandatory disclosure
+        self.assertNotIn("##", txt)              # no malformed hashtags
 
 
 class TestDB(unittest.TestCase):

@@ -73,9 +73,12 @@ def hashtag_mix(title: str, source: str, max_tags: int = 8) -> str:
     pool = []
     for group in (huge, medium, niche):
         random.shuffle(group)
-    pool += huge[:2]
-    pool += ["#" + t.replace(" ", "") for t in medium[:3]]
-    pool += niche[:3]
+    def norm(t: str) -> str:
+        t = t.replace(" ", "")
+        return t if t.startswith("#") else "#" + t
+    pool += [norm(t) for t in huge[:2]]
+    pool += [norm(t) for t in medium[:3]]
+    pool += [norm(t) for t in niche[:3]]
     seen, out = set(), []
     for t in pool:
         if t not in seen:

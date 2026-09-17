@@ -29,7 +29,7 @@ class TestGrowth(unittest.TestCase):
         tags = hashtag_mix("Wireless Earbuds Bluetooth Headphones", "amazon", 8)
         parts = tags.split()
         self.assertLessEqual(len(parts), 8)
-        self.assertTrue(all(p.startswith("#") for p in parts))
+        self.assertTrue(all(p.startswith("#") and not p.startswith("##") for p in parts))
         self.assertTrue(len(parts) >= 4)  # multi-tier mix
 
     def test_peak_window(self):

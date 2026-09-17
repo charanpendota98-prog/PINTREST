@@ -93,6 +93,11 @@ DEFAULTS: dict[str, Any] = {
     "video": {
         "auto_reel": True,   # no product video? auto-generate a viral reel from photos
     },
+    "autopilot": {
+        "auto_source": True,    # hunt trending products automatically when queue is low
+        "min_queue": 5,         # trigger sourcing below this many queued pins
+        "discover_limit": 4,    # products to discover per store per cycle
+    },
     "storage": {
         "db_path": "data/pindrop.db",
         "media_dir": "data/media",

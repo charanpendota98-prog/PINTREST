@@ -61,6 +61,7 @@ MIGRATIONS = [
     "ALTER TABLE products ADD COLUMN video_path TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE posts ADD COLUMN ig_post_id TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE posts ADD COLUMN ig_error TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE products ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
 ]
 
 

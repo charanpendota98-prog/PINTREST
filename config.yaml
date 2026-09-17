@@ -32,6 +32,11 @@ video:
   auto_reel: true          # no product video on the page? auto-generate a
                            # viral 6s reel from the photos (hook → zoom → CTA)
 
+autopilot:
+  auto_source: true        # ZERO-TOUCH: hunt trending products when queue is low
+  min_queue: 5
+  discover_limit: 4        # products per store per hunt cycle
+
 design:
   width: 1000
   height: 1500             # Pinterest's ideal 2:3 vertical ratio

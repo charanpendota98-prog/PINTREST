@@ -11,6 +11,7 @@ Priority: amazon > meesho > flipkart > configured default_wrapper.
 """
 from __future__ import annotations
 
+import os
 import re
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
@@ -31,19 +32,23 @@ class AffiliateLinker:
 
     @property
     def meesho_affid(self) -> str:
-        return (self.cfg.get("affiliate.meesho_affid", "") or "").strip()
+        return (os.getenv("MEESHO_AFFID", "") or
+                self.cfg.get("affiliate.meesho_affid", "") or "").strip()
 
     @property
     def flipkart_affid(self) -> str:
-        return (self.cfg.get("affiliate.flipkart_affid", "") or "").strip()
+        return (os.getenv("FLIPKART_AFFID", "") or
+                self.cfg.get("affiliate.flipkart_affid", "") or "").strip()
 
     @property
     def earnkaro_prefix(self) -> str:
-        return (self.cfg.get("affiliate.earnkaro_prefix", "") or "").strip()
+        return (os.getenv("EARNKARO_PREFIX", "") or
+                self.cfg.get("affiliate.earnkaro_prefix", "") or "").strip()
 
     @property
     def cuelinks_template(self) -> str:
-        return (self.cfg.get("affiliate.cuelinks_template", "") or "").strip()
+        return (os.getenv("CUELINKS_TEMPLATE", "") or
+                self.cfg.get("affiliate.cuelinks_template", "") or "").strip()
 
     @property
     def generic_template(self) -> str:

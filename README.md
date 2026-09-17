@@ -33,6 +33,26 @@ daily automatic ga Pinterest lo post chestundi → **meeru commission earn chest
 
 ---
 
+## 🛸 ZERO-TOUCH MODE (nenu em cheyakunda)
+
+```bash
+./run.sh &            # one command. Forever. (or: python -m bot setup first)
+```
+
+That's it. Autopilot then does EVERYTHING by itself, 24×7:
+- 🛰 **hunts trending products** on Amazon/Meesho/Flipkart when the queue runs low
+- 🎨 designs fresh pins + auto-reels, ✍️ writes SEO titles from LIVE Pinterest keywords
+- 📌 posts in peak windows with human gaps, retries failures, skips 3-strike products
+- 📸 cross-posts to Instagram, 🔗 tracks every click, 🧾 logs everything
+
+The ONLY one-time human steps (API security — nobody can automate account logins):
+`python -m bot setup` → paste Pinterest App ID/Secret + click ALLOW + paste your
+affiliate IDs (Amazon tag / Meesho affid / EarnKaro). ~5 minutes, once in a lifetime.
+
+Guardian: `run.sh` auto-installs deps and restarts the bot if it ever crashes.
+
+---
+
 ## 🚀 Setup (first time, 10 minutes)
 
 ### 1. Install

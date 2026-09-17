@@ -273,7 +273,44 @@ class Scraper:
                 prod.title = t.get_text(strip=True)
 
     # ------------------------------------------------------------ download
-    def download_image(self, prod: Product, dest_dir) -> str:
+    def discover_products(self, source: str = "amazon", limit: int = 6) -> list[str]:
+        """AUTOPILOT: hunt trending product URLs by themselves.
+
+        Scrapes public bestseller/deal listing pages and extracts product
+        links. Zero-touch content sourcing. Returns [] politely when the
+        network blocks us (bot then waits and retries later).
+        """
+        urls = {
+            "amazon": "https://www.amazon.in/gp/bestsellers/electronics",
+            "flipkart": "https://www.flipkart.com/mobiles/pr?sid=tyy,4io",
+            "meesho": "https://www.meesho.com/women-ethnic-wear/pl/1k1b6",
+        }
+        patterns = {
+            "amazon": re.compile(r"/dp/([A-Z0-9]{10})"),
+            "flipkart": re.compile(r"\?pid=([A-Z0-9]+)"),
+            "meesho": re.compile(r"/p/([a-z0-9]+)"),
+        }
+        page = urls.get(source)
+        if not page:
+            return []
+        html = self._fetch(page)
+        if not html:
+            return []
+        found: list[str] = []
+        for m in patterns[source].finditer(html):
+            if source == "amazon":
+                u = f"https://www.amazon.in/dp/{m.group(1)}"
+            elif source == "flipkart":
+                u = f"https://www.flipkart.com/item/p?pid={m.group(1)}"
+            else:
+                u = f"https://www.meesho.com/product/p/{m.group(1)}"
+            if u not in found:
+                found.append(u)
+            if len(found) >= limit:
+                break
+        if found:
+            log.info("Discovered %d %s products", len(found), source)
+        return found
         """Download product image locally; returns saved path or ''."""
         return self.download_image_url(prod.image_url, dest_dir, prod.title)
 
