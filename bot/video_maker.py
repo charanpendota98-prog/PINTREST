@@ -56,6 +56,27 @@ def _accent() -> tuple[int, int, int]:
     return (230, 0, 35)
 
 
+def pick_music(cfg) -> str:
+    """Pick a BGM track the USER added manually.
+
+    Drop mp3/m4a/wav files into data/music/ (or upload via dashboard) —
+    the bot rotates them automatically into every new reel. Your trending
+    audio + our automation = best of both.
+    """
+    import random as _r
+    from pathlib import Path as _P
+    cands: list[str] = []
+    mdir = _P(__file__).resolve().parent.parent / str(
+        cfg.get("video.music_dir", "data/music"))
+    if mdir.exists():
+        cands += [str(p) for p in mdir.iterdir()
+                  if p.suffix.lower() in (".mp3", ".m4a", ".wav", ".aac")]
+    single = str(cfg.get("video.music", "") or "")
+    if single and _P(single).exists():
+        cands.append(single)
+    return _r.choice(cands) if cands else ""
+
+
 class ReelMaker:
     def __init__(self, cfg):
         self.cfg = cfg

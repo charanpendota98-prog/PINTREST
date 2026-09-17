@@ -27,7 +27,7 @@ from .pinterest_api import PinterestAPI, PinterestError
 from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
 from .trends import score_product, sourcing_plan
-from .video_maker import ReelMaker
+from .video_maker import ReelMaker, pick_music
 
 log = logging.getLogger("pindrop.engine")
 
@@ -145,7 +145,7 @@ class Engine:
                 vo_path = vo.generate(script, lang,
                                       self.cfg.media_dir / f"vo_{int(time.time()*1000)}.mp3")
                 vo_secs = vo.estimate_seconds(script) if vo_path else 0.0
-                music = str(self.cfg.get("video.music", "") or "")
+                music = pick_music(self.cfg)   # user's manually-added trending audio
                 reel_path = self.cfg.media_dir / f"reel_{int(time.time()*1000)}.mp4"
                 video_path = self.reel.make(local_imgs[0], hook, prod.title, label,
                                             reel_path, network,

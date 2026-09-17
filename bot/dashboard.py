@@ -198,6 +198,23 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         engine.scraper.polite_wait()
         return jsonify({"ok": True, "results": results})
 
+    @app.post("/api/upload-audio")
+    def upload_audio():
+        """Manual step for YOU: upload trending audio once.
+        The bot then mixes it into every reel automatically."""
+        f = request.files.get("file")
+        if not f or not f.filename:
+            return jsonify({"ok": False, "error": "no file"}), 400
+        if not f.filename.lower().endswith((".mp3", ".m4a", ".wav", ".aac")):
+            return jsonify({"ok": False, "error": "only mp3/m4a/wav/aac"}), 400
+        music_dir = ROOT / str(cfg.get("video.music_dir", "data/music"))
+        music_dir.mkdir(parents=True, exist_ok=True)
+        safe = "".join(c for c in f.filename if c.isalnum() or c in "._-")[:80]
+        dest = music_dir / safe
+        f.save(dest)
+        db.log("INFO", f"🎵 Audio added by user: {safe} — reels will use it automatically")
+        return jsonify({"ok": True, "file": safe})
+
     @app.post("/api/add-manual")
     @_api_check
     def add_manual():

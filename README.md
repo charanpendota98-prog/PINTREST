@@ -209,7 +209,7 @@ How the big faceless channels actually operate, and our coverage:
 | Download Amazon gallery photos & brand videos | raw material | ✅ scraper (gallery + video + MRP) |
 | Edit 5-8s reels: hook → zoom → price → CTA | watch-time | ✅ video_maker |
 | **Add voiceover** ("only ₹1099! link in bio!") | voice = trust + retention | ✅ **voiceover.py** (free neural TTS: English/Hindi/**Telugu**) mixed into reel + burned subtitles |
-| Add trending/BGM audio | retention | ✅ mix your own mp3 (`video.music`) — *licensed trending audio can't be added via API; top creators add it in-app or use royalty-free* |
+| Add trending/BGM audio | retention | ✅ **You upload once** (dashboard 🎵 button or drop into `data/music/`) — bot auto-rotates & mixes it into every reel. *Licensed IG trending audio itself can only be added in-app; royalty-free/BGM is fully automated* |
 | Post pin via Pinterest scheduler/API | consistency | ✅ official API + scheduler |
 | Post IG reel + "comment LINK" bait | reach | ✅ IG module + **auto-reply to "link" comments** |
 | Use affiliate tag/links everywhere | money | ✅ 6-network affiliate engine |

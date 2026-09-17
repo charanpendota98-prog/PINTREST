@@ -100,6 +100,14 @@
       <input id="mVideo" placeholder="Video URL (optional, for video pins)" class="inp" style="grid-column:1/-1">
     </div>
     <button class="btn" onclick="addManual()">➕ Add to Queue (Manual)</button>
+
+    <h3 style="margin:26px 0 12px">🎵 Add trending audio (your manual step — rest is auto)</h3>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+      <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.aac" class="inp" style="max-width:320px">
+      <button class="btn" onclick="uploadAudio()">🎵 Upload Audio</button>
+    </div>
+    <div class="hint">Upload your favourite trending/BGM audio once — the bot automatically mixes it
+      (ducked under the voiceover) into every new reel it generates. Files live in <code>data/music/</code>.</div>
   </div>
 
   <div class="panel" id="tab-queue" style="display:none">
@@ -220,6 +228,16 @@ async function postNow(count){
 }
 async function skipP(id){
   await api(`/api/products/${id}/skip`, {method:'POST'}); refresh();
+}
+async function uploadAudio(){
+  const inp = $('#audioFile');
+  if(!inp.files.length) return toast('Choose an audio file first', true);
+  const fd = new FormData(); fd.append('file', inp.files[0]);
+  try{
+    const r = await fetch('/api/upload-audio', {method:'POST', body: fd}).then(r=>r.json());
+    if(r.ok){ toast('🎵 Audio saved — reels will use it automatically!'); inp.value=''; refresh(); }
+    else toast(r.error, true);
+  }catch(e){ toast('Upload failed: '+e, true); }
 }
 async function addManual(){
   const body = {title: $('#mTitle').value.trim(), price: $('#mPrice').value.trim(),
