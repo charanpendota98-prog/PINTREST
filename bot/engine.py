@@ -293,6 +293,14 @@ class Engine:
             media_id = ""
             if mode == "reel" and str(product.get("video_url", "")).startswith("http"):
                 media_id = self.ig.post_reel(product["video_url"], caption)
+            elif mode == "reel" and str(product.get("video_path", "")):
+                # local reel (downloaded/auto-generated) → host it publicly first
+                hosted_vid = self.ig.upload_catbox(product["video_path"])
+                if hosted_vid:
+                    media_id = self.ig.post_reel(hosted_vid, caption)
+                else:
+                    self.db.log("WARN", "Instagram: reel hosting failed, skipped")
+                    return
             elif len(urls) > 1 and mode == "carousel":
                 media_id = self.ig.post_carousel(urls, caption)
             elif urls:

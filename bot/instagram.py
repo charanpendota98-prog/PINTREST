@@ -92,6 +92,25 @@ class InstagramAPI:
         )
 
     # ------------------------------------------------------------- hosting
+    def upload_catbox(self, file_path: str) -> str:
+        """Host a LOCAL reel video at a public URL (catbox.moe — free,
+        anonymous, no account). IG pulls the video once at publish time."""
+        try:
+            with open(file_path, "rb") as fh:
+                r = requests.post(
+                    "https://catbox.moe/user/api.php",
+                    data={"reqtype": "fileupload"},
+                    files={"fileToUpload": fh},
+                    timeout=180,
+                )
+            url = r.text.strip()
+            if r.ok and url.startswith("http"):
+                return url
+            log.warning("Catbox upload failed: %s", url[:120])
+        except requests.RequestException as exc:
+            log.warning("Catbox upload error: %s", exc)
+        return ""
+
     def upload_imgbb(self, image_path: str) -> str:
         """Upload a local image to ImgBB (free hosting) → public URL."""
         if not self.imgbb_key:
