@@ -26,6 +26,11 @@ DEFAULTS: dict[str, Any] = {
         "schedule_days_ahead": 0, # 0 = post immediately; 1-14 = schedule ahead
         "pins_per_product": 3,    # pin variations per product (different photos+designs)
         "peak_mode": True,        # post only in peak IST traffic windows
+        "board_strategy": "niche",  # niche = keyword boards per category (more reach)
+    },
+    "link": {
+        "bridge": False,          # true = pins link to YOUR domain /go/<id> (tracked)
+        "public_base": "",        # e.g. https://yourdeals.in (where dashboard is hosted)
     },
     "scraping": {
         "delay_seconds": 4.0,

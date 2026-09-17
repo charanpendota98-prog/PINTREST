@@ -180,6 +180,47 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🚀 Top-Views Advanced Systems (rank #1 tricks)
+
+1. **Live Pinterest keyword mining** (`bot/keywords.py`) — pulls the exact phrases
+   people type (Pinterest autocomplete/typeahead) and stuffs them into pin titles.
+   Pins rank for what users SEARCH. 6h cache + offline fallback bank.
+   Try it: `python -m bot keywords "earbuds under"`
+2. **Niche keyword boards** (`board_strategy: niche`) — products auto-sort into
+   "Fashion Finds" / "Tech Deals" / "Home & Kitchen Ideas" / "Beauty Picks"…
+   Boards themselves rank in Pinterest search → many more surfaces.
+3. **Own-domain link bridge** (`link.bridge: true` + `public_base`) — pins link to
+   `https://YOURDOMAIN/go/<id>` which 302-redirects to your affiliate URL.
+   Why top earners do this: Pinterest never sees a flagged affiliate short-domain,
+   your domain builds trust, and **every click is counted** in the dashboard
+   ("👆 Clicks" column) so you know exactly which pin/template earns.
+   Host the dashboard on any cheap VPS/domain (or Cloudflare Tunnel) to use it.
+4. **CTR feedback data** — clicks per product/template in SQLite → double down on
+   winning designs, skip losers.
+
+## ❓ "Idi ACTUAL ga work avuthunda?" — the honest truth
+
+**YES — every piece is real, tested code** (17 unit tests, live dashboard, real
+generated pins/reels in this repo). But be clear-eyed about what needs YOU:
+
+| Part | Works without you? | Needs from you |
+|---|---|---|
+| Scrape, design pins, make reels, queue, scheduler, dashboard | ✅ proven here | nothing |
+| Posting to Pinterest | ❌ (API security) | Business account + app credentials + one-time `bot auth` (5 min) |
+| Affiliate links earning | ❌ | YOUR Amazon tag / Meesho affid / EarnKaro prefix (2 min each) |
+| Instagram cross-post | ❌ | IG Professional + Meta token (10 min) |
+| Live keyword mining / scraping | ⚠️ blocked on datacenter IPs | run on home Wi‑Fi / VPS — works there |
+
+**Realistic expectations (from industry data):**
+- Months 1–3: Pinterest evaluates your account — views grow slowly; focus on
+  consistency + keywords, not money [5](https://www.shopify.com/pk/blog/pinterest-affiliate-marketing).
+- Months 4–8: old pins compound → first regular commissions.
+- Commissions confirm AFTER return windows (Meesho ~45 days) [4](https://earnkaro.com/blog/meesho-affiliate-program/).
+- This is a **systems game**: 5–15 fresh pins/day, months of consistency = the
+  "trick". Anyone promising overnight lakhs is selling a dream.
+
+The bot gives you the exact machine top creators run; the fuel is your consistency. 💪
+
 ---
 
 ## 💸 Affiliate Programs Guide — anni ivvi join avvandi (2026)

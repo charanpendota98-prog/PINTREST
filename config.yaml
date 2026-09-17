@@ -15,6 +15,12 @@ posting:
   schedule_days_ahead: 0   # 0 = post instantly, 1..14 = schedule ahead
   pins_per_product: 3      # pin variations per product (different photo + design)
   peak_mode: true          # post only in peak IST traffic windows (viral trick)
+  board_strategy: niche    # niche keyword boards per category = more search surfaces
+
+link:
+  bridge: false            # true → pins point at YOUR domain /go/<id> (click tracking
+                           # + Pinterest never sees a flagged affiliate domain)
+  public_base: ""          # e.g. https://yourdeals.in — host the dashboard there
 
 scraping:
   delay_seconds: 4         # pause between scrapes (be polite, avoid blocks)

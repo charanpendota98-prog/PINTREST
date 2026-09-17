@@ -261,6 +261,20 @@ def cmd_ig_check(cfg) -> int:
         return 1
 
 
+def cmd_keywords(cfg, seeds: list[str]) -> int:
+    """Mine live Pinterest autocomplete phrases for your niche."""
+    from .keywords import fetch_suggestions
+    for seed in seeds:
+        phrases = fetch_suggestions(seed)
+        print(f"\n🔎 '{seed}' → {len(phrases)} live search phrases:")
+        for p in phrases[:10]:
+            print(f"   • {p}")
+        if not phrases:
+            print("   (Pinterest blocked this network — bot falls back to its keyword bank;")
+            print("    on your home network this mines real trending phrases.)")
+    return 0
+
+
 def cmd_queue(cfg) -> int:
     db = DB(cfg.db_path)
     stats = db.stats()
@@ -335,6 +349,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_add(cfg, rest)
     if cmd == "add-csv" and rest:
         return cmd_add_csv(cfg, rest[0])
+    if cmd == "keywords" and rest:
+        return cmd_keywords(cfg, rest)
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":

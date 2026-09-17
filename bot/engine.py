@@ -18,8 +18,9 @@ from zoneinfo import ZoneInfo
 
 from .affiliate import AffiliateLinker, price_label
 from .db import DB
-from .growth import hashtag_mix, hook_for, peak_window, seo_title
+from .growth import hashtag_mix, hook_for, peak_window, pick_board, seo_title
 from .instagram import InstagramAPI, InstagramError
+from .keywords import KeywordCache
 from .pinterest_api import PinterestAPI, PinterestError
 from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
@@ -58,7 +59,16 @@ class Engine:
         self.reel = ReelMaker(cfg)
         self.api = PinterestAPI(cfg)
         self.ig = InstagramAPI(cfg)
+        self.kw = KeywordCache(self.db)
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
+
+    # ------------------------------------------------------------- links
+    def _pin_link(self, product: dict) -> str:
+        """Bridge link (your domain, tracked) or raw affiliate link."""
+        base = str(self.cfg.get("link.public_base", "") or "").strip().rstrip("/")
+        if self.cfg.get("link.bridge", False) and base:
+            return f"{base}/go/{product['id']}"
+        return product["affiliate_url"]
 
     # ---------------------------------------------------------- ingestion
     def ingest_url(self, url: str, force: bool = False) -> int:
@@ -156,8 +166,13 @@ class Engine:
     # ------------------------------------------------------------- posting
     def post_product(self, product: dict) -> dict:
         """Publish one queued product to Pinterest. Updates DB rows."""
-        board_name = self.cfg.get("pinterest.board_name", "Best Deals")
+        default_board = self.cfg.get("pinterest.board_name", "Best Deals")
+        if self.cfg.get("posting.board_strategy", "niche") == "niche":
+            board_name = pick_board(product["title"], product["source"], default_board)
+        else:
+            board_name = default_board
         board_id = self.api.ensure_board(board_name)
+        link = self._pin_link(product)
 
         days_ahead = int(self.cfg.get("posting.schedule_days_ahead", 0))
         scheduled_for = None
@@ -171,22 +186,24 @@ class Engine:
             scheduled_for=scheduled_for.isoformat() if scheduled_for else "",
         )
         try:
-            # keyword-stuffed SEO title (Pinterest = search engine)
+            # keyword-stuffed SEO title (Pinterest = search engine) + LIVE
+            # autocomplete phrase mined from Pinterest typeahead
+            phrase = self.kw.phrase_for(product["title"])
             seo_t = seo_title(product["title"],
                               price_label(product["price"], product["currency"]),
-                              product["source"])
+                              product["source"], phrase=phrase)
             video_file = product.get("video_path", "") or ""
             if video_file and Path(video_file).exists():
                 # video pin path — real / auto-generated reel uploaded to Pinterest
                 media_id = self.api.upload_video(video_file)
                 pin = self.api.create_video_pin(
-                    board_id, media_id, product["affiliate_url"],
+                    board_id, media_id, link,
                     seo_t, product["seo_text"], scheduled_for,
                 )
             else:
                 pin = self.api.create_image_pin(
                     board_id=board_id,
-                    link=product["affiliate_url"],
+                    link=link,
                     title=seo_t,
                     description=product["seo_text"],
                     alt_text=product["title"][:500],

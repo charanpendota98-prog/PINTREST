@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS logs (
     level   TEXT NOT NULL,
     message TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS clicks (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    ts         TEXT NOT NULL,
+    ua         TEXT NOT NULL DEFAULT ''
+);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 """
 
@@ -174,9 +180,25 @@ class DB:
     def recent_posts(self, limit: int = 200) -> list[dict[str, Any]]:
         with self._conn() as c:
             rows = c.execute(
-                """SELECT p.*, pr.title, pr.source, pr.affiliate_url, pr.pin_image
+                """SELECT p.*, pr.title, pr.source, pr.affiliate_url, pr.pin_image,
+                          (SELECT COUNT(*) FROM clicks cl WHERE cl.product_id=p.product_id) AS clicks
                    FROM posts p JOIN products pr ON pr.id=p.product_id
                    ORDER BY p.id DESC LIMIT ?""",
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # --------------------------------------------------------------- clicks
+    def log_click(self, product_id: int, ua: str = "") -> None:
+        with _lock, self._conn() as c:
+            c.execute(
+                "INSERT INTO clicks(product_id, ts, ua) VALUES(?,?,?)",
+                (product_id, utcnow(), ua[:200]),
+            )
+
+    def click_counts(self) -> dict[int, int]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT product_id, COUNT(*) n FROM clicks GROUP BY product_id"
+            ).fetchall()
+        return {r["product_id"]: r["n"] for r in rows}

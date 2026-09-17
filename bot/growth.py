@@ -45,16 +45,16 @@ SOURCE_KEYWORDS = {
 }
 
 
-def seo_title(title: str, price_label: str, source: str) -> str:
+def seo_title(title: str, price_label: str, source: str, phrase: str = "") -> str:
     """Keyword-rich Pinterest title, ≤100 chars.
 
-    Pattern:  <clean product name> | <source kw> | <price kw> (year)
+    Pattern:  <clean product name> | <LIVE search phrase or source kw> | price kw
     """
-    clean = " ".join(title.split())[:58]
-    src_kw = random.choice(SOURCE_KEYWORDS.get(source, SOURCE_KEYWORDS["other"]))
+    clean = " ".join(title.split())[:52]
+    kw = (phrase or "").strip() or random.choice(
+        SOURCE_KEYWORDS.get(source, SOURCE_KEYWORDS["other"]))
     price_kw = random.choice(PRICE_KEYWORDS) if price_label else random.choice(POWER_KEYWORDS)
-    extra = random.choice(POWER_KEYWORDS)
-    cand = f"{clean} | {src_kw} | {price_kw} {extra} {YEAR}"
+    cand = f"{clean} | {kw} | {price_kw} {YEAR}"
     return cand[:100]
 
 
@@ -105,3 +105,27 @@ def roundup_title(price_label: str, kw: str) -> str:
     return random.choice(ROUNDUP_TITLES).format(
         price=price_label or "₹999", kw=kw or "Amazon"
     ).strip()
+
+
+# ------------------------------------------------- niche boards (more surfaces)
+BOARD_RULES = [
+    (("kurta", "saree", "dress", "fashion", "women", "jewel", "footwear", "bag"),
+     "Fashion Finds"),
+    (("earbud", "watch", "phone", "gadget", "headphone", "speaker", "smart", "charger"),
+     "Tech Deals"),
+    (("home", "kitchen", "decor", "bedsheet", "lamp", "organizer", "storage"),
+     "Home & Kitchen Ideas"),
+    (("serum", "cream", "beauty", "makeup", "hair", "skincare"),
+     "Beauty Picks"),
+    (("kids", "baby", "toy", "school"), "Kids & Toys"),
+]
+
+
+def pick_board(title: str, source: str, default: str) -> str:
+    """Niche board per product — boards rank in search too, so several
+    keyword-named niche boards = many more surfaces than one big board."""
+    low = title.lower()
+    for words, board in BOARD_RULES:
+        if any(w in low for w in words):
+            return board
+    return default

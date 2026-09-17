@@ -41,6 +41,21 @@ def create_app(cfg, db: DB | None = None) -> Flask:
     def index():
         return send_from_directory(ROOT / "templates", "index.html")
 
+    @app.get("/go/<int:pid>")
+    def go(pid: int):
+        """Your own-domain bridge link: Pinterest → /go/12 → affiliate URL.
+
+        Why top affiliates do this: your domain is never flagged as a known
+        affiliate short-link, it builds account trust, and every click is
+        counted so you know EXACTLY which pin makes money.
+        """
+        from flask import redirect
+        rows = [p for p in db.all_products(limit=2000) if p["id"] == pid]
+        if not rows:
+            return jsonify({"ok": False, "error": "unknown product"}), 404
+        db.log_click(pid, request.headers.get("User-Agent", ""))
+        return redirect(rows[0]["affiliate_url"], code=302)
+
     @app.get("/media/<path:name>")
     def media(name: str):
         return send_file(media_dir / name)
