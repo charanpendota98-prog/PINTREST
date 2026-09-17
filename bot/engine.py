@@ -24,6 +24,7 @@ from .keywords import KeywordCache
 from .pinterest_api import PinterestAPI, PinterestError
 from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
+from .trends import score_product, sourcing_plan
 from .video_maker import ReelMaker
 
 log = logging.getLogger("pindrop.engine")
@@ -153,6 +154,7 @@ class Engine:
                 variant=v,
                 category=prod.category,
                 seo_text=seo,
+                score=score_product(prod.title, prod.price, prod.source),
             )
             if first_id < 0:
                 first_id = pid
@@ -293,14 +295,15 @@ class Engine:
 
     # ----------------------------------------------------------- autopilot
     def auto_source(self) -> int:
-        """ZERO-TOUCH sourcing: hunt trending products by itself."""
+        """ZERO-TOUCH winner-clone sourcing: hunts products in the exact
+        niches top channels push, priority order (fashion → decor → beauty…)."""
         added = 0
         limit = int(self.cfg.get("autopilot.discover_limit", 4))
-        for src in ("amazon", "meesho", "flipkart"):
+        for store, query, niche in sourcing_plan():
             try:
-                urls = self.scraper.discover_products(src, limit=limit)
+                urls = self.scraper.discover_products(store, limit=limit, query=query)
             except Exception as exc:  # noqa: BLE001
-                self.db.log("WARN", f"Discover {src} failed: {exc}")
+                self.db.log("WARN", f"Discover {store} '{query}' failed: {exc}")
                 urls = []
             for u in urls:
                 if self.db.url_exists(u):
@@ -311,8 +314,11 @@ class Engine:
                 except ValueError:
                     continue
                 self.scraper.polite_wait()
+            if added:  # don't over-hunt in one cycle
+                break
         if added:
-            self.db.log("INFO", f"🛰 Autopilot sourced {added} new trending product(s)")
+            self.db.log("INFO", f"🏆 Winner-clone sourced {added} new product(s) "
+                                "from top niches")
         return added
 
     # ----------------------------------------------------------- scheduler

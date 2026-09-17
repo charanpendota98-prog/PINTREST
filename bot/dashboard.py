@@ -161,10 +161,12 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         pin_path = cfg.media_dir / f"pin_{int(time.time()*1000)}.jpg"
         PinDesigner(cfg).create(img_path, title, price_label(price), pin_path, network)
         seo = build_seo_text(cfg, title, price, "INR", network)
+        from .trends import score_product
         pid = db.add_product(source=src, url=url, affiliate_url=aff_url, title=title,
                              price=price, image_url=image_url, image_path=img_path,
                              pin_image=str(pin_path), video_url=video_url,
-                             video_path=video_path, seo_text=seo)
+                             video_path=video_path, seo_text=seo,
+                             score=score_product(title, price, src))
         db.log("INFO", f"Manually queued product #{pid}: {title[:60]}")
         return jsonify({"ok": True, "id": pid})
 

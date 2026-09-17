@@ -273,18 +273,27 @@ class Scraper:
                 prod.title = t.get_text(strip=True)
 
     # ------------------------------------------------------------ download
-    def discover_products(self, source: str = "amazon", limit: int = 6) -> list[str]:
+    def discover_products(self, source: str = "amazon", limit: int = 6,
+                          query: str = "") -> list[str]:
         """AUTOPILOT: hunt trending product URLs by themselves.
 
-        Scrapes public bestseller/deal listing pages and extracts product
-        links. Zero-touch content sourcing. Returns [] politely when the
-        network blocks us (bot then waits and retries later).
+        With `query` → scrapes the store's SEARCH results for that winning
+        niche (winner-clone mode). Without → bestseller/deal listing pages.
+        Returns [] politely when the network blocks us.
         """
-        urls = {
-            "amazon": "https://www.amazon.in/gp/bestsellers/electronics",
-            "flipkart": "https://www.flipkart.com/mobiles/pr?sid=tyy,4io",
-            "meesho": "https://www.meesho.com/women-ethnic-wear/pl/1k1b6",
-        }
+        from urllib.parse import quote_plus
+        if query:
+            urls = {
+                "amazon": f"https://www.amazon.in/s?k={quote_plus(query)}",
+                "flipkart": f"https://www.flipkart.com/search?q={quote_plus(query)}",
+                "meesho": f"https://www.meesho.com/search?q={quote_plus(query)}",
+            }
+        else:
+            urls = {
+                "amazon": "https://www.amazon.in/gp/bestsellers/electronics",
+                "flipkart": "https://www.flipkart.com/mobiles/pr?sid=tyy,4io",
+                "meesho": "https://www.meesho.com/women-ethnic-wear/pl/1k1b6",
+            }
         patterns = {
             "amazon": re.compile(r"/dp/([A-Z0-9]{10})"),
             "flipkart": re.compile(r"\?pid=([A-Z0-9]+)"),

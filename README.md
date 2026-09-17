@@ -200,6 +200,29 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🏆 Winner Cloning — top channels em peduthunnavo, FIRST priority
+
+Data-driven analysis of the highest-view affiliate channels (Pinterest + IG,
+2026) shows the same winning niches again and again [2](https://sociavault.com/blog/pinterest-affiliate-marketing-data-driven)[4](https://pingroupie.com/blog/pinterest-trending-niches-2026):
+
+1. **Women's Fashion** (kurtas/sarees — Meesho's kingdom; 13B+ pins category) [4](https://pingroupie.com/blog/pinterest-trending-niches-2026)
+2. **Home Decor & Organization** (top performer, huge saves) [4](https://pingroupie.com/blog/pinterest-trending-niches-2026)
+3. **Beauty & Skincare** (6B+ pins) [4](https://pingroupie.com/blog/pinterest-trending-niches-2026)
+4. **Tech gadgets under ₹1,500** (India impulse zone; Flipkart/Amazon) [5](https://www.investkraft.com/blog/top-affiliate-marketing-websites-india-2026)
+5. Kitchen tools → Jewellery → Kids → Fitness
+
+`bot/trends.py` encodes this as a **priority engine**:
+- **Autopilot hunts these niches first** (store search queries per niche)
+- every product gets a **winner score** (niche priority + sweet-price ₹199–₹999
+  + hooky words) — the queue posts **highest score first** 🏆
+- dashboard shows the 🏆 score per product
+- `python -m bot trends` prints the current winner list
+
+⚠️ We clone the winning *categories* (that's data) — never someone's images or
+videos. Original pins for the same winning niches = safe + effective.
+
+---
+
 ## 🚀 Top-Views Advanced Systems (rank #1 tricks)
 
 1. **Live Pinterest keyword mining** (`bot/keywords.py`) — pulls the exact phrases

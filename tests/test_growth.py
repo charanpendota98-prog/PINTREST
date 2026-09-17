@@ -62,3 +62,24 @@ class TestReelMaker(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestTrends(unittest.TestCase):
+    def test_winner_scoring(self):
+        from bot.trends import score_product
+        fashion = score_product("Women Yellow Floral Kurta Set", "549", "meesho")
+        random_ = score_product("Industrial Bearing 6204 ZZ", "549", "other")
+        self.assertGreater(fashion, random_)
+        # sweet price bonus
+        cheap = score_product("Wireless Earbuds", "999", "amazon")
+        pricey = score_product("Wireless Earbuds", "99999", "amazon")
+        self.assertGreater(cheap, pricey)
+
+    def test_sourcing_plan_priority(self):
+        from bot.trends import sourcing_plan
+        plan = sourcing_plan()
+        self.assertTrue(plan)
+        # fashion niche must come first (priority 1)
+        self.assertEqual(plan[0][2], "Women's Fashion")
+        stores = {p[0] for p in plan}
+        self.assertTrue(stores & {"amazon", "meesho", "flipkart"})

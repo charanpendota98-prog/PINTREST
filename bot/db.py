@@ -62,6 +62,7 @@ MIGRATIONS = [
     "ALTER TABLE posts ADD COLUMN ig_post_id TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE posts ADD COLUMN ig_error TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE products ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE products ADD COLUMN score INTEGER NOT NULL DEFAULT 0",
 ]
 
 
@@ -124,7 +125,8 @@ class DB:
     def pending_products(self, limit: int = 50) -> list[dict[str, Any]]:
         with self._conn() as c:
             rows = c.execute(
-                "SELECT * FROM products WHERE status='queued' ORDER BY id LIMIT ?",
+                """SELECT * FROM products WHERE status='queued'
+                   ORDER BY score DESC, id ASC LIMIT ?""",
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]

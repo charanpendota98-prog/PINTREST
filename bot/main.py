@@ -225,10 +225,11 @@ def cmd_add_csv(cfg, path: str) -> int:
                     pin_path = cfg.media_dir / f"pin_{int(time.time()*1000)}.jpg"
                     PinDesigner(cfg).create(img_path, title, price, pin_path, network)
                     seo = build_seo_text(cfg, title, price, "INR", network)
+                    from .trends import score_product
                     db.add_product(source=src, url=url, affiliate_url=aff_url, title=title,
                                    price=price, image_url=image_url, image_path=img_path,
                                    pin_image=str(pin_path), video_url=(row.get("video_url") or ""),
-                                   seo_text=seo)
+                                   seo_text=seo, score=score_product(title, price, src))
                     added += 1
                     print(f"✅ {title[:55]}")
                 else:
@@ -350,6 +351,16 @@ def cmd_ig_check(cfg) -> int:
         return 1
 
 
+def cmd_trends(cfg) -> int:
+    """Show the winner-niche priority list (what top channels push)."""
+    from .trends import describe, WINNER_NICHES
+    print()
+    print(describe())
+    print("\n   Autopilot hunts these niches FIRST, and the queue posts")
+    print("   higher-scored products first. Same winners, original pins. 🏆")
+    return 0
+
+
 def cmd_keywords(cfg, seeds: list[str]) -> int:
     """Mine live Pinterest autocomplete phrases for your niche."""
     from .keywords import fetch_suggestions
@@ -440,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_add_csv(cfg, rest[0])
     if cmd == "keywords" and rest:
         return cmd_keywords(cfg, rest)
+    if cmd == "trends":
+        return cmd_trends(cfg)
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":

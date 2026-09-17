@@ -165,7 +165,7 @@ async function refresh(){
         <td>${p.pin_image ? `<img class="thumb" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
         <td><a href="${p.url}" target="_blank">${esc(p.title.slice(0,70))}</a><br><span style="color:var(--muted);font-size:11.5px">${esc(p.affiliate_url.slice(0,80))}</span></td>
         <td><span class="badge b-${p.source}">${p.source}</span></td>
-        <td>${esc(p.price)}</td>
+        <td>${esc(p.price)}<br><span class="badge" style="background:#3a2f13;color:#ffd166" title="winner score — higher posts first">🏆 ${p.score||0}</span></td>
         <td><span class="badge b-${p.status}">${p.status}</span></td>
         <td class="row-actions">${p.status==='queued'?`<button onclick="skipP(${p.id})">skip</button>`:''}</td>
       </tr>`).join('');
