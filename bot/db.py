@@ -198,6 +198,42 @@ class DB:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ------------------------------------------------------------- reshare
+    def reshare_candidates(self, min_clicks: int = 3, rest_days: int = 7,
+                           max_shares: int = 3, limit: int = 5) -> list[dict]:
+        """Proven winners worth re-pinning with FRESH designs.
+
+        Top-0.1% trick: Pinterest rewards NEW pins, and winners earn more
+        each round — so rotate them (new template, new keywords, same deal).
+        """
+        sql = """
+        SELECT p.*,
+          (SELECT COUNT(*) FROM posts po WHERE po.product_id=p.id
+             AND po.status='posted') AS shares,
+          (SELECT MAX(po.posted_at) FROM posts po WHERE po.product_id=p.id
+             AND po.status='posted') AS last_post,
+          (SELECT COUNT(*) FROM clicks cl WHERE cl.product_id=p.id) AS clicks
+        FROM products p WHERE p.status='posted'
+        """
+        rows: list[dict] = []
+        with self._conn() as c:
+            rows = [dict(r) for r in c.execute(sql).fetchall()]
+        now = datetime.now(timezone.utc)
+        out = []
+        for r in rows:
+            if r["clicks"] < min_clicks or r["shares"] >= max_shares:
+                continue
+            lp = r.get("last_post") or ""
+            if lp:
+                try:
+                    if (now - datetime.fromisoformat(lp)).days < rest_days:
+                        continue
+                except ValueError:
+                    pass
+            out.append(r)
+        out.sort(key=lambda r: r["clicks"], reverse=True)
+        return out[:limit]
+
     # --------------------------------------------------------------- clicks
     def log_click(self, product_id: int, ua: str = "") -> None:
         with _lock, self._conn() as c:

@@ -192,12 +192,16 @@ class PinterestAPI:
             body["description"] = description
         return self._request("POST", "/boards", json=body)
 
-    def ensure_board(self, name: str) -> str:
-        """Return board_id for `name`, creating it if needed."""
+    def ensure_board(self, name: str, description: str = "") -> str:
+        """Return board_id for `name`, creating it if needed (SEO description)."""
         for b in self.list_boards():
             if b.get("name", "").lower() == name.lower():
                 return b["id"]
-        board = self.create_board(name, f"Auto-curated deals by {self.cfg.get('design.brand_name', 'PinDrop Pro')}")
+        brand = self.cfg.get("design.brand_name", "PinDrop Pro")
+        desc = description or (f"{name} — latest offers, price drops & top-rated "
+                               f"finds curated by {brand}. Best deals India: "
+                               f"online shopping, discounts & combo offers.")
+        board = self.create_board(name, desc)
         log.info("Created board '%s' (id=%s)", name, board.get("id"))
         return board["id"]
 

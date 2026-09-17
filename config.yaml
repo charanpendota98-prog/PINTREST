@@ -29,6 +29,11 @@ scraping:
   max_retries: 2
   max_images: 3            # gallery photos to download per product
 
+reshare:
+  min_clicks: 3            # proven winners = products with ≥ this many clicks
+  rest_days: 7             # let a winner rest this long before a fresh re-pin
+  max_shares: 3            # never spam: max total posts per product
+
 video:
   auto_reel: true          # no product video on the page? auto-generate a
                            # viral 6s reel from the photos (hook → zoom → CTA)

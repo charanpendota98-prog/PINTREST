@@ -74,6 +74,7 @@ class Engine:
         self.kw = KeywordCache(self.db)
         self.notify = Notifier()
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
+        self._last_reshare = 0.0  # daily winners-rotation timer
 
     # ------------------------------------------------------------- links
     def pick_template(self) -> str:
@@ -210,7 +211,9 @@ class Engine:
             board_name = pick_board(product["title"], product["source"], default_board)
         else:
             board_name = default_board
-        board_id = self.api.ensure_board(board_name)
+        board_id = self.api.ensure_board(board_name,
+            f"{board_name} — best offers, price drops & top-rated finds. "
+            "Daily deals India: online shopping discounts & combo offers.")
         link = self._pin_link(product)
 
         days_ahead = int(self.cfg.get("posting.schedule_days_ahead", 0))
@@ -258,6 +261,10 @@ class Engine:
             self.db.update_product(product["id"], status="posted")
             self.db.log("INFO", f"Posted pin {pin.get('id')} — {product['title'][:50]}")
             self.notify.posted(product["title"], str(pin.get("id")), product["source"])
+            # broadcast to public Telegram deals channel (top-India trick)
+            self.notify.deal(product["title"],
+                             price_label(product["price"], product["currency"]),
+                             link, product.get("image_url", ""))
             self._post_instagram(product, post_id)
             return pin
         except PinterestError as exc:
@@ -367,6 +374,28 @@ class Engine:
                                 "from top niches")
         return added
 
+    # ----------------------------------------------------------- reshare
+    def reshare_winners(self) -> int:
+        """Top-0.1% rotation: re-post proven winners as FRESH pins.
+
+        Pinterest's algorithm boosts new pins; products that already earned
+        clicks get a new design + new keywords and go around again.
+        """
+        cands = self.db.reshare_candidates(
+            min_clicks=int(self.cfg.get("reshare.min_clicks", 3)),
+            rest_days=int(self.cfg.get("reshare.rest_days", 7)),
+            max_shares=int(self.cfg.get("reshare.max_shares", 3)))
+        n = 0
+        for prod in cands[:2]:  # gentle: max 2 re-shares per cycle
+            try:
+                self.post_product(prod)
+                n += 1
+                self.db.log("INFO", f"🔁 Re-shared winner #{prod['id']} "
+                                    f"({prod.get('clicks')} clicks) with fresh design")
+            except Exception as exc:  # noqa: BLE001
+                self.db.log("WARN", f"Reshare failed: {exc}")
+        return n
+
     # ----------------------------------------------------------- scheduler
     def _human_gap(self) -> float:
         mins = float(self.cfg.get("posting.min_gap_minutes", 40))
@@ -386,6 +415,13 @@ class Engine:
 
         while True:
             now = datetime.now(self.tz)
+            # top-0.1% freshness trick: rotate proven winners as new pins daily
+            if time.time() - self._last_reshare > 24 * 3600:
+                self._last_reshare = time.time()
+                try:
+                    self.reshare_winners()
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"Reshare cycle error: {exc}")
             w_start, w_end = peak_window(now) if peak else (start_h, end_h)
             # festival / payday volume boost (India shopping spikes)
             fest_name, _, mult = festival_boost(now)

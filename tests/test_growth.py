@@ -131,3 +131,27 @@ class TestMusicMaker(unittest.TestCase):
             with wave.open(out) as w:
                 self.assertEqual(w.getnchannels(), 1)
                 self.assertGreater(w.getnframes(), 22050 * 3)  # ~4s audio
+
+
+class TestReshare(unittest.TestCase):
+    def test_reshare_candidates(self):
+        import tempfile
+        from datetime import datetime, timezone, timedelta
+        from pathlib import Path
+        from bot.db import DB
+        with tempfile.TemporaryDirectory() as tmp:
+            db = DB(Path(tmp) / "t.db")
+            pid = db.add_product(source="amazon", url="http://x/1", title="Winner Item",
+                                    price="499", currency="INR", image_url="", affiliate_url="http://a")
+            db.add_post(product_id=pid, board_id="b1", status="posted",
+                        posted_at=(datetime.now(timezone.utc) - timedelta(days=10)).isoformat())
+            db.update_product(pid, status="posted")
+            db.update_post(1, status="posted")
+            for _ in range(4):
+                db.log_click(pid, "ua")
+            cands = db.reshare_candidates(min_clicks=3, rest_days=7)
+            self.assertEqual(len(cands), 1)
+            self.assertEqual(cands[0]["clicks"], 4)
+            # rested too recently → excluded
+            db.update_post(1, posted_at=datetime.now(timezone.utc).isoformat())
+            self.assertEqual(len(db.reshare_candidates()), 0)

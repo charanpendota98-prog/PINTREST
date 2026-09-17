@@ -200,6 +200,17 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🔬 Top-0.1% Micro Layer — the small moves that compound
+
+| Micro trick | What it does |
+|---|---|
+| 🔁 **Winners rotation** (`reshare_winners`) | products that earned clicks get re-posted as FRESH pins daily (new design + keywords) — Pinterest boosts freshness, winners earn each round |
+| 💬 **WhatsApp share button** on every landing page | India's #1 viral loop — family/WhatsApp-group sharing = free distribution |
+| 📢 **Telegram deals channel** (`TELEGRAM_DEALS_CHANNEL`) | broadcast every deal to a public channel — how India's top affiliates scale |
+| 📋 **SEO board descriptions** | boards created with keyword-rich descriptions (Pinterest indexes them) |
+| 🎣 **Hook bank** (incl. Hinglish) | 15+ rotating curiosity hooks, tested phrasing, A/B by template CTR |
+| ⏰ **Hour-wise CTR learning** | denser posting in YOUR proven click hours (≥10 clicks learned) |
+
 ## 🎬 "Amazon photos/videos tho top vallu em chestunnaru?" — Gap Analysis
 
 How the big faceless channels actually operate, and our coverage:

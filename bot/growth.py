@@ -28,6 +28,12 @@ HOOKS = [
     "The {kw} upgrade your desk/home needed ✨",
     "Under {price}?! Take my money 💸",
     "3 reasons this {kw} is worth it ⬇️",
+    "Price-drop alert 📉 run don't walk",
+    "Why is NO ONE talking about this {kw}?? 😤",
+    "Your cart called — it wants this 🛒",
+    "Gift-ready find under {price} 🎁",
+    "Ye deal miss mat karna 😱 ({kw})",
+    "Best {kw} under {price} — saving this one 📌",
     "Don't buy a {kw} until you see this 🚫",
 ]
 

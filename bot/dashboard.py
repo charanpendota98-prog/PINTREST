@@ -39,6 +39,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
      padding:18px;border-radius:14px;text-decoration:none;margin:18px 0;
      box-shadow:0 6px 18px rgba(230,0,35,.35)}
  a.buy:active{transform:scale(.98)}
+ a.wa{display:block;text-align:center;background:#25D366;color:#fff;font-size:16px;
+     font-weight:800;padding:13px;border-radius:14px;text-decoration:none;margin:0 0 16px}
  .disc{color:#999;font-size:11.5px;text-align:center;padding:10px}
  .urg{background:#fff3cd;border:1px solid #ffe08a;color:#7a5c00;border-radius:10px;
      padding:10px;text-align:center;font-weight:600;font-size:14px}
@@ -56,6 +58,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
     <li>💯 Secure checkout on the official store</li>
   </ul>
   <a class="buy" rel="nofollow sponsored" href="{{ buy }}">🛒 GRAB THE DEAL →</a>
+  <a class="wa" href="https://wa.me/?text={{ wa }}" target="_blank" rel="noopener">
+     💬 Share this deal on WhatsApp (family groups = free sales!)</a>
   <form method="post" action="/subscribe/{{ pid }}">
     <input type="email" name="email" required placeholder="Your email — get daily best deals free"
       style="width:100%;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:15px">
@@ -105,13 +109,18 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         if not cfg.get("link.landing", True):
             return redirect(p["affiliate_url"], code=302)
 
+        from urllib.parse import quote
         from .affiliate import price_label
         price = price_label(p["price"], p["currency"]) or "Best Price"
         disc = int(p.get("discount", 0) or 0)
+        public = str(cfg.get("link.public_base", "")).rstrip("/")
+        wa = quote(f"🔥 Deal alert! {p['title']} — only {price}"
+                   f"{' (' + str(disc) + '% OFF)' if disc >= 15 else ''} 👉 "
+                   f"{public}/go/{pid}")
         return render_template_string(LANDING_HTML,
                                       title=p["title"], price=price,
                                       disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
-                                      buy=p["affiliate_url"], pid=pid,
+                                      buy=p["affiliate_url"], pid=pid, wa=wa,
                                       brand=cfg.get("design.brand_name", "Deal Drops"))
 
     @app.post("/subscribe/<int:pid>")

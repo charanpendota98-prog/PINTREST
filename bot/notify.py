@@ -21,6 +21,25 @@ class Notifier:
     def __init__(self):
         self.token = os.getenv("TELEGRAM_TOKEN", "").strip()
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        # top Indian affiliates run Telegram DEALS channels — broadcast mode:
+        self.deals_channel = os.getenv("TELEGRAM_DEALS_CHANNEL", "").strip()
+
+    def deal(self, title: str, price: str, url: str, image: str = "") -> None:
+        """Broadcast a deal card to your public deals channel (optional)."""
+        if not (self.token and self.deals_channel):
+            return
+        caption = (f"🔥 {title}\n💰 {price}\n👉 {url}\n\n#Deals #Offer #India")[:1000]
+        try:
+            if image:
+                requests.post(f"https://api.telegram.org/bot{self.token}/sendPhoto",
+                              data={"chat_id": self.deals_channel, "photo": image,
+                                    "caption": caption}, timeout=20)
+            else:
+                requests.post(f"https://api.telegram.org/bot{self.token}/sendMessage",
+                              data={"chat_id": self.deals_channel, "text": caption,
+                                    "disable_web_page_preview": "false"}, timeout=20)
+        except requests.RequestException as exc:
+            log.warning("Telegram deals broadcast failed: %s", exc)
 
     @property
     def enabled(self) -> bool:
