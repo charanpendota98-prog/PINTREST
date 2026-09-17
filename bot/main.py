@@ -21,6 +21,7 @@ import http.server
 import logging
 import os
 import sys
+from pathlib import Path
 import threading
 import urllib.parse
 import webbrowser
@@ -330,6 +331,64 @@ def cmd_setup(cfg) -> int:
     return 0
 
 
+def cmd_doctor(cfg) -> int:
+    """Full health check — 'anthi set avuthunda?' ki oka command answer."""
+    import shutil
+    from .instagram import InstagramAPI
+    from .notify import Notifier
+
+    checks: list[tuple[str, bool, str]] = []
+    def ck(name: str, ok: bool, fix: str = "") -> None:
+        checks.append((name, ok, fix))
+
+    ck("Python ≥3.9", __import__("sys").version_info >= (3, 9))
+    try:
+        import PIL, flask, bs4, yaml, imageio_ffmpeg  # noqa: F401
+        ck("Dependencies installed", True)
+        ck("ffmpeg (reels)", bool(imageio_ffmpeg.get_ffmpeg_exe()))
+    except ImportError as e:
+        ck("Dependencies installed", False, f"pip install -r requirements.txt ({e})")
+    ck("Fonts (pin text)", Path("/usr/share/fonts/truetype/dejavu").exists()
+       or shutil.which("fc-list") is not None)
+    ck(".env file", (Path(__file__).parent.parent / ".env").exists(),
+       "python -m bot setup")
+    ck("Pinterest App ID/Secret", bool(cfg.pinterest_app_id and cfg.pinterest_app_secret),
+       "developers.pinterest.com → create app → .env")
+    ck("Pinterest token (auth done)", cfg.token_path.exists(),
+       "python -m bot auth-url  +  auth --code")
+    ck("Amazon tag", bool(cfg.amazon_tag), "affiliate-program.amazon.in")
+    ck("Meesho/EarnKaro/Cuelinks (any)", bool(
+        cfg.get("affiliate.meesho_affid") or os.getenv("MEESHO_AFFID")
+        or cfg.get("affiliate.earnkaro_prefix") or os.getenv("EARNKARO_PREFIX")
+        or cfg.get("affiliate.cuelinks_template")), "see README affiliate guide")
+    ig = InstagramAPI(cfg)
+    ck("Instagram (optional)", ig.configured or not cfg.get("instagram.enabled"),
+       "README → Instagram Automation")
+    ck("Telegram alerts (optional)", Notifier().enabled or True,
+       "@BotFather token → .env")
+    db = DB(cfg.db_path)
+    st = db.stats()
+    ck("Database OK", st["total"] >= 0)
+    ck("Queue has products", st["queued"] > 0, "bot add <url>  (or autopilot hunts)")
+
+    print("\n🩺 PinDrop Pro doctor\n" + "-" * 58)
+    bad = 0
+    for name, ok, fix in checks:
+        mark = "✅" if ok else "❌"
+        if not ok and "optional" not in name:
+            bad += 1
+        line = f" {mark} {name}"
+        if not ok and fix:
+            line += f"  → {fix}"
+        print(line)
+    print("-" * 58)
+    if bad:
+        print(f" {bad} thing(s) to fix — mostly `python -m bot setup` covers all.\n")
+    else:
+        print(" 🎉 FULLY SET! Run:  ./run.sh   (24×7 autopilot)\n")
+    return 0 if bad == 0 else 1
+
+
 def cmd_ig_check(cfg) -> int:
     ig = InstagramAPI(cfg)
     if not ig.configured:
@@ -443,6 +502,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_auth_url(cfg)
     if cmd == "check":
         return cmd_check(cfg)
+    if cmd == "doctor":
+        return cmd_doctor(cfg)
     if cmd == "ig-check":
         return cmd_ig_check(cfg)
     if cmd == "add" and rest:

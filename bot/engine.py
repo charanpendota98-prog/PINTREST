@@ -12,7 +12,7 @@ import logging
 import random
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -22,6 +22,7 @@ from .growth import (festival_boost, hashtag_mix, hook_for, peak_window,
                      pick_board, seo_title)
 from .instagram import InstagramAPI, InstagramError
 from .keywords import KeywordCache
+from .notify import Notifier
 from .pinterest_api import PinterestAPI, PinterestError
 from .pin_designer import PinDesigner, TEMPLATES
 from .scraper import Scraper
@@ -71,6 +72,7 @@ class Engine:
         self.api = PinterestAPI(cfg)
         self.ig = InstagramAPI(cfg)
         self.kw = KeywordCache(self.db)
+        self.notify = Notifier()
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
 
     # ------------------------------------------------------------- links
@@ -245,6 +247,7 @@ class Engine:
             )
             self.db.update_product(product["id"], status="posted")
             self.db.log("INFO", f"Posted pin {pin.get('id')} — {product['title'][:50]}")
+            self.notify.posted(product["title"], str(pin.get("id")), product["source"])
             self._post_instagram(product, post_id)
             return pin
         except PinterestError as exc:
@@ -396,6 +399,12 @@ class Engine:
             if fest_name and mult > 1:
                 self.db.log("INFO", f"🎉 {fest_name} boost: {eff_per_day} pins today")
             gap_s = min(self._human_gap(), remaining_hours * 3600 / max(todo, 1))
+            # hour-wise CTR learning: denser posting in YOUR proven hours
+            hours = self.db.click_hours()
+            if sum(hours.values()) >= 10:
+                utc_h = now.astimezone(timezone.utc).hour
+                avg = sum(hours.values()) / max(1, len(hours))
+                gap_s *= 0.6 if hours.get(utc_h, 0) > avg else 1.3
             try:
                 self.post_next()
             except PinterestError:

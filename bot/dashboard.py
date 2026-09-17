@@ -14,6 +14,7 @@ from flask import Flask, jsonify, request, send_file, send_from_directory
 
 from .db import DB
 from .engine import Engine
+from .notify import Notifier
 from .pinterest_api import PinterestAPI, PinterestError
 
 log = logging.getLogger("pindrop.dashboard")
@@ -55,6 +56,12 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
     <li>💯 Secure checkout on the official store</li>
   </ul>
   <a class="buy" rel="nofollow sponsored" href="{{ buy }}">🛒 GRAB THE DEAL →</a>
+  <form method="post" action="/subscribe/{{ pid }}">
+    <input type="email" name="email" required placeholder="Your email — get daily best deals free"
+      style="width:100%;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:15px">
+    <button style="width:100%;margin-top:8px;padding:12px;border:none;border-radius:10px;
+      background:#222;color:#fff;font-weight:700;font-size:15px">🔔 Send Me Daily Deals</button>
+  </form>
   <div class="disc">As an affiliate partner we may earn from qualifying purchases.
   Price can change anytime — check the store for the live price.</div>
 </div></div></body></html>"""
@@ -103,10 +110,21 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         disc = int(p.get("discount", 0) or 0)
         return render_template_string(LANDING_HTML,
                                       title=p["title"], price=price,
-                                      mrp=price_label("", "") or "",
                                       disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
-                                      buy=p["affiliate_url"],
+                                      buy=p["affiliate_url"], pid=pid,
                                       brand=cfg.get("design.brand_name", "Deal Drops"))
+
+    @app.post("/subscribe/<int:pid>")
+    def subscribe(pid: int):
+        """Email capture on landing pages — build YOUR buyer list (gold)."""
+        email = (request.form.get("email") or "").strip()
+        ok = bool(email) and db.add_subscriber(email)
+        from flask import render_template_string
+        return render_template_string(
+            "<html><body style='font-family:sans-serif;text-align:center;padding-top:60px'>"
+            "<h2>{{ msg }}</h2><p>You'll get the best deals daily. 🔥</p></body></html>",
+            msg="✅ You're on the list!" if ok else "Already subscribed — you're in!",
+        )
 
     @app.get("/media/<path:name>")
     def media(name: str):
@@ -146,6 +164,8 @@ def create_app(cfg, db: DB | None = None) -> Flask:
             "meesho": bool(cfg.get("affiliate.meesho_affid")),
             "board": cfg.get("pinterest.board_name"),
             "instagram": ig_info,
+            "telegram": Notifier().enabled,
+            "subscribers": db.subscriber_count(),
             "account": account,
             "stats": stats,
         })

@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS clicks (
     ts         TEXT NOT NULL,
     ua         TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS subscribers (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    ts    TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 """
 
@@ -217,3 +222,28 @@ class DB:
                    WHERE pr.template != '' GROUP BY pr.template"""
             ).fetchall()
         return {r["template"]: r["n"] for r in rows}
+
+    def click_hours(self) -> dict[int, int]:
+        """Clicks per IST hour-of-day — the scheduler learns YOUR best hours."""
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT CAST(substr(ts, 12, 2) AS INT) h, COUNT(*) n "
+                "FROM clicks GROUP BY h"
+            ).fetchall()
+        return {r["h"]: r["n"] for r in rows}
+
+    # ---------------------------------------------------------- subscribers
+    def add_subscriber(self, email: str) -> bool:
+        with _lock, self._conn() as c:
+            try:
+                c.execute(
+                    "INSERT INTO subscribers(email, ts) VALUES(?,?)",
+                    (email.lower(), utcnow()),
+                )
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def subscriber_count(self) -> int:
+        with self._conn() as c:
+            return c.execute("SELECT COUNT(*) n FROM subscribers").fetchone()["n"]

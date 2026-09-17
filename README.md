@@ -200,6 +200,21 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 📡 Ultimate Layer — alerts, buyer list, self-learning, one-command deploy
+
+- **🔔 Telegram alerts** — phone lo notification when pins go live + daily
+  report (`.env`: TELEGRAM_TOKEN/CHAT_ID; optional).
+- **📧 Email capture** — landing pages collect buyer emails into YOUR list
+  (dashboard shows count). Email lists convert 8-15% — your own asset, not
+  rented traffic.
+- **🕐 Hour-wise CTR learning** — scheduler posts denser in the hours YOUR
+  clicks actually happen (learns from `/go/` click timestamps).
+- **🩺 `python -m bot doctor`** — one command answers "anthi set avuthunda?":
+  full ✅/❌ checklist with exact fixes.
+- **🚀 `sudo ./deploy.sh`** — VPS pe one command: venv + deps + systemd
+  service (auto-start on boot, auto-restart on crash). True 24×7 set.
+- **`scripts/seed_demo.py`** — preview the pipeline with demo data, no creds.
+
 ## 💰 Conversion Engine — products EKUVA KONIPINCHADAM (sales focus)
 
 Views alone ≠ money. These systems turn views into PURCHASES:
