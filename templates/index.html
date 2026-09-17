@@ -93,7 +93,8 @@
     <h3 style="margin:26px 0 12px">✍️ Manual add (when scrape is blocked)</h3>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
       <input id="mTitle" placeholder="Product title *" class="inp">
-      <input id="mPrice" placeholder="Price (e.g. 1099)" class="inp">
+      <input id="mPrice" placeholder="Deal price (e.g. 1099)" class="inp">
+      <input id="mMrp" placeholder="MRP / list price (for % OFF badge)" class="inp" style="grid-column:1/-1">
       <input id="mUrl" placeholder="Product page URL *" class="inp" style="grid-column:1/-1">
       <input id="mImg" placeholder="Product image URL *" class="inp" style="grid-column:1/-1">
       <input id="mVideo" placeholder="Video URL (optional, for video pins)" class="inp" style="grid-column:1/-1">
@@ -222,12 +223,13 @@ async function skipP(id){
 }
 async function addManual(){
   const body = {title: $('#mTitle').value.trim(), price: $('#mPrice').value.trim(),
+    mrp: $('#mMrp').value.trim(),
     product_url: $('#mUrl').value.trim(), image_url: $('#mImg').value.trim(),
     video_url: $('#mVideo').value.trim()};
   if(!body.product_url || !body.title || !body.image_url) return toast('Fill title, product URL and image URL', true);
   try{
     const r = await api('/api/add-manual', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    if(r.ok){ toast('✅ Added to queue (id '+r.id+')'); ['mTitle','mPrice','mUrl','mImg','mVideo'].forEach(i=>$('#'+i).value=''); refresh(); }
+    if(r.ok){ toast('✅ Added to queue (id '+r.id+')'); ['mTitle','mPrice','mMrp','mUrl','mImg','mVideo'].forEach(i=>$('#'+i).value=''); refresh(); }
     else toast(r.error, true);
   }catch(e){ toast('Failed: '+e, true); }
 }

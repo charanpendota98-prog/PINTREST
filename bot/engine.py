@@ -18,7 +18,8 @@ from zoneinfo import ZoneInfo
 
 from .affiliate import AffiliateLinker, price_label
 from .db import DB
-from .growth import hashtag_mix, hook_for, peak_window, pick_board, seo_title
+from .growth import (festival_boost, hashtag_mix, hook_for, peak_window,
+                     pick_board, seo_title)
 from .instagram import InstagramAPI, InstagramError
 from .keywords import KeywordCache
 from .pinterest_api import PinterestAPI, PinterestError
@@ -30,12 +31,21 @@ from .video_maker import ReelMaker
 log = logging.getLogger("pindrop.engine")
 
 
-def build_seo_text(cfg, title: str, price: str, currency: str, source: str) -> str:
-    """SEO-rich Pinterest description: hook + benefits + tiered hashtag mix."""
+def build_seo_text(cfg, title: str, price: str, currency: str, source: str,
+                   discount: int = 0, festival_kw: str = "") -> str:
+    """SEO-rich Pinterest description: hook + urgency + tiered hashtag mix."""
     label = price_label(price, currency) or "Best price"
-    hashtags = hashtag_mix(title, source, int(cfg.get("seo.max_hashtags", 8)))
+    hashtags = hashtag_mix(title + (" " + festival_kw if festival_kw else ""),
+                           source, int(cfg.get("seo.max_hashtags", 8)))
     template = cfg.get("seo.description_template")
     text = template.format(title=title, price=label, hashtags=hashtags).strip()
+    urgency = []
+    if discount >= 15:
+        urgency.append(f"⚡ FLAT {discount}% OFF — today only!")
+    if festival_kw:
+        urgency.append(f"🎉 {festival_kw.title()} special")
+    urgency.append("⏳ Limited stock at this price — grab it now!")
+    text = "\n".join([text] + urgency)
     # FTC / Pinterest policy: always disclose affiliate links
     if "#ad" not in text:
         text += "\n#ad #affiliate"
@@ -64,6 +74,16 @@ class Engine:
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
 
     # ------------------------------------------------------------- links
+    def pick_template(self) -> str:
+        """CTR-learning loop: 70% exploit the best-clicked template, 30% explore."""
+        counts = self.db.template_clicks()
+        total = sum(counts.values())
+        if total >= 5 and counts:
+            best = max(counts, key=counts.get)
+            if random.random() < 0.7:
+                return best
+        return random.choice(TEMPLATES)
+
     def _pin_link(self, product: dict) -> str:
         """Bridge link (your domain, tracked) or raw affiliate link."""
         base = str(self.cfg.get("link.public_base", "") or "").strip().rstrip("/")
@@ -128,16 +148,19 @@ class Engine:
         per_product = max(1, int(self.cfg.get("posting.pins_per_product", 2)))
         n_variants = min(per_product, len(local_imgs)) or 1
 
-        seo = build_seo_text(self.cfg, prod.title, prod.price, prod.currency, network)
-        templates = list(TEMPLATES)
-        random.shuffle(templates)
+        disc = prod.discount_pct
+        _, fest_kw, _ = festival_boost(datetime.now(self.tz))
+        seo = build_seo_text(self.cfg, prod.title, prod.price, prod.currency,
+                             network, discount=disc, festival_kw=fest_kw)
         first_id = -1
         for v in range(n_variants):
+            tpl = self.pick_template()
             pin_path = self.cfg.media_dir / f"pin_{int(time.time()*1000)}_v{v}.jpg"
             self.designer.create(
                 local_imgs[v], prod.title, label, pin_path, network,
-                template=templates[v % len(templates)],
+                template=tpl,
                 extra_images=[p for p in local_imgs if p != local_imgs[v]],
+                discount=disc,
             )
             pid = self.db.add_product(
                 source=prod.source,
@@ -155,6 +178,8 @@ class Engine:
                 category=prod.category,
                 seo_text=seo,
                 score=score_product(prod.title, prod.price, prod.source),
+                discount=disc,
+                template=tpl,
             )
             if first_id < 0:
                 first_id = pid
@@ -341,6 +366,9 @@ class Engine:
         while True:
             now = datetime.now(self.tz)
             w_start, w_end = peak_window(now) if peak else (start_h, end_h)
+            # festival / payday volume boost (India shopping spikes)
+            fest_name, _, mult = festival_boost(now)
+            eff_per_day = int(per_day * mult)
             queue = self.db.pending_products(limit=100)
 
             # ZERO-TOUCH: queue running dry? go hunt trending products itself
@@ -364,7 +392,9 @@ class Engine:
 
             # spread today's pins across remaining window hours
             remaining_hours = max(1, w_end - now.hour - now.minute / 60)
-            todo = min(per_day, len(queue))
+            todo = min(eff_per_day, len(queue))
+            if fest_name and mult > 1:
+                self.db.log("INFO", f"🎉 {fest_name} boost: {eff_per_day} pins today")
             gap_s = min(self._human_gap(), remaining_hours * 3600 / max(todo, 1))
             try:
                 self.post_next()

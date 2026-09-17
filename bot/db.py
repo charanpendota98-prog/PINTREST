@@ -63,6 +63,8 @@ MIGRATIONS = [
     "ALTER TABLE posts ADD COLUMN ig_error TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE products ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE products ADD COLUMN score INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE products ADD COLUMN discount INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE products ADD COLUMN template TEXT NOT NULL DEFAULT ''",
 ]
 
 
@@ -205,3 +207,13 @@ class DB:
                 "SELECT product_id, COUNT(*) n FROM clicks GROUP BY product_id"
             ).fetchall()
         return {r["product_id"]: r["n"] for r in rows}
+
+    def template_clicks(self) -> dict[str, int]:
+        """Clicks per pin template — feeds the CTR learning loop."""
+        with self._conn() as c:
+            rows = c.execute(
+                """SELECT pr.template, COUNT(*) n FROM clicks cl
+                   JOIN products pr ON pr.id = cl.product_id
+                   WHERE pr.template != '' GROUP BY pr.template"""
+            ).fetchall()
+        return {r["template"]: r["n"] for r in rows}

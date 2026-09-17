@@ -101,8 +101,13 @@ class PinDesigner:
     # ==================================================================
     def create(self, product_image_path: str, title: str, price_label: str,
                out_path: str | Path, source_name: str = "",
-               template: str | None = None, extra_images: list | None = None) -> str:
-        """Build a pin graphic with a random (or given) template; returns path."""
+               template: str | None = None, extra_images: list | None = None,
+               discount: int = 0) -> str:
+        """Build a pin graphic with a random (or given) template; returns path.
+
+        `discount` (0-99) draws a "% OFF" burst — the single strongest
+        click/conversion trigger in Indian e-commerce pins.
+        """
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -125,6 +130,9 @@ class PinDesigner:
             "overlay": self._t_overlay,
             "collage": self._t_collage,
         }[tpl](product, extras, title, price_label, source_name)
+
+        if discount >= 15:
+            canvas = self._burst(canvas, discount)
 
         canvas.convert("RGB").save(out_path, "JPEG", quality=92, optimize=True)
         log.info("Pin designed with template '%s' -> %s", tpl, out_path.name)
@@ -164,6 +172,29 @@ class PinDesigner:
         _rounded(draw, box, h // 2, fill=self.accent + (255,))
         draw.text((self.W / 2, y + h / 2 - 2), text, font=f,
                   fill=(255, 255, 255), anchor="mm")
+
+    def _burst(self, canvas: Image.Image, discount: int) -> Image.Image:
+        """Yellow starburst '% OFF' badge, top-right — proven CTR magnet."""
+        canvas = canvas.convert("RGBA")
+        size = 260
+        burst = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(burst)
+        cx = size // 2
+        import math as _m
+        points = []
+        spikes = 12
+        for i in range(spikes * 2):
+            r = cx if i % 2 == 0 else int(cx * 0.82)
+            a = _m.pi * i / spikes
+            points.append((cx + r * _m.sin(a), cx + r * _m.cos(a)))
+        bd.polygon(points, fill=(255, 196, 0, 255))
+        f1 = _font(True, 74)
+        f2 = _font(True, 40)
+        bd.text((cx, cx - 18), f"{discount}%", font=f1, fill=(20, 20, 20), anchor="mm")
+        bd.text((cx, cx + 44), "OFF", font=f2, fill=(20, 20, 20), anchor="mm")
+        burst = burst.rotate(-12, expand=True, resample=Image.BICUBIC)
+        canvas.alpha_composite(burst, (self.W - size - 30, 110))
+        return canvas
 
     # ============================================================ TEMPLATES
     def _t_classic(self, product, extras, title, price_label, source_name):

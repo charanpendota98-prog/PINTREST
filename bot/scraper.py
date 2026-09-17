@@ -44,6 +44,7 @@ class Product:
     url: str
     title: str = ""
     price: str = ""
+    mrp: str = ""                 # list price → % OFF badge (conversion trigger)
     currency: str = "INR"
     image_url: str = ""
     images: list = field(default_factory=list)   # full gallery (multiple pins!)
@@ -51,6 +52,17 @@ class Product:
     category: str = ""
     description: str = ""
     source: str = field(default="other")
+
+    @property
+    def discount_pct(self) -> int:
+        try:
+            p = float(re.sub(r"[^\d.]", "", self.price.replace(",", "")) or 0)
+            m = float(re.sub(r"[^\d.]", "", self.mrp.replace(",", "")) or 0)
+            if m and p and m > p:
+                return int(round((m - p) / m * 100))
+        except ValueError:
+            pass
+        return 0
 
     @property
     def ok(self) -> bool:
@@ -108,6 +120,7 @@ class Scraper:
             self._site_specific(soup, prod)
         self._collect_images(soup, prod)
         self._collect_videos(soup, prod)
+        self._collect_mrp(soup, prod)
         return prod
 
     # -- gallery images (multiple pins per product) -----------------------
@@ -199,6 +212,9 @@ class Scraper:
                     if price:
                         prod.price = str(price)
                         prod.currency = offers.get("priceCurrency", prod.currency)
+                    high = offers.get("highPrice") or offers.get("maxPrice") or ""
+                    if high:
+                        prod.mrp = prod.mrp or str(high)
                     img = node.get("image")
                     if isinstance(img, list):
                         img = img[0] if img else ""
@@ -271,6 +287,17 @@ class Scraper:
             t = soup.select_one("h1")
             if t:
                 prod.title = t.get_text(strip=True)
+
+    # -- MRP / list price (for % OFF badges) -----------------------------
+    def _collect_mrp(self, soup: BeautifulSoup, prod: Product) -> None:
+        if not prod.mrp:
+            tag = soup.select_one("#listPrice, .a-text-price .a-offscreen, ._3yOZfI")
+            if tag:
+                prod.mrp = tag.get_text(strip=True)
+        if not prod.mrp:
+            m = re.search(r"M\.?R\.?P\.?[:\s]*₹\s*([\d,]+)", soup.get_text(" ", strip=True))
+            if m:
+                prod.mrp = m.group(1)
 
     # ------------------------------------------------------------ download
     def discover_products(self, source: str = "amazon", limit: int = 6,

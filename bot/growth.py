@@ -110,7 +110,38 @@ def roundup_title(price_label: str, kw: str) -> str:
     ).strip()
 
 
-# ------------------------------------------------- niche boards (more surfaces)
+# ------------------------------------------------- India shopping festivals
+# (month, day, name, keyword) — pin volume & keywords boost in the 7 days
+# before each: India's shopping spikes are festival-driven.
+FESTIVALS = [
+    (1, 1, "New Year Sale", "new year sale"),
+    (1, 14, "Makar Sankranti", "sankranti shopping"),
+    (3, 3, "Holi Sale", "holi sale"),
+    (8, 15, "Independence Day Sale", "independence day sale"),
+    (8, 29, "Raksha Bandhan", "rakhi gift"),
+    (9, 7, "Ganesh Chaturthi", "ganesh chaturthi"),
+    (10, 2, "Navratri", "navratri fashion"),
+    (10, 20, "Dussehra Sale", "dussehra sale"),
+    (11, 8, "Diwali", "diwali deals"),
+    (11, 14, "Children's Day", "kids gift"),
+    (12, 25, "Christmas Sale", "christmas gifts"),
+]
+
+
+def festival_boost(now: datetime) -> tuple[str, str, float]:
+    """Returns (festival_name, keyword, volume_multiplier).
+
+    Within 7 days before a festival (or on it): 1.5× pins + festival keyword.
+    Days 1-3 of any month (payday/salary week): 1.25× — India buys on salary.
+    """
+    for m, d, name, kw in FESTIVALS:
+        fest = datetime(now.year, m, d)
+        delta = (fest - now.replace(tzinfo=None)).days if now.tzinfo else (fest - now).days
+        if 0 <= delta <= 7:
+            return name, kw, 1.5
+    if now.day <= 3:
+        return "Payday", "salary sale", 1.25
+    return "", "", 1.0
 BOARD_RULES = [
     (("kurta", "saree", "dress", "fashion", "women", "jewel", "footwear", "bag"),
      "Fashion Finds"),

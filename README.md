@@ -200,6 +200,23 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 💰 Conversion Engine — products EKUVA KONIPINCHADAM (sales focus)
+
+Views alone ≠ money. These systems turn views into PURCHASES:
+
+1. **% OFF starburst badges** — MRP is scraped; when discount ≥15% a yellow
+   "63% OFF" burst is burned onto the pin. India's #1 click trigger.
+2. **Urgency copy** — "⏳ Limited stock", "⚡ FLAT X% OFF today" auto-added to
+   every description/caption.
+3. **Mini landing pages** (`/go/<id>`) — warm-up page with hero photo, price +
+   % OFF, trust bullets and a giant BUY button. Landing pages convert **3-8×**
+   raw affiliate links (direct 1-2% vs landing 3-8%+).
+4. **Festival & payday boosts** — Diwali/Rakhi/Holi/etc. calendar: 1.5× pins in
+   the 7 days before each festival + festival keywords; 1.25× on salary days.
+5. **CTR learning loop** — clicks counted per template; best-converting design
+   used 70% of the time (exploit) + 30% testing (explore).
+6. **Winner scoring** — proven-earner products post first (see below).
+
 ## 🏆 Winner Cloning — top channels em peduthunnavo, FIRST priority
 
 Data-driven analysis of the highest-view affiliate channels (Pinterest + IG,

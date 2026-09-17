@@ -21,6 +21,7 @@ link:
   bridge: false            # true → pins point at YOUR domain /go/<id> (click tracking
                            # + Pinterest never sees a flagged affiliate domain)
   public_base: ""          # e.g. https://yourdeals.in — host the dashboard there
+  landing: true            # warm-up landing page (converts 3-8× raw links)
 
 scraping:
   delay_seconds: 4         # pause between scrapes (be polite, avoid blocks)

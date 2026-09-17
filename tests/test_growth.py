@@ -83,3 +83,39 @@ class TestTrends(unittest.TestCase):
         self.assertEqual(plan[0][2], "Women's Fashion")
         stores = {p[0] for p in plan}
         self.assertTrue(stores & {"amazon", "meesho", "flipkart"})
+
+
+class TestConversion(unittest.TestCase):
+    def test_discount_pct(self):
+        from bot.scraper import Product
+        p = Product(url="x", price="1099", mrp="2999")
+        self.assertEqual(p.discount_pct, 63)
+        p2 = Product(url="x", price="1099", mrp="")
+        self.assertEqual(p2.discount_pct, 0)
+
+    def test_festival_boost(self):
+        from bot.growth import festival_boost
+        # 5 days before Diwali (Nov 8)
+        import datetime as dt
+        name, kw, mult = festival_boost(dt.datetime(2026, 11, 3, 12, 0))
+        self.assertEqual(name, "Diwali")
+        self.assertGreater(mult, 1)
+        # payday
+        name2, _, mult2 = festival_boost(dt.datetime(2026, 6, 2, 12, 0))
+        self.assertEqual(name2, "Payday")
+        self.assertGreaterEqual(mult2, 1.2)
+
+    def test_seo_urgency(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from bot.engine import build_seo_text
+        from bot.config import Config
+        cfg = Config(raw={"seo": {"hashtags": True, "max_hashtags": 6,
+                                  "extra_hashtags": [],
+                                  "description_template": "{title} {price} {hashtags}"}})
+        txt = build_seo_text(cfg, "Earbuds", "999", "INR", "amazon",
+                             discount=63, festival_kw="diwali deals")
+        self.assertIn("63% OFF", txt)
+        self.assertIn("Diwali Deals", txt)
+        self.assertIn("#ad", txt)

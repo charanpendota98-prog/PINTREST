@@ -19,6 +19,46 @@ from .pinterest_api import PinterestAPI, PinterestError
 log = logging.getLogger("pindrop.dashboard")
 ROOT = Path(__file__).resolve().parent.parent
 
+# High-converting mini landing page (warm-up between pin and affiliate link)
+LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} — {{ brand }}</title>
+<style>
+ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222}
+ .wrap{max-width:520px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 40px rgba(0,0,0,.08)}
+ .top{background:#E60023;color:#fff;text-align:center;padding:10px;font-weight:700;letter-spacing:1px}
+ img.hero{width:100%;display:block}
+ .body{padding:22px}
+ h1{font-size:20px;line-height:1.35;margin:0 0 12px}
+ .price{font-size:34px;font-weight:800;color:#E60023}
+ .off{display:inline-block;background:#ffc400;color:#111;font-weight:800;border-radius:8px;
+     padding:4px 12px;margin-left:10px;font-size:18px;vertical-align:middle}
+ ul{padding-left:20px;line-height:1.9;color:#444}
+ a.buy{display:block;text-align:center;background:#E60023;color:#fff;font-size:20px;font-weight:800;
+     padding:18px;border-radius:14px;text-decoration:none;margin:18px 0;
+     box-shadow:0 6px 18px rgba(230,0,35,.35)}
+ a.buy:active{transform:scale(.98)}
+ .disc{color:#999;font-size:11.5px;text-align:center;padding:10px}
+ .urg{background:#fff3cd;border:1px solid #ffe08a;color:#7a5c00;border-radius:10px;
+     padding:10px;text-align:center;font-weight:600;font-size:14px}
+</style></head><body><div class="wrap">
+<div class="top">🔥 {{ brand }} — VERIFIED DEAL</div>
+<img class="hero" src="{{ img }}" alt="{{ title }}">
+<div class="body">
+  <h1>{{ title }}</h1>
+  <div><span class="price">{{ price }}</span>
+  {% if disc >= 15 %}<span class="off">{{ disc }}% OFF</span>{% endif %}</div>
+  <div class="urg" style="margin-top:12px">⏳ Limited stock at this price — selling fast!</div>
+  <ul>
+    <li>✅ Best price verified by {{ brand }}</li>
+    <li>🚚 Fast delivery & easy returns</li>
+    <li>💯 Secure checkout on the official store</li>
+  </ul>
+  <a class="buy" rel="nofollow sponsored" href="{{ buy }}">🛒 GRAB THE DEAL →</a>
+  <div class="disc">As an affiliate partner we may earn from qualifying purchases.
+  Price can change anytime — check the store for the live price.</div>
+</div></div></body></html>"""
+
 
 def create_app(cfg, db: DB | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
@@ -43,18 +83,30 @@ def create_app(cfg, db: DB | None = None) -> Flask:
 
     @app.get("/go/<int:pid>")
     def go(pid: int):
-        """Your own-domain bridge link: Pinterest → /go/12 → affiliate URL.
+        """Your own-domain bridge link: Pinterest → landing → affiliate URL.
 
-        Why top affiliates do this: your domain is never flagged as a known
-        affiliate short-link, it builds account trust, and every click is
-        counted so you know EXACTLY which pin makes money.
+        Landing pages convert 3-8× better than raw affiliate links (they warm
+        the buyer, show the deal, handle disclosure) AND keep Pinterest from
+        flagging affiliate short-domains. Every view is click-tracked.
         """
-        from flask import redirect
+        from flask import redirect, render_template_string
         rows = [p for p in db.all_products(limit=2000) if p["id"] == pid]
         if not rows:
             return jsonify({"ok": False, "error": "unknown product"}), 404
+        p = rows[0]
         db.log_click(pid, request.headers.get("User-Agent", ""))
-        return redirect(rows[0]["affiliate_url"], code=302)
+        if not cfg.get("link.landing", True):
+            return redirect(p["affiliate_url"], code=302)
+
+        from .affiliate import price_label
+        price = price_label(p["price"], p["currency"]) or "Best Price"
+        disc = int(p.get("discount", 0) or 0)
+        return render_template_string(LANDING_HTML,
+                                      title=p["title"], price=price,
+                                      mrp=price_label("", "") or "",
+                                      disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
+                                      buy=p["affiliate_url"],
+                                      brand=cfg.get("design.brand_name", "Deal Drops"))
 
     @app.get("/media/<path:name>")
     def media(name: str):
@@ -134,6 +186,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         url = str(data.get("product_url", "")).strip()
         title = str(data.get("title", "")).strip()
         price = str(data.get("price", "")).strip()
+        mrp = str(data.get("mrp", "")).strip()
         image_url = str(data.get("image_url", "")).strip()
         video_url = str(data.get("video_url", "")).strip()
         if not url or not title or not image_url:
@@ -159,14 +212,18 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         if video_url:
             video_path = engine.scraper.download_video(video_url, cfg.media_dir)
         pin_path = cfg.media_dir / f"pin_{int(time.time()*1000)}.jpg"
-        PinDesigner(cfg).create(img_path, title, price_label(price), pin_path, network)
-        seo = build_seo_text(cfg, title, price, "INR", network)
+        from .scraper import Product as ProdModel
+        disc = ProdModel(url=url, price=price, mrp=mrp).discount_pct
+        PinDesigner(cfg).create(img_path, title, price_label(price), pin_path,
+                                network, discount=disc)
+        seo = build_seo_text(cfg, title, price, "INR", network, discount=disc)
         from .trends import score_product
         pid = db.add_product(source=src, url=url, affiliate_url=aff_url, title=title,
                              price=price, image_url=image_url, image_path=img_path,
                              pin_image=str(pin_path), video_url=video_url,
                              video_path=video_path, seo_text=seo,
-                             score=score_product(title, price, src))
+                             score=score_product(title, price, src),
+                             discount=disc, template="")
         db.log("INFO", f"Manually queued product #{pid}: {title[:60]}")
         return jsonify({"ok": True, "id": pid})
 

@@ -31,6 +31,7 @@ DEFAULTS: dict[str, Any] = {
     "link": {
         "bridge": False,          # true = pins link to YOUR domain /go/<id> (tracked)
         "public_base": "",        # e.g. https://yourdeals.in (where dashboard is hosted)
+        "landing": True,          # show a high-converting mini landing page (vs raw 302)
     },
     "scraping": {
         "delay_seconds": 4.0,
