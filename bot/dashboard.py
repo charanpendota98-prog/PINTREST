@@ -41,6 +41,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
  a.buy:active{transform:scale(.98)}
  a.wa{display:block;text-align:center;background:#25D366;color:#fff;font-size:16px;
      font-weight:800;padding:13px;border-radius:14px;text-decoration:none;margin:0 0 16px}
+ a.more{display:block;text-align:center;background:#7b2ff7;color:#fff;font-size:15px;
+     font-weight:800;padding:13px;border-radius:14px;text-decoration:none;margin:0 0 16px}
  .disc{color:#999;font-size:11.5px;text-align:center;padding:10px}
  .urg{background:#fff3cd;border:1px solid #ffe08a;color:#7a5c00;border-radius:10px;
      padding:10px;text-align:center;font-weight:600;font-size:14px}
@@ -58,6 +60,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
     <li>💯 Secure checkout on the official store</li>
   </ul>
   <a class="buy" rel="nofollow sponsored" href="{{ buy }}">🛒 GRAB THE DEAL →</a>
+  {% if more %}<a class="more" rel="nofollow sponsored" href="{{ more }}">
+     🛍️ Browse More Deals — full collection</a>{% endif %}
   {% if wa_on %}<a class="wa" href="https://wa.me/?text={{ wa }}" target="_blank" rel="noopener">
      💬 Share this deal on WhatsApp (family groups = free sales!)</a>{% endif %}
   <form method="post" action="/subscribe/{{ pid }}">
@@ -122,6 +126,8 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                                       disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
                                       buy=p["affiliate_url"], pid=pid, wa=wa,
                                       wa_on=bool(cfg.get("link.whatsapp_share", False)),
+                                      more=str(cfg.get("affiliate.meesho_collection_link",
+                                                       "") or ""),
                                       brand=cfg.get("design.brand_name", "Deal Drops"))
 
     @app.post("/subscribe/<int:pid>")

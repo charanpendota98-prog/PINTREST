@@ -36,7 +36,7 @@ USER_AGENTS = [
 
 DOMAIN_SOURCES = {
     "amazon": ("amazon.in", "amazon.com", "amazon.co.uk", "amazon.ae", "amzn.in", "amzn.to"),
-    "meesho": ("meesho.com",),
+    "meesho": ("meesho.com", "affiliate.meesho.com"),
     "flipkart": ("flipkart.com", "fkrt.it"),
 }
 

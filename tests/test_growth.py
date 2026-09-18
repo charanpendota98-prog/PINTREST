@@ -269,3 +269,22 @@ class TestPlatforms(unittest.TestCase):
         names = {r["name"] for r in rows}
         self.assertIn("Facebook Page posting", names)
         self.assertIn("Pinterest posting", names)
+
+
+class TestMeeshoRealLinks(unittest.TestCase):
+    def test_generated_links_untouched(self):
+        import os
+        os.environ["MEESHO_AFFID"] = "charan123"
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        lk = AffiliateLinker(load_config())
+        real = ["https://affiliate.meesho.com/collection/MTEwNDEyMjY6Ojo6Ojpub3JtYWw=",
+                "https://www.meesho.com/af_invite/24197020:instagram_stories:11040673"
+                "?p_id=394590772&ext_id=6ixg6s&utm_source=instagram_stories"]
+        for u in real:
+            out, net = lk.convert(u, "meesho")
+            self.assertEqual(out, u)      # Meesho's own tracking intact
+            self.assertEqual(net, "meesho")
+        # plain product URL still auto-monetized
+        plain, _ = lk.convert("https://www.meesho.com/kurta/p/xyz", "meesho")
+        self.assertIn("affid=charan123", plain)

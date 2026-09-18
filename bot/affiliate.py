@@ -71,7 +71,15 @@ class AffiliateLinker:
             (parsed.scheme, parsed.netloc, parsed.path, "", urlencode(params), "")
         )
 
+    # Links Meesho's affiliate site generates for YOU (af_invite / collection
+    # / links already carrying p_id+ext_id tracking). They're ALREADY
+    # monetized — rewriting them would break Meesho's own tracking.
+    MEESHO_MONETIZED = re.compile(
+        r"af_invite|affiliate\.meesho\.com|affid=|ext_id=|/collection/")
+
     def meeshoize(self, url: str) -> str:
+        if self.MEESHO_MONETIZED.search(url):
+            return url  # your generated link, passed through untouched
         if not self.meesho_affid:
             return url
         parsed = urlparse(url)
@@ -145,6 +153,8 @@ class AffiliateLinker:
         if src == "amazon":
             out = self.amazonize(url)
         elif src == "meesho":
+            if self.MEESHO_MONETIZED.search(url):
+                return url, "meesho"  # user-generated link: zero rewriting
             out = self.meeshoize(url)
         elif src == "flipkart":
             out = self.flipkartize(url)

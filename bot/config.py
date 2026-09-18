@@ -57,6 +57,9 @@ DEFAULTS: dict[str, Any] = {
         "amazon_tag": "",
         # Meesho affiliate: your affid / campaign id appended to meesho links
         "meesho_affid": "",
+        # Meesho collection link generated from affiliate.meesho.com
+        # (used as "all deals" CTA on landing pages / IG bio)
+        "meesho_collection_link": "",
         # Flipkart affiliate id (FAS). If empty, flipkart links go through
         # earnkaro/cuelinks wrapper below instead.
         "flipkart_affid": "",
