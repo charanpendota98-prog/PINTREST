@@ -83,9 +83,9 @@ class TestAffiliate(unittest.TestCase):
         out, net = self.l.convert(
             "https://www.meesho.com/embellished-kurta-p/489088490")
         self.assertEqual(net, "meesho")
-        self.assertIn("/af_invite/24197020:pinterest_pins:11040673", out)
+        self.assertIn("/af_invite/24197020:instagram_stories:11040673", out)
         self.assertIn("p_id=489088490", out)   # product id from the new URL
-        self.assertIn("utm_source=pinterest_pins", out)
+        self.assertIn("utm_source=instagram_stories", out)
 
     def test_other_wrapped_earnkaro(self):
         out, net = self.l.convert("https://shop.example.com/product/42")

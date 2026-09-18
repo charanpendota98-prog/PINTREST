@@ -80,14 +80,15 @@ class AffiliateLinker:
         r"af_invite|affiliate\.meesho\.com|affid=|ext_id=|/collection/")
 
     @property
-    def meesho_ids(self) -> tuple[str, str]:
-        """Your Meesho publisher + campaign IDs, learned from ONE sample
-        af_invite link you paste (MEESHO_TEMPLATE_LINK) — then the bot
-        generates af_invite links for EVERY product with YOUR IDs."""
+    def meesho_ids(self) -> tuple[str, str, str]:
+        """Your Meesho publisher + source-token + campaign IDs, learned from
+        ONE sample af_invite link you paste (MEESHO_TEMPLATE_LINK) — then the
+        bot generates af_invite links for EVERY product with YOUR IDs and
+        the EXACT source token Meesho already accepts for your account."""
         sample = (os.getenv("MEESHO_TEMPLATE_LINK", "") or
                   self.cfg.get("affiliate.meesho_template_link", "") or "").strip()
-        m = re.search(r"af_invite/(\d+):[^:/]+:(\d+)", sample)
-        return (m.group(1), m.group(2)) if m else ("", "")
+        m = re.search(r"af_invite/(\d+):([^:/]+):(\d+)", sample)
+        return (m.group(1), m.group(2), m.group(3)) if m else ("", "", "")
 
     def meeshoize(self, url: str) -> str:
         if self.MEESHO_MONETIZED.search(url):
@@ -95,15 +96,15 @@ class AffiliateLinker:
         # DIRECT Meesho affiliate: build af_invite with YOUR publisher +
         # campaign IDs and the product's p_id (from its URL) — commission
         # lands in YOUR Meesho account, no middleman.
-        pub, camp = self.meesho_ids
+        pub, src, camp = self.meesho_ids
         if pub and camp:
             pid = re.search(r"-p/(\d+)", urlparse(url).path)
             if pid:
                 ext = "".join(random.choices(string.ascii_lowercase + string.digits,
                                              k=6))
-                return (f"https://www.meesho.com/af_invite/{pub}:pinterest_pins:"
+                return (f"https://www.meesho.com/af_invite/{pub}:{src}:"
                         f"{camp}?p_id={pid.group(1)}&ext_id={ext}"
-                        f"&utm_source=pinterest_pins")
+                        f"&utm_source={src}")
         # fallbacks: raw reseller affid param, then aggregator
         if self.meesho_affid:
             parsed = urlparse(url)
