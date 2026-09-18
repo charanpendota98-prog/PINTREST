@@ -82,6 +82,7 @@
     <div class="tab" data-tab="analytics">📊 Analytics</div>
     <div class="tab" data-tab="radar">🧭 Radar</div>
     <div class="tab" data-tab="money">💰 Money</div>
+    <div class="tab" data-tab="setup">🎯 Setup</div>
   </div>
 
   <div class="panel" id="tab-add">
@@ -150,6 +151,20 @@
     <table><thead><tr><th>Pin</th><th>Source</th><th>👆 Clicks</th></tr></thead>
     <tbody id="topBody"></tbody></table>
   </div>
+  <div class="panel" id="tab-setup" style="display:none">
+    <h3 style="margin:6px 0 4px">🎯 Readiness <span id="readyPct" class="pill ok">…</span></h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 14px">
+      Only a few things can't be automated (they need YOUR login/OTP). Everything
+      below that is done once — after that the bot runs itself.</p>
+    <h4 style="margin:14px 0 6px">You do (one time)</h4>
+    <div id="readyYou"></div>
+    <h4 style="margin:16px 0 6px">Recommended (money-optimizing)</h4>
+    <div id="readyRec"></div>
+    <h4 style="margin:16px 0 6px">Optional platforms</h4>
+    <div id="readyOpt"></div>
+    <h4 style="margin:18px 0 6px">🤖 The bot does this forever — no humans</h4>
+    <ul id="readyAuto" style="font-size:13px;line-height:1.7;color:#333"></ul>
+  </div>
   <div class="panel" id="tab-money" style="display:none">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px">
       <button id="ctlBtn" onclick="togglePause()">⏸ Pause posting</button>
@@ -208,8 +223,8 @@ function toast(msg, isErr){
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['add','queue','posted','logs','analytics','radar','money'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
-  refresh(); refreshRadar(); refreshMoney();
+  ['add','queue','posted','logs','analytics','radar','money','setup'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
+  refresh(); refreshRadar(); refreshMoney(); refreshReady();
 });
 
 async function api(path, opts){
@@ -321,6 +336,31 @@ async function huntNow(){
   }catch(e){ toast('Hunt failed: ' + e, true); }
   if(b) { b.disabled = false; b.textContent = '🔍 Hunt now'; }
   refreshRadar();
+}
+
+function readyRow(i, mark){
+  const how = (i.how || '').split('\n').map(l => esc(l)).join('<br>');
+  return `<div class="card" style="text-align:left;width:auto;margin-bottom:8px">
+    <b>${mark} ${esc(i.label)}</b>
+    ${i.minutes ? `<span style="color:#888;font-size:12px"> · ~${i.minutes} min</span>` : ''}
+    ${how ? `<div style="color:#666;font-size:12.5px;margin-top:4px">${how}</div>` : ''}
+  </div>`;
+}
+
+async function refreshReady(){
+  const r = await api('/api/ready');
+  if(!r || !r.ok) return;
+  $('#readyPct').textContent = r.percent + '% ready' +
+    (r.ready ? ' — all set 🎉' : ` · ~${r.minutes_left} min left`);
+  const you = (r.you_must_do || []);
+  $('#readyYou').innerHTML = you.length
+    ? you.map(i => readyRow(i, '❌')).join('')
+    : '<p style="color:#1a7f37">✅ Nothing left for you — done forever.</p>';
+  $('#readyRec').innerHTML = (r.recommended_left || []).map(i => readyRow(i, '⭐')).join('')
+    || '<p style="color:#999">all done</p>';
+  $('#readyOpt').innerHTML = (r.optional_left || []).map(i => readyRow(i, '○')).join('')
+    || '<p style="color:#999">all done</p>';
+  $('#readyAuto').innerHTML = (r.automatic || []).map(l => `<li>${esc(l)}</li>`).join('');
 }
 
 async function refreshMoney(){

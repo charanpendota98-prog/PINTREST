@@ -362,7 +362,8 @@ Verify any time: `python -m bot pin-stats` (real numbers), `python -m bot trends
 (the 2026 hook/carousel/timing playbook the bot follows automatically),
 `python -m bot links` (are the affiliate links alive and still tagged?),
 `python -m bot earnings` (honest commission estimate from real clicks) and
-`python -m bot report --days 7 [--telegram]` (period report). Owner control:
+`python -m bot report --days 7 [--telegram]` (period report) and
+`python -m bot ready` (exactly what is left for YOU to do — nothing else). Owner control:
 `python -m bot pause "reason"` / `python -m bot resume` — also on the panel's
 💰 Money tab together with Pause/Resume, earnings and link-health buttons.
 

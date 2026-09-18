@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot ready                    # 🎯 what is left for YOU to do (one time)
   python -m bot pause [reason]           # ⏸ stop posting (kill switch)
   python -m bot resume                   # ▶️ start posting again
   python -m bot links [N]                # 💸 are affiliate links alive + tagged?
@@ -867,6 +868,15 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+
+def cmd_ready(cfg) -> int:
+    """🎯 "Naaku em cheyyali migilindi?" — one honest screen, forever."""
+    from . import ready
+    lines = ready.lines(cfg)
+    print("\n" + "\n".join(lines) + "\n")
+    return 0 if ready.summary(cfg)["ready"] else 1
+
+
 def cmd_pause(cfg, reason: str = "") -> int:
     """⏸ Kill switch — stop the scheduler (state persists through restarts)."""
     from . import control
@@ -1069,6 +1079,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd == "ready":
+        return cmd_ready(cfg)
     if cmd == "pause":
         return cmd_pause(cfg, " ".join(rest).strip())
     if cmd == "resume":

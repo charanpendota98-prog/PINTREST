@@ -7,6 +7,7 @@ import stat
 import tempfile
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from bot import control, earnings, health, report
@@ -375,3 +376,113 @@ class TestMoneyPanelAPI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReadiness(unittest.TestCase):
+    """`bot ready` — the honest "what is left for YOU" answer."""
+
+    def test_items_and_summary_shape(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            s = ready.summary(cfg)
+            self.assertIn("percent", s)
+            self.assertTrue(0 <= s["percent"] <= 100)
+            self.assertTrue(s["you_must_do"])
+            self.assertTrue(s["automatic"])
+            keys = {i["key"] for i in s["items"]}
+            self.assertIn("pinterest_token", keys)
+            self.assertIn("money", keys)
+
+    def test_every_unfinished_item_has_instructions(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            for item in ready.summary(cfg)["you_must_do"]:
+                self.assertTrue(item["how"].strip(), item["key"])
+                self.assertGreater(item["minutes"], 0)
+
+    def test_optional_platforms_are_not_required(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            you = {i["key"] for i in ready.summary(cfg)["you_must_do"]}
+            for opt in ("instagram", "facebook", "youtube"):
+                self.assertNotIn(opt, you)      # never block a launch on these
+
+    def test_ready_when_pinterest_and_money_present(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            cfg = _cfg(tmp)
+            cfg.raw["affiliate"] = {"amazon_tag": "mytag-21"}
+            (tmp / ".env").write_text("X=1")
+            os.chmod(tmp / ".env", 0o600)
+            with unittest.mock.patch.dict(os.environ, {
+                    "PINTEREST_APP_ID": "app-id-123",
+                    "PINTEREST_APP_SECRET": "secret-xyz"}):
+                items = {i["key"]: i["done"] for i in ready.checks(cfg)}
+            self.assertTrue(items["pinterest_app"])
+            self.assertTrue(items["money"])
+            self.assertFalse(items["pinterest_token"])   # still needs the click
+
+    def test_lines_are_printable_and_mention_deploy(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            text = "\n".join(ready.lines(cfg))
+            self.assertIn("YOU DO (one time only)", text)
+            self.assertIn("BOT DOES", text)
+            self.assertIn("deploy.sh", text)
+
+    def test_automatic_list_covers_the_core_promises(self):
+        from bot import ready
+        text = " ".join(ready.automatic_lines()).lower()
+        for promise in ("affiliate link", "qa gate", "hunts top products",
+                        "circuit breaker", "self-audit"):
+            self.assertIn(promise, text)
+
+    def test_never_raises_on_odd_config(self):
+        from bot import ready
+        cfg = Config(raw={"storage": {"db_path": "/nonexistent/x.db"}})
+        self.assertIsInstance(ready.summary(cfg), dict)
+
+
+class TestSetupTabAPI(unittest.TestCase):
+    def test_ready_endpoint_and_ui(self):
+        from bot.dashboard import create_app
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            cfg = _cfg(tmp)
+            html_client = create_app(cfg, DB(cfg.db_path)).test_client()
+            r = html_client.get("/api/ready").get_json()
+            self.assertTrue(r["ok"])
+            self.assertIn("you_must_do", r)
+            self.assertGreater(len(r["automatic"]), 5)
+            html = html_client.get("/").data.decode()
+            self.assertIn('data-tab="setup"', html)
+            self.assertIn("refreshReady", html)
+
+
+class TestSelfAudit(unittest.TestCase):
+    def test_self_audit_logs_something(self):
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            eng = Engine(cfg, DB(cfg.db_path))
+            eng._self_audit()                    # must not raise on empty db
+            logs = eng.db.recent_logs(limit=10)
+            self.assertTrue(any("self-audit" in str(r.get("message", ""))
+                                for r in logs))
+
+    def test_self_audit_reports_pause(self):
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            db = DB(cfg.db_path)
+            eng = Engine(cfg, db)
+            control.pause(db, "audit test")
+            eng._self_audit()
+            logs = " ".join(str(r.get("message", ""))
+                            for r in db.recent_logs(limit=20))
+            self.assertIn("PAUSED", logs)

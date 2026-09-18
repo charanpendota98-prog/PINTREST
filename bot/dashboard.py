@@ -532,6 +532,15 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         engine.scraper.polite_wait()
         return jsonify({"ok": True, "results": results})
 
+    @app.get("/api/ready")
+    @_api_check
+    def ready_api():
+        """Setup checklist + what the bot does by itself (read-only)."""
+        from . import ready as _ready
+        data = _ready.summary(cfg)
+        data["ok"] = True
+        return jsonify(data)
+
     # ---------------------------------------------- owner control (R45)
     @app.get("/api/control")
     @_api_check

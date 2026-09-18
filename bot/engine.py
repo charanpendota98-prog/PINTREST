@@ -770,6 +770,54 @@ class Engine:
                                 "from top niches")
         return added
 
+    def _self_audit(self) -> None:
+        """Once a day: am I still healthy? Links, secrets, queue, breaker.
+
+        Logs a single readable line per issue (and one summary) so the owner
+        only has to glance at the dashboard — nobody has to check anything.
+        """
+        from . import control, health, radar, ready
+        notes: list[str] = []
+        try:
+            secrets = health.audit_secrets(self.cfg)
+            bad = [s for s in secrets if s.get("exists") and not s.get("ok")]
+            if bad:
+                notes.append(f"{len(bad)} credential file(s) not private "
+                             f"(chmod 600 .env data/*.txt)")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            s = ready.summary(self.cfg)
+            if not s["ready"]:
+                left = ", ".join(i["label"] for i in s["you_must_do"][:3])
+                notes.append(f"setup {s['percent']}% — still needed: {left}")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            stats = self.db.stats()
+            if int(stats.get("queued", 0)) == 0:
+                notes.append("queue empty (radar/autopilot will refill it)")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            if control.is_paused(self.db):
+                notes.append("posting is PAUSED by owner")
+            if self.api_paused():
+                notes.append("API breaker open (token/rate limit)")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            view = radar.radar_view(self.cfg, self.db, n=1)
+            best = view["best"][0]["usefulness"] if view.get("best") else 0
+        except Exception:  # noqa: BLE001
+            best = 0
+        if notes:
+            for n in notes:
+                self.db.log("WARN", f"📋 self-audit: {n}")
+        else:
+            self.db.log("INFO", "📋 self-audit: all good — posting healthy, "
+                                f"best product {best}/100")
+
     # ------------------------------------------------ API circuit breaker
     def api_paused(self) -> dict:
         """Open breaker state (or {}) — persisted, survives restarts."""
@@ -1221,6 +1269,14 @@ class Engine:
             if sum(days.values()) >= 10:
                 avg_d = sum(days.values()) / max(1, len(days))
                 gap_s *= 0.7 if days.get(now.weekday(), 0) > avg_d else 1.2
+            # 📋 daily self-audit — the bot checks itself and says so
+            try:
+                if getattr(self, "_last_audit_day", "") != now.date().isoformat():
+                    self._last_audit_day = now.date().isoformat()
+                    self._self_audit()
+            except Exception as exc:  # noqa: BLE001 — audit never breaks a run
+                self.db.log("WARN", f"self-audit skipped: {exc}")
+
             # owner control plane: pause / daily cap / quiet hours
             from . import control
             hold = control.gate(self.db, self.cfg, now.hour, tz=self.tz)

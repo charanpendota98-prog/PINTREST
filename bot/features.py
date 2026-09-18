@@ -240,13 +240,28 @@ def print_how_it_works() -> None:
    🔐 SECRETS AUDIT — health.audit_secrets: .env / token / password files
      group-world readable unte warn (600 cheyyamani).
 
-10) SAFETY (account safe, money safe)
+10) READINESS + SELF-AUDIT (R46) — "naaku em cheyyali migilindi?"
+   🎯 `python -m bot ready` / panel 🎯 Setup tab:
+   - YOU bucket: one-time items only (Pinterest app + ALLOW click, one
+     affiliate ID) with per-item time estimate + exact command/URL.
+   - RECOMMENDED bucket: Meesho af_invite direct link, Amazon tag.
+   - OPTIONAL bucket: IG / FB / YouTube tokens.
+   - BOT bucket: 13 automatic behaviours listed openly (hunt, design, QA,
+     post, track clicks, learn hooks, vary feed, breaker, cap, quiet hours,
+     auto-DM, self-audit, report).
+   - Percent + "~N min left" so the owner always knows the exact remaining
+     human work (currently: 4 items, ~12 min, then nothing).
+   📋 DAILY SELF-AUDIT: run loop once a day logs a health line — credential
+     file perms, setup %, queue, pause/breaker state, best product score.
+     Owner chudalsina avasaram ledu — issue unte log + panel lo kanipistundi.
+
+11) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   277 automated tests.
+   287 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
