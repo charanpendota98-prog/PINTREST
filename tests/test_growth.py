@@ -362,3 +362,26 @@ class TestMultiCampaign(unittest.TestCase):
         self.assertEqual(camps, ["11040673", "11049016"])
         out, _ = lk.convert("https://www.meesho.com/kurta-p/555", "meesho")
         self.assertIn(":11049016?", out)   # latest campaign wins
+
+
+class TestAutoDM(unittest.TestCase):
+    def test_dm_matches_product(self):
+        import tempfile
+        from pathlib import Path
+        from bot.config import load_config
+        from bot.db import DB
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as tmp:
+            db = DB(Path(tmp) / "t.db")
+            e = Engine(load_config(), db)
+            pid = db.add_product(source="amazon", url="http://x/1",
+                                 title="boAt Airdopes 141 Earbuds",
+                                 price="1099", currency="INR", image_url="",
+                                 affiliate_url="https://amzn.to/x")
+            db.add_post(product_id=pid, board_id="b")
+            db.update_post(1, status="posted")
+            dm = e._ig_dm_for("link", "earbuds link please")
+            self.assertIn("Airdopes", dm)
+            self.assertIn("amzn.to", dm)
+            dm2 = e._ig_dm_for("link", "something random xyz")
+            self.assertIn("bio", dm2)  # fallback

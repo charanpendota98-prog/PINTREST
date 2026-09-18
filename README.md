@@ -211,7 +211,7 @@ ground with official API + zero monthly cost:
 | Per-product replies | ✅ media→product mapping, {title}/{price} auto-fill |
 | Rate safety | ✅ caps + human delays + duplicate skip |
 | Visual flow builder | ⚪ not needed — templates are config, not drag-drop |
-| Auto-DM | ⛔ Meta blocks 3rd-party DM bots (even ManyChat is limited here) |
+| Auto-DM (keyword → product + link) | ✅ `auto_dm` — official Instagram Messaging API, polls conversations, answers with matched product & buy link (needs instagram_manage_messages scope) |
 
 If you STILL want ManyChat someday: connect it to the same IG account —
 it complements us (you'd just be paying for a drag-drop UI).

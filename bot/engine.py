@@ -370,6 +370,23 @@ class Engine:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
 
+    def _ig_dm_for(self, trigger: str, text: str) -> str:
+        """ManyChat-style DM answer with a REAL product + its buy link:
+        matches the DM words against your posted products; fallback =
+        today's deals page."""
+        base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
+        bridge = bool(self.cfg.get("link.bridge", False)) and base
+        words = [w for w in text.lower().split() if len(w) > 3]
+        for p in self.db.recent_posts(limit=60):
+            t = (p.get("title") or "").lower()
+            if any(w in t for w in words):
+                link = (f"{base}/go/{p['product_id']}" if bridge
+                        else p.get("affiliate_url", ""))
+                return (f"🔥 {p['title'][:60]} — grab it here 😍 {link}")
+        if base:
+            return f"😍 Today's best deals, all in one place: {base}/deals/today"
+        return "🔗 Link in bio! 😍"
+
     def _ig_reply_for(self, media_id: str, trigger: str = "link") -> str:
         """ManyChat-style, per-PRODUCT comment reply: the trigger keyword
         picks the template, {title}/{price} fill from the product behind
@@ -616,6 +633,7 @@ class Engine:
                 if self.ig.enabled and self.ig.configured:
                     self.ig.auto_reply_links(
                         reply_for=self._ig_reply_for)  # per-product answers
+                    self.ig.auto_dm(reply_for=self._ig_dm_for)  # ManyChat-grade DMs
             except PinterestError:
                 time.sleep(300)  # back off on API errors
                 continue

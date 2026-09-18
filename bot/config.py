@@ -104,6 +104,7 @@ DEFAULTS: dict[str, Any] = {
         "ig_user_id": "",          # or IG_USER_ID in .env
         "mode": "carousel",        # single | carousel | reel
         "posts_per_day": 3,
+        "auto_dm": True,           # ManyChat-grade keyword DM auto-answers
         "host_designed_pins": False,  # upload designed pins to ImgBB (needs IMGBB_KEY)
         "caption_template": (
             "🔥 {title}\n💰 Price: {price}\n"

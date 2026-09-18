@@ -73,6 +73,20 @@ class InstagramAPI:
             )
         return data
 
+    def _post_json(self, path: str, body: dict) -> dict:
+        resp = requests.post(
+            f"{GRAPH}/{path}",
+            params={"access_token": self.token},
+            json=body,
+            timeout=90,
+        )
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+        if resp.status_code >= 400 or "error" in data:
+            raise InstagramError(
+                f"Instagram API {resp.status_code}: {str(data.get('error', data))[:300]}"
+            )
+        return data
+
     def _get(self, path: str, **params) -> dict:
         resp = requests.get(
             f"{GRAPH}/{path}", params={"access_token": self.token, **params}, timeout=60
@@ -220,4 +234,62 @@ class InstagramAPI:
                         continue
         if n:
             log.info("Auto-replied to %d 'link' comments", n)
+        return n
+
+    # ------------------------------------------------- ManyChat-style DMs
+    def auto_dm(self, reply_for=None, max_per_cycle: int = 5) -> int:
+        """ManyChat-grade AUTO-DM via the OFFICIAL Instagram Messaging API
+        (no third-party, no ban risk): polls conversations, answers keyword
+        DMs ("link", "price", "buy"…) with the matching product + link.
+
+        Needs instagram_manage_messages scope on the token. Best-effort:
+        any API hiccup is logged and skipped, never fatal.
+        """
+        import random as _r
+        import time as _t
+        if not self.cfg.get("instagram.auto_dm", True):
+            return 0
+        triggers = list((self.cfg.get("instagram.triggers") or {"link": ""}).keys())
+        n = 0
+        try:
+            convs = self._get(
+                f"{self.ig_user_id}/conversations",
+                fields="messages{from,text,timestamp}",
+            ).get("data", [])
+        except InstagramError as exc:
+            log.warning("DM poll skipped: %s", str(exc)[:120])
+            return 0
+        for conv in convs[:12]:
+            if n >= max_per_cycle:
+                break
+            msgs = (conv.get("messages") or {}).get("data", [])
+            if not msgs:
+                continue
+            last = msgs[0]
+            frm = last.get("from") or {}
+            if str(frm.get("id", "")) == str(self.ig_user_id):
+                continue  # last message was ours — human already handled
+            text = (last.get("text") or "").lower()
+            hit = next((k for k in triggers if k in text), "")
+            if not hit:
+                continue
+            body = ""
+            if reply_for:
+                try:
+                    body = reply_for(hit, text) or ""
+                except Exception:  # noqa: BLE001
+                    body = ""
+            if not body:
+                body = "🔗 Link in bio! 😍"
+            try:
+                self._post_json(f"{self.ig_user_id}/messages", {
+                    "recipient": {"id": frm.get("id")},
+                    "message": {"text": body[:1000]},
+                })
+                n += 1
+                _t.sleep(2 + _r.random() * 4)  # human-ish
+            except InstagramError as exc:
+                log.warning("DM send skipped: %s", str(exc)[:120])
+        if n:
+            log.info("Auto-DM answered %d conversation(s)", n)
         return n
