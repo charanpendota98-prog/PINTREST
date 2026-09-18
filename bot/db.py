@@ -293,6 +293,19 @@ class DB:
             ).fetchall()
         return {r["h"]: r["n"] for r in rows}
 
+    def click_days(self) -> dict[int, int]:
+        """Clicks per weekday (0=Mon) — scheduler learns YOUR best days."""
+        with self._conn() as c:
+            rows = c.execute("SELECT ts FROM clicks").fetchall()
+        out: dict[int, int] = {}
+        for r in rows:
+            try:
+                out[datetime.fromisoformat(r["ts"]).weekday()] = (
+                    out.get(datetime.fromisoformat(r["ts"]).weekday(), 0) + 1)
+            except (ValueError, TypeError):
+                continue
+        return out
+
     # ---------------------------------------------------------- subscribers
     def add_subscriber(self, email: str) -> bool:
         with _lock, self._conn() as c:

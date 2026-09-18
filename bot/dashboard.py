@@ -7,6 +7,7 @@ all URLs are relative).
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from pathlib import Path
 
@@ -24,6 +25,14 @@ ROOT = Path(__file__).resolve().parent.parent
 LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }} — {{ brand }}</title>
+<meta property="og:title" content="{{ title }} — {{ price }}">
+<meta property="og:type" content="product">
+<meta property="og:description" content="Verified deal: {{ title }} at {{ price }}. Grab it before price jumps!">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Product","name":"{{ title }}",
+ "offers":{"@type":"Offer","price":"{{ raw_price }}","priceCurrency":"INR",
+ "availability":"https://schema.org/InStock"}}
+</script>
 <style>
  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222}
  .wrap{max-width:520px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 40px rgba(0,0,0,.08)}
@@ -178,6 +187,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                    f"{public}/go/{pid}")
         return render_template_string(LANDING_HTML,
                                       title=p["title"], price=price,
+                                      raw_price=re.sub(r"[^0-9.]", "", p["price"]) or "0",
                                       disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
                                       buy=p["affiliate_url"], pid=pid, wa=wa,
                                       wa_on=bool(cfg.get("link.whatsapp_share", False)),

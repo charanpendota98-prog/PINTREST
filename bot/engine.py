@@ -185,7 +185,11 @@ class Engine:
         first_id = -1
         for v in range(n_variants):
             tpl = self.pick_template()
-            pin_path = self.cfg.media_dir / f"pin_{int(time.time()*1000)}_v{v}.jpg"
+            # Pinterest image SEO: keyword-rich filenames rank in search
+            slug = re.sub(r"[^a-z0-9]+", "-", prod.title.lower()).strip("-")[:40]
+            price_slug = re.sub(r"[^0-9]", "", label) or "0"
+            pin_path = self.cfg.media_dir / (
+                f"{slug}-{price_slug}-{int(time.time()*1000)}_v{v}.jpg")
             self.designer.create(
                 local_imgs[v], prod.title, label, pin_path, network,
                 template=tpl,
@@ -707,6 +711,11 @@ class Engine:
                 utc_h = now.astimezone(timezone.utc).hour
                 avg = sum(hours.values()) / max(1, len(hours))
                 gap_s *= 0.6 if hours.get(utc_h, 0) > avg else 1.3
+            # day-wise learning: your proven weekdays post denser too
+            days = self.db.click_days()
+            if sum(days.values()) >= 10:
+                avg_d = sum(days.values()) / max(1, len(days))
+                gap_s *= 0.7 if days.get(now.weekday(), 0) > avg_d else 1.2
             try:
                 self.post_next()
                 if self.ig.enabled and self.ig.configured:
