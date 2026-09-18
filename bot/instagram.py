@@ -180,6 +180,22 @@ class InstagramAPI:
         # reels process asynchronously; publish anyway
         return self._publish(c["id"])
 
+    def post_story(self, image_url: str) -> str:
+        """Publish an Instagram STORY (24h, top of feed = cheap reach).
+
+        Honest note: the API cannot attach a tappable link STICKER (that's
+        app-only). So the story carries a 'link in bio / DM us' CTA, and our
+        bio auto-link + ManyChat-grade auto-DM deliver the actual buy link.
+        """
+        c = self._post(f"{self.ig_user_id}/media",
+                       media_type="STORIES", image_url=image_url)
+        return self._publish(c["id"])
+
+    def post_story_video(self, video_url: str) -> str:
+        c = self._post(f"{self.ig_user_id}/media",
+                       media_type="STORIES", video_url=video_url)
+        return self._publish(c["id"])
+
     # ------------------------------------------------------- engagement
     def auto_reply_links(self, reply: str = "🔗 Link in bio! Tap our bio & grab "
                                              "the deal 😍",

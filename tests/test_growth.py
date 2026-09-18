@@ -537,3 +537,136 @@ class TestMeeshoCollectionGuidance(unittest.TestCase):
         out = lk.meesho_link_for("https://www.meesho.com/kurta-p/489088490")
         self.assertIn("af_invite/24197020:instagram_stories:11040673", out)
         self.assertIn("p_id=489088490", out)
+
+
+class TestMeeshoPerPlatform(unittest.TestCase):
+    """Real owner links show per-platform tokens (instagram_stories /
+    facebook). Each surface must publish its OWN token+campaign."""
+
+    def _lk_with(self, links: str):
+        import os
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        os.environ.pop("MEESHO_TEMPLATE_LINK", None)
+        lk = AffiliateLinker(load_config())
+        lk.cfg.raw["affiliate"]["meesho_template_link"] = links
+        return lk
+
+    LINKS = ("https://www.meesho.com/af_invite/24197020:instagram_stories:11075346"
+             "?p_id=5121&ext_id=3y9&utm_source=instagram_stories,"
+             "https://www.meesho.com/af_invite/24197020:facebook:11075421"
+             "?p_id=5121&ext_id=3y9&utm_source=facebook")
+
+    def test_token_map(self):
+        lk = self._lk_with(self.LINKS)
+        self.assertEqual(lk.meesho_template_map(),
+                         {"instagram_stories": "11075346",
+                          "facebook": "11075421"})
+
+    def test_instagram_gets_instagram_token(self):
+        lk = self._lk_with(self.LINKS)
+        out = lk.meesho_link_for("https://www.meesho.com/kurta/p/1k1b6",
+                                 platform="instagram")
+        self.assertIn(":instagram_stories:11075346", out)
+        self.assertIn("p_id=1k1b6", out)
+        self.assertIn("utm_source=instagram_stories", out)
+
+    def test_facebook_gets_facebook_token(self):
+        lk = self._lk_with(self.LINKS)
+        out = lk.meesho_link_for("https://www.meesho.com/kurta/p/1k1b6",
+                                 platform="facebook")
+        self.assertIn(":facebook:11075421", out)
+        self.assertIn("utm_source=facebook", out)
+
+    def test_override_map_for_platforms_without_tokens(self):
+        lk = self._lk_with(self.LINKS)
+        lk.cfg.raw["affiliate"]["meesho_platform_tokens"] = {
+            "pinterest": "instagram_stories", "youtube": "facebook"}
+        self.assertEqual(lk.meesho_source_for("pinterest"), "instagram_stories")
+        self.assertEqual(lk.meesho_source_for("youtube"), "facebook")
+        self.assertIn(":instagram_stories:11075346",
+                      lk.meesho_link_for("https://x.com/p/1k1b6", "pinterest"))
+
+    def test_engine_uses_platform_specific_link(self):
+        import tempfile
+        from pathlib import Path
+        from bot.db import DB
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as td:
+            lk = self._lk_with(self.LINKS)
+            cfg = lk.cfg
+            cfg.raw["storage"] = {"db_path": str(Path(td) / "t.db"),
+                                  "media_dir": str(Path(td) / "media")}
+            e = Engine(cfg, DB(cfg.db_path))
+            prod = {"id": 1, "source": "meesho",
+                    "url": "https://www.meesho.com/kurta/p/1k1b6",
+                    "affiliate_url": "https://www.meesho.com/af_invite/"
+                                     "24197020:instagram_stories:11075346?p_id=1"}
+            ig = e._aff_link(prod, "instagram")
+            fb = e._aff_link(prod, "facebook")
+            self.assertIn(":instagram_stories:", ig)
+            self.assertIn(":facebook:", fb)
+            self.assertNotEqual(ig, fb)
+            # non-meesho products keep their stored link untouched
+            ama = {"id": 2, "source": "amazon", "url": "https://amazon.in/dp/X",
+                   "affiliate_url": "https://amazon.in/dp/X?tag=t-21"}
+            self.assertEqual(e._aff_link(ama, "instagram"), ama["affiliate_url"])
+
+
+class TestYouTubeUploader(unittest.TestCase):
+    def _yt(self):
+        from bot.config import load_config
+        from bot.youtube import YouTubeAPI
+        return YouTubeAPI(load_config())
+
+    def test_not_configured_without_env(self):
+        import os
+        for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"):
+            os.environ.pop(k, None)
+        yt = self._yt()
+        yt.token_path = yt.token_path.parent / "_nope_token.json"
+        self.assertFalse(yt.configured)
+        self.assertIn("client", yt.status())
+
+    def test_auth_url_requires_client_and_has_scope(self):
+        import os
+        from bot.youtube import YouTubeError
+        yt = self._yt()
+        try:
+            yt.auth_url()
+            self.fail("should require client id/secret")
+        except YouTubeError:
+            pass
+        os.environ["YT_CLIENT_ID"] = "cid"
+        os.environ["YT_CLIENT_SECRET"] = "sec"
+        url = yt.auth_url()
+        self.assertIn("youtube.upload", url)
+        self.assertIn("access_type=offline", url)
+        for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET"):
+            os.environ.pop(k, None)
+
+    def test_upload_requires_existing_file(self):
+        from bot.youtube import YouTubeError
+        yt = self._yt()
+        try:
+            yt.upload_short("/nope/missing.mp4", "t", "d")
+            self.fail("should raise")
+        except YouTubeError as exc:
+            self.assertIn("missing", str(exc))
+
+    def test_engine_youtube_is_best_effort(self):
+        """Not configured → engine must silently skip, never raise."""
+        import tempfile
+        from pathlib import Path
+        from bot.db import DB
+        from bot.engine import Engine
+        from bot.config import load_config
+        with tempfile.TemporaryDirectory() as td:
+            cfg = load_config()
+            cfg.raw["storage"] = {"db_path": str(Path(td) / "t.db"),
+                                  "media_dir": str(Path(td) / "media")}
+            e = Engine(cfg, DB(cfg.db_path))
+            e._post_youtube({"id": 1, "title": "x", "price": "99",
+                             "currency": "INR", "source": "meesho",
+                             "url": "u", "affiliate_url": "a",
+                             "video_path": ""})   # must not raise

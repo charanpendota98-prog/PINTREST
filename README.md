@@ -9,6 +9,8 @@ product URL ─▶ scrape (title/price/image) ─▶ YOUR affiliate link
 ```
 
 Amazon Associates + Meesho + Flipkart (EarnKaro / Cuelinks) — **anni support**.
+
+**Surfaces:** Pinterest (main) · Instagram (feed + reels + **Stories** + bio + auto-DM) · Facebook Page · **YouTube Shorts** (optional uploader) · **Telegram deals channel** (optional broadcast).
 Bot scrape chestundi, mee affiliate link petti, manchi pin design chesi,
 daily automatic ga Pinterest lo post chestundi → **meeru commission earn chestaru**.
 
@@ -288,6 +290,40 @@ Every known leak path, audited & sealed:
 | Link rewritten & broken | ✅ monetized links pass through UNTOUCHED |
 | Bio/DM/comment links | ✅ bridge/affiliate link per product |
 | Winners going stale | ✅ price-watch re-announces 📉 drops + rotation |
+
+## 🛍 Meesho affiliate — exactly how it works (no API needed)
+
+Meesho has **no public affiliate API**, and it doesn't need one: Meesho's own
+"Get commission link" screen produces an `af_invite` URL that *is* the
+affiliate mechanism. Your publisher id + source token + campaign id live in
+that URL; the product is selected by `p_id`.
+
+```
+your share link (from affiliate.meesho.com)
+  /af_invite/24197020:instagram_stories:11075346?p_id=5121&ext_id=3y9
+             ▲ publisher      ▲ source token  ▲ campaign   ▲ product
+                                                          (Meesho fills
+                                                           product when you
+                                                           share from a page)
+
+bot builds, for ANY scraped product:
+  /af_invite/24197020:instagram_stories:11075346?p_id=<REAL PRODUCT>&ext_id=<fresh 6-char>&utm_source=instagram_stories
+              ▲ same publisher/campaign/params — only product + click id change
+```
+
+**Per platform** (Meesho gives each surface its own token + campaign):
+
+| Surface | Token used | Why |
+|---|---|---|
+| Instagram | `instagram_stories` (yours) | matches where the click came from |
+| Facebook | `facebook` (yours) | clean Meesho report |
+| YouTube | `youtube` if you created one, else newest | Meesho offers "YouTube Shorts/videos" |
+| Pinterest | override in `affiliate.meesho_platform_tokens` | Meesho has no Pinterest option — map it to any token (commission is unaffected; publisher id decides the money) |
+
+Verify in one command: `python -m bot meesho "https://www.meesho.com/<product>"` →
+prints the exact link per platform + structural checks. `python -m bot platforms`
+shows every surface + its token. Honest limit: only your phone + the Meesho
+dashboard can confirm a click end-to-end (see `bot meesho` output).
 
 ## 💰 Money Layer — deep-level revenue thinking
 

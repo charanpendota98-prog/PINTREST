@@ -100,6 +100,21 @@ line chupistundi.
 
 ## 7. What is PROVEN vs what needs your VPS
 
+## 7b. Platforms — ekada post avutundi (2026-09 update)
+
+| Surface | Status | Link delivery |
+|---|---|---|
+| **Pinterest** (main) | pins + video pins + daily list pin + winners rotation | `yourdomain/go/<id>` bridge or affiliate link directly |
+| **Instagram** | feed carousel/single, **reels**, **Stories (24h)**, bio auto-link, comment 'link' auto-reply, keyword **auto-DM** | bio link + DM/comment reply (API cannot attach story link stickers — that's app-only; our auto-DM covers it) |
+| **Facebook Page** | photo post / link post + comment auto-reply | clickable link in post text |
+| **YouTube Shorts** | optional uploader (your reel → Short + link in description) | affiliate link in the description — evergreen search traffic |
+| **Telegram deals channel** | optional broadcast of every deal | affiliate link in the message |
+
+**Meesho link per platform:** Meesho gives each platform its own
+`source token + campaign id`. The bot stores them all and publishes the
+platform-correct one (`instagram_stories` on IG, `facebook` on FB, ...) so
+your Meesho report stays readable. Check with `python -m bot platforms`.
+
 **Proven here (real runs, not stories):**
 
 ```

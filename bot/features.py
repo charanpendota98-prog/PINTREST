@@ -8,6 +8,7 @@ FEATURES + the code — the inventory, doctor and README stay in sync.
 from __future__ import annotations
 
 import os
+import pathlib
 
 FEATURES = [
     # (name, category, what it does, enablement check, how to enable)
@@ -20,6 +21,26 @@ FEATURES = [
     ("Facebook Page posting", "posting", "photo/link posts on your FB Page",
      lambda cfg: bool(os.getenv("FACEBOOK_ACCESS_TOKEN", "")),
      "facebook.enabled=true + FACEBOOK_ACCESS_TOKEN, FACEBOOK_PAGE_ID"),
+    ("YouTube Shorts posting", "posting",
+     "product reel → Short + affiliate link in description (evergreen search)",
+     lambda cfg: bool(os.getenv("YT_CLIENT_ID", "") and
+                      os.getenv("YT_CLIENT_SECRET", "") and
+                      (os.getenv("YT_REFRESH_TOKEN", "") or
+                       (pathlib.Path("data/yt_token.json").exists()))),
+     "youtube.enabled=true + YT_CLIENT_ID/SECRET + python -m bot yt-auth-url"),
+    ("Instagram Stories", "posting",
+     "24h story per product (CTA + bio link + auto-DM deliver the link)",
+     lambda cfg: bool(os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
+                      and cfg.get("instagram.stories", True)),
+     "instagram.stories=true (default on) + IG token"),
+    ("Per-platform Meesho links", "money",
+     "instagram_stories / facebook token+campaign chosen per surface",
+     lambda cfg: bool(cfg.get("affiliate.meesho_template_link")),
+     "paste your af_invite link(s) in MEESHO_TEMPLATE_LINK"),
+    ("Telegram deals channel", "reach",
+     "every deal broadcast to your public Telegram channel",
+     lambda cfg: bool(os.getenv("TELEGRAM_DEALS_CHANNEL", "")),
+     "TELEGRAM_TOKEN + TELEGRAM_DEALS_CHANNEL in .env (optional)"),
     ("Telegram alerts", "reach", "posted/daily reports to your chat",
      lambda cfg: bool(os.getenv("TELEGRAM_TOKEN", "")),
      "TELEGRAM_TOKEN + TELEGRAM_CHAT_ID (optional)"),

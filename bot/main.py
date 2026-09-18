@@ -375,6 +375,16 @@ def cmd_doctor(cfg) -> int:
             "https://www.meesho.com/women-kurta-set/p/1k1b6")
         ck("Meesho product-id parser (alphanumeric)", _pid == "1k1b6",
            "run `python -m bot meesho <your product url>` to inspect")
+    from .youtube import YouTubeAPI as _YT
+    _yt = _YT(cfg)
+    _yts = _yt.status()
+    if _yts["enabled"]:
+        ck("YouTube Shorts (reels → Shorts + link in description)", _yts["configured"],
+           "console.cloud.google.com → YouTube Data API v3 → Desktop OAuth → "
+           "python -m bot yt-auth-url")
+    else:
+        ck("YouTube Shorts (optional)", True,
+           "youtube.enabled=true + YT_CLIENT_ID/SECRET + bot yt-auth-url")
     fb_ok = bool(os.getenv("FACEBOOK_ACCESS_TOKEN") and os.getenv("FACEBOOK_PAGE_ID"))
     ck("Facebook Page (optional)", fb_ok or not cfg.get("facebook.enabled"),
        "FB Page → Meta app token → .env FACEBOOK_*")
@@ -687,6 +697,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_music(cfg)
     if cmd == "simulate":
         return cmd_simulate(cfg)
+    if cmd == "platforms":
+        return cmd_platforms(cfg)
+    if cmd in ("yt-auth", "yt-auth-url"):
+        return cmd_yt_auth(cfg, rest)
     if cmd == "meesho":
         return cmd_meesho(cfg, rest)
     if cmd == "how":
@@ -777,6 +791,15 @@ def cmd_meesho(cfg, args: list[str]) -> int:
         print("     → .env: MEESHO_TEMPLATE_LINK=<that link>   (comma-separate many)")
         ok = False
 
+    # per-platform view: which token+campaign each surface will publish
+    if lk.meesho_template_map():
+        print("\n  PER-PLATFORM LINKS (each platform uses its own token):")
+        for plat in ("instagram", "facebook", "youtube", "pinterest"):
+            tok = lk.meesho_source_for(plat)
+            pl = lk.meesho_link_for(sample, platform=plat)
+            print(f"   • {plat:10s} token={tok:22s}")
+            print(f"     {pl}")
+
     print("\n  PHONE LO TEST (only your phone can confirm — server nunchi")
     print("  meesho.com reach avvadu, so idi real proof):")
     print("   1. Copy the link above, WhatsApp yourself ki pampu")
@@ -790,3 +813,75 @@ def cmd_meesho(cfg, args: list[str]) -> int:
     print("     anataniki reason ledu — ee 5 steps ne proof.")
     print("-" * 62)
     return 0 if ok else 0
+
+
+def cmd_yt_auth(cfg, args: list[str]) -> int:
+    """One-time Google OAuth for the YouTube Shorts uploader."""
+    from .youtube import YouTubeAPI, YouTubeError
+    yt = YouTubeAPI(cfg)
+    if args and args[0] == "--code":
+        if len(args) < 2:
+            print("usage: python -m bot yt-auth --code <CODE_FROM_REDIRECT_URL>")
+            return 2
+        print("\n🔑 Exchanging code for a refresh token…")
+        try:
+            yt.exchange_code(args[1])
+        except YouTubeError as exc:
+            print(f"❌ {exc}")
+            return 1
+        print(f"✅ Saved — YouTube Shorts uploads are LIVE from now on\n"
+              f"   token file: {yt.token_path}")
+        return 0
+    try:
+        print("\n🔗 Open this URL (any device), pick your channel, click Allow:\n")
+        print("   " + yt.auth_url())
+        print("\n   After Allow, your browser shows a URL like")
+        print("   http://localhost:8080/?code=4/0Ab...&scope=...")
+        print("   Copy the code (between 'code=' and '&scope') and run:\n")
+        print("   python -m bot yt-auth --code <PASTE_CODE>\n")
+    except YouTubeError as exc:
+        print(f"❌ {exc}")
+        return 1
+    return 0
+
+
+def cmd_platforms(cfg) -> int:
+    """Show every surface the bot posts to + how the link is built for it."""
+    from .affiliate import AffiliateLinker
+    from .instagram import InstagramAPI
+    from .facebook import FacebookAPI
+    from .youtube import YouTubeAPI
+    lk = AffiliateLinker(cfg)
+    ig, fb, yt = InstagramAPI(cfg), FacebookAPI(cfg), YouTubeAPI(cfg)
+    order = cfg.get("posting.platform_order",
+                    ["instagram", "facebook", "youtube", "pinterest"])
+    print("\n📡 WHERE THE BOT POSTS — platform · status · Meesho source token\n" + "-" * 66)
+    rows = []
+    for plat in order + ["pinterest"]:
+        if plat in [r[0] for r in rows]:
+            continue
+        if plat == "pinterest":
+            ok = bool(cfg.get("pinterest.access_token") or
+                      __import__("os").getenv("PINTEREST_ACCESS_TOKEN"))
+            detail = "official API: pins + video pins + roundups + winners rotation"
+        elif plat == "instagram":
+            ok = bool(ig.enabled and ig.configured)
+            detail = "feed carousel / single, reels, STORIES, bio link, auto-DM"
+        elif plat == "facebook":
+            ok = bool(fb.enabled and fb.configured)
+            detail = "Page photo/link post + clickable direct link"
+        elif plat == "youtube":
+            ok = bool(yt.enabled and yt.configured)
+            detail = "Shorts upload (reel) + affiliate link in description"
+        else:
+            ok, detail = False, "unknown"
+        rows.append((plat, ok, detail))
+    for plat, ok, detail in rows:
+        tok = lk.meesho_source_for(plat) if lk.meesho_template_map() else "(no template)"
+        print(f"  {'✅' if ok else '⚪'} {plat:10s} {detail}")
+        print(f"     ↳ Meesho token: {tok}")
+    print("-" * 66)
+    print("  ✅ = configured & live   ⚪ = add creds to switch on")
+    print("  Telegram deals channel: "
+          f"{'✅ on' if __import__('os').getenv('TELEGRAM_DEALS_CHANNEL') else '⚪ off (optional)'}")
+    return 0

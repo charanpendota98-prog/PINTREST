@@ -112,6 +112,31 @@ class Engine:
             return f"{base}/go/{product['id']}"
         return product["affiliate_url"]
 
+    def _aff_link(self, product: dict, platform: str = "") -> str:
+        """Affiliate link tuned for the platform being posted to.
+
+        Meesho gives each platform its OWN source token + campaign id
+        (instagram_stories / facebook / ...). Posting a Pinterest pin with a
+        'facebook' token muddies the Meesho report — so rebuild the link per
+        platform for Meesho products. Every other store keeps its stored
+        link (Amazon tag etc. is platform-agnostic).
+        """
+        stored = product.get("affiliate_url", "")
+        if (product.get("source") or "") != "meesho" or not platform:
+            return stored
+        if self.cfg.get("affiliate.meesho_per_platform", True) is False:
+            return stored
+        try:
+            base_url = product.get("url") or ""
+            if not base_url or AffiliateLinker.MEESHO_MONETIZED.search(base_url):
+                return stored
+            fresh = AffiliateLinker(self.cfg).meesho_link_for(
+                base_url, platform=platform)
+            return fresh or stored
+        except Exception as exc:  # noqa: BLE001 — never break a post over this
+            self.db.log("WARN", f"per-platform Meesho link skipped: {exc}")
+            return stored
+
     # ---------------------------------------------------------- ingestion
     def ingest_url(self, url: str, force: bool = False) -> int:
         """Scrape + enqueue one product as MULTIPLE pin variations.
@@ -291,6 +316,8 @@ class Engine:
                     self._post_instagram(product, post_id)
                 elif plat == "facebook":
                     self._post_facebook(product)
+                elif plat == "youtube":
+                    self._post_youtube(product)
                 done.add(plat)
             if video_file and Path(video_file).exists():
                 # video pin path — real / auto-generated reel uploaded to Pinterest
@@ -330,6 +357,8 @@ class Engine:
                     self._post_instagram(product, post_id)
                 elif plat == "facebook":
                     self._post_facebook(product)
+                elif plat == "youtube":
+                    self._post_youtube(product)
             return pin
         except PinterestError as exc:
             attempts = int(product.get("attempts", 0) or 0) + 1
@@ -385,11 +414,50 @@ class Engine:
             bio_link = (f"{str(self.cfg.get('link.public_base','') or '').rstrip('/')}/go/{product['id']}"
                         if (self.cfg.get("link.bridge", False)
                             and self.cfg.get("link.public_base"))
-                        else product["affiliate_url"])
+                        else self._aff_link(product, "instagram"))
             self.ig.set_bio_link(bio_link)
+            # story = extra 24h surface (cheap reach, CTA + auto-DM covers
+            # the missing link sticker which the API cannot attach)
+            if self.cfg.get("instagram.stories", True) and urls:
+                try:
+                    sid = self.ig.post_story(urls[0])
+                    self.db.log("INFO", f"Instagram story {sid} live")
+                except Exception as exc:  # noqa: BLE001 — story is a bonus
+                    self.db.log("WARN", f"Instagram story skipped: {exc}")
         except InstagramError as exc:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
+
+    def _post_youtube(self, product: dict) -> None:
+        """Publish the product's reel as a YouTube Short (optional, best-effort).
+
+        YouTube descriptions allow clickable links and Shorts keep earning
+        search traffic for years — same evergreen logic as Pinterest.
+        """
+        from .youtube import YouTubeAPI, YouTubeError
+        yt = YouTubeAPI(self.cfg)
+        if not (yt.enabled and yt.configured):
+            return
+        video = str(product.get("video_path") or "")
+        if not video:
+            self.db.log("WARN", "YouTube: no reel for this product, skipped")
+            return
+        link = self._aff_link(product, "youtube")
+        label = price_label(product["price"], product["currency"])
+        title = build_seo_text(self.cfg, product["title"], product["price"],
+                               product["currency"], "amazon", discount=0)
+        title = (title.splitlines()[0] if title else product["title"])
+        desc = (f"🔥 {product['title']}\n💰 {label}\n\n"
+                f"🛒 Buy here: {link}\n\n"
+                f"#Shorts #Deals #India #Shopping #Offer "
+                f"#{(product.get('source') or 'deal')}")
+        try:
+            vid = yt.upload_short(video, title, desc,
+                                  tags=["deals", "india", "shopping",
+                                        "offer", "shorts"])
+            self.db.log("INFO", f"YouTube Short uploaded: {vid}")
+        except YouTubeError as exc:
+            self.db.log("WARN", f"YouTube upload failed: {exc}")
 
     def _ig_dm_for(self, trigger: str, text: str) -> str:
         """ManyChat-style DM answer with a REAL product + its buy link:
@@ -402,7 +470,7 @@ class Engine:
             t = (p.get("title") or "").lower()
             if any(w in t for w in words):
                 link = (f"{base}/go/{p['product_id']}" if bridge
-                        else p.get("affiliate_url", ""))
+                        else self._aff_link(p, "instagram"))
                 return (f"🔥 {p['title'][:60]} — grab it here 😍 {link}")
         if base:
             return f"😍 Today's best deals, all in one place: {base}/deals/today"
@@ -432,12 +500,13 @@ class Engine:
             base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
             fb_link = (f"{base}/go/{product['id']}"
                        if (self.cfg.get("link.bridge", False) and base)
-                       else product["affiliate_url"])
+                       else self._aff_link(product, "facebook"))
             caption = f"{caption}\n\n🛒 Direct link: {fb_link}"
             mode = str(self.cfg.get("facebook.mode", "photo"))
             if mode == "link":
                 base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
-                url = f"{base}/go/{product['id']}" if base else product["affiliate_url"]
+                url = (f"{base}/go/{product['id']}" if base
+                       else self._aff_link(product, "facebook"))
                 fid = self.fb.post_link(url, caption)
             else:
                 fid = self.fb.post_photo(product.get("image_url", ""), caption)

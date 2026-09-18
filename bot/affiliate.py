@@ -142,16 +142,79 @@ class AffiliateLinker:
             "ready": bool((pub and camps) or self.meesho_affid),
         }
 
-    def meesho_link_for(self, url: str) -> str:
+    # platform → the source tokens Meesho generates for that platform.
+    # (Meesho's "Get commission link" screen lets you pick Instagram Story,
+    #  Facebook Post, etc — each comes with its OWN token + campaign id.)
+    PLATFORM_TOKENS = {
+        "pinterest": ("pinterest", "pinterest_stories", "pinterest_ideas"),
+        "instagram": ("instagram_stories", "instagram", "instagram_reels",
+                      "instagram_feed", "instagram_story"),
+        "facebook": ("facebook", "facebook_post", "facebook_stories"),
+        "youtube": ("youtube", "youtube_shorts"),
+    }
+
+    def meesho_template_map(self) -> dict[str, str]:
+        """{source_token: latest campaign id} from every pasted link."""
+        out: dict[str, str] = {}
+        for lnk in self.meesho_template_links:
+            m = re.search(r"af_invite/[^:/?]+:([^:/?]+):([^:/?&]+)", lnk)
+            if m:
+                out[m.group(1)] = m.group(2)   # later paste wins = newest
+        return out
+
+    def meesho_source_for(self, platform: str = "") -> str:
+        """Pick the right source token for the platform being posted to.
+
+        Attribution matters: a Pinterest pin tagged 'facebook' muddies the
+        Meesho report. Falls back to the newest token when that platform has
+        no link yet (commission still lands — publisher id is unchanged).
+        """
+        m = self.meesho_template_map()
+        if not m:
+            return ""
+        # 1) explicit override: affiliate.meesho_platform_tokens:
+        #      {pinterest: instagram_stories}   (Meesho has no Pinterest token)
+        override = (self.cfg.get("affiliate.meesho_platform_tokens") or {})
+        if isinstance(override, dict):
+            forced = str(override.get(platform.lower(), "") or "").strip()
+            if forced and forced in m:
+                return forced
+        # 2) exact platform token
+        for tok in self.PLATFORM_TOKENS.get(platform.lower(), ()):
+            if tok in m:
+                return tok
+        # 3) partial match (e.g. 'instagram_stories_2')
+        for tok in m:
+            if any(k in tok for k in self.PLATFORM_TOKENS.get(
+                    platform.lower(), ())):
+                return tok
+        # 4) newest token the owner pasted (commission is unaffected —
+        #    publisher id is the same; only the report label differs)
+        newest = ""
+        for lnk in reversed(self.meesho_template_links):
+            mm = re.search(r"af_invite/[^:/?]+:([^:/?]+):", lnk)
+            if mm:
+                newest = mm.group(1)
+                break
+        return newest or list(m)[-1]
+
+    def meesho_link_for(self, url: str, platform: str = "") -> str:
         """Build the exact link the bot would publish for this product URL.
 
         Faithful by design: the af_invite base + every parameter from YOUR
-        latest share link are copied verbatim; only p_id (this product) and
+        matching share link are copied verbatim; only p_id (this product) and
         ext_id (fresh click id) change. Nothing is invented.
         """
         pid = self.meesho_product_id(url)
         pub, src, camps = self.meesho_ids
-        template = self.meesho_template_links[-1] if self.meesho_template_links else ""
+        token = self.meesho_source_for(platform) or src
+        template = ""
+        for lnk in reversed(self.meesho_template_links):
+            if token and f":{token}:" in lnk:
+                template = lnk
+                break
+        if not template:
+            template = self.meesho_template_links[-1] if self.meesho_template_links else ""
         m = re.search(r"(https?://[^?\s]*af_invite/[^?\s]+)", template)
         if m:
             base = m.group(1)
@@ -162,25 +225,30 @@ class AffiliateLinker:
                 tparams.append(("p_id", pid))
             tparams.append(("ext_id", "".join(
                 random.choices(string.ascii_lowercase + string.digits, k=6))))
-            # your source token stays visible as utm_source (Meesho report
-            # reads the af_invite path token; this keeps it consistent)
-            if src and not any(k == "utm_source" for k, _ in tparams):
-                tparams.append(("utm_source", src))
+            # source token stays visible as utm_source (Meesho's report reads
+            # the af_invite path token; this keeps the two consistent)
+            has_utm = any(k == "utm_source" for k, _ in tparams)
+            if has_utm:
+                tparams = [(k, token if k == "utm_source" and token else v)
+                           for k, v in tparams]
+            elif token:
+                tparams.append(("utm_source", token))
             return f"{base}?{urlencode(tparams)}"
         if pub and camps and pid:
             ext = "".join(random.choices(string.ascii_lowercase + string.digits,
                                          k=6))
-            return (f"https://www.meesho.com/af_invite/{pub}:{src}:{camps[-1]}"
-                    f"?p_id={pid}&ext_id={ext}&utm_source={src}")
+            tok = token or src
+            return (f"https://www.meesho.com/af_invite/{pub}:{tok}:{camps[-1]}"
+                    f"?p_id={pid}&ext_id={ext}&utm_source={tok}")
         return ""
 
-    def meeshoize(self, url: str) -> str:
+    def meeshoize(self, url: str, platform: str = "") -> str:
         if self.MEESHO_MONETIZED.search(url):
             return url  # your generated link, passed through untouched
         # DIRECT Meesho affiliate: build af_invite with YOUR publisher +
         # campaign IDs and the product's p_id — commission lands in YOUR
         # Meesho account, no middleman. Verbatim template params preserved.
-        built = self.meesho_link_for(url)
+        built = self.meesho_link_for(url, platform=platform)
         if built:
             return built
         if self.meesho_template_links:
@@ -273,15 +341,19 @@ class AffiliateLinker:
         return url
 
     def convert(self, url: str, source: str | None = None,
-                utm: bool = True) -> tuple[str, str]:
-        """Returns (affiliate_url, network_name)."""
+                utm: bool = True, platform: str = "") -> tuple[str, str]:
+        """Returns (affiliate_url, network_name).
+
+        `platform` (pinterest/instagram/facebook/youtube) picks the matching
+        Meesho source token + campaign so your Meesho report stays clean.
+        """
         src = source or detect_source(url)
         if src == "amazon":
             out = self.amazonize(url)
         elif src == "meesho":
             if self.MEESHO_MONETIZED.search(url):
                 return url, "meesho"  # user-generated link: zero rewriting
-            out = self.meeshoize(url)
+            out = self.meeshoize(url, platform=platform)
         elif src == "flipkart":
             out = self.flipkartize(url)
         else:

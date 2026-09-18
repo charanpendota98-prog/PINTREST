@@ -16,7 +16,7 @@ posting:
   pins_per_product: 3      # pin variations per product (different photo + design)
   peak_mode: true          # post only in peak IST traffic windows (viral trick)
   board_strategy: niche    # niche keyword boards per category = more search surfaces
-  platform_order: [instagram, facebook, pinterest]  # IG+FB buzz first, Pinterest after
+  platform_order: [instagram, facebook, youtube, pinterest]  # IG+FB buzz first, Pinterest after
 
 link:
   bridge: false            # true → pins point at YOUR domain /go/<id> (click tracking
@@ -61,6 +61,9 @@ affiliate:
   cuelinks_template: ""    # template with {url} placeholder
   generic_template: ""     # fallback wrapper with {url} for any other shop
   default_wrapper: earnkaro  # wrapper for non-amazon/meesho/flipkart links
+  meesho_template_link: ""   # paste your af_invite share link(s) — comma-separated.
+                             # Each platform gets its own source token+campaign.
+  meesho_per_platform: true  # build a platform-correct link per post (recommended)
 
 seo:
   hashtags: true
@@ -86,6 +89,20 @@ instagram:
     💰 Price: {price}
     🛒 Comment 'LINK' — link in bio!
     {hashtags}
+  stories: true             # also drop a 24h Story per product (extra reach)
+
+youtube:
+  enabled: false            # true → publish each reel as a YouTube Short
+  privacy: public           # public | unlisted | private
+  category_id: 26           # 26 = Howto & Style (deals/fashion fits)
+  made_for_kids: false
+  redirect_uri: http://localhost:8080/
+  token_file: data/yt_token.json
+
+telegram:
+  # optional: broadcast every deal to your own Telegram deals channel
+  # (set TELEGRAM_TOKEN + TELEGRAM_DEALS_CHANNEL in .env — off by default)
+  enabled: false
 
 storage:
   db_path: data/pindrop.db
