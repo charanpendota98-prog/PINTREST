@@ -698,6 +698,51 @@ def create_app(cfg, db: DB | None = None) -> Flask:
     def post_status():
         return jsonify({"ok": True, **_post_job})
 
+    # 🧭 Radar hunt in the background — one click finds the top useful
+    # products. Bounded by radar.budget_seconds, so it can never hang a tab.
+    _radar_job: dict = {"running": False, "added": 0, "best": 0,
+                        "started": "", "last": "", "error": ""}
+
+    @app.post("/api/radar/hunt")
+    @_api_check
+    def radar_hunt_now():
+        import threading
+        if _radar_job["running"]:
+            return jsonify({"ok": True, "running": True,
+                            "message": "Hunt already running — no duplicate start."})
+
+        def _work() -> None:
+            _radar_job.update({"running": True, "added": 0, "best": 0,
+                               "started": time.strftime("%H:%M:%S"),
+                               "last": "", "error": ""})
+            try:
+                from . import radar as _radar
+                eng = engine
+                added = _radar.radar_hunt(
+                    cfg, eng, n=cfg.get_int("radar.hunt_count", 3),
+                    min_score=cfg.get_int("radar.min_score", 40))
+                _radar_job["added"] = len(added)
+                _radar_job["best"] = added[0]["usefulness"] if added else 0
+                if not added:
+                    _radar_job["error"] = ("nothing added — stores unreachable "
+                                           "or all candidates already queued")
+            except Exception as exc:  # noqa: BLE001 — job must always end
+                _radar_job["error"] = str(exc)[:200]
+                db.log("ERROR", f"radar hunt job failed: {exc}")
+            finally:
+                _radar_job["running"] = False
+                _radar_job["last"] = time.strftime("%H:%M:%S")
+
+        threading.Thread(target=_work, daemon=True,
+                         name="radar-hunt-now").start()
+        return jsonify({"ok": True, "running": True,
+                        "message": "Hunting top products in the background…"})
+
+    @app.get("/api/radar/hunt/status")
+    @_api_check
+    def radar_hunt_status():
+        return jsonify({"ok": True, **_radar_job})
+
     @app.post("/api/products/<int:pid>/skip")
     @_api_check
     def skip(pid: int):

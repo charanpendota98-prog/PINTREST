@@ -150,7 +150,9 @@
     <tbody id="topBody"></tbody></table>
   </div>
   <div class="panel" id="tab-radar" style="display:none">
-    <h3 style="margin:6px 0 4px">🧭 Radar — most USEFUL products (0-100)</h3>
+    <h3 style="margin:6px 0 4px">🧭 Radar — most USEFUL products (0-100)
+      <button id="radarHunt" style="float:right;font-size:12px"
+              onclick="huntNow()">🔍 Hunt now</button></h3>
     <p style="color:#666;font-size:12.5px;margin:0 0 12px">
       Problem-solvers, impulse prices (₹299-999), repeat-purchase items rank high.
       The queue posts the highest score first, so these go out before fillers.</p>
@@ -276,6 +278,26 @@ async function addProducts(){
   }catch(e){ toast('Failed: '+e, true); }
   btn.disabled = false; btn.innerHTML = '🔍 Scrape & Add to Queue';
 }
+async function huntNow(){
+  const b = $('#radarHunt');
+  if(b) { b.disabled = true; b.textContent = '🔎 hunting…'; }
+  try{
+    const r = await api('/api/radar/hunt', {method:'POST'});
+    toast(r.message || 'Hunting…');
+    for(let i = 0; i < 60; i++){
+      await new Promise(res => setTimeout(res, 3000));
+      const st = await api('/api/radar/hunt/status');
+      if(!st.running){
+        if(st.added) toast(`🧭 ${st.added} top product(s) queued — best ${st.best}/100`);
+        else toast(st.error || 'Nothing new found', true);
+        break;
+      }
+    }
+  }catch(e){ toast('Hunt failed: ' + e, true); }
+  if(b) { b.disabled = false; b.textContent = '🔍 Hunt now'; }
+  refreshRadar();
+}
+
 async function refreshRadar(){
   const r = await api('/api/radar');
   if(!r.ok) return;

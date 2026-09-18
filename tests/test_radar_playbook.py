@@ -8,6 +8,7 @@ Both are deterministic and offline by design — these tests lock that in.
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -460,3 +461,92 @@ class TestHuntIsTimeBounded(unittest.TestCase):
         src = (Path(__file__).resolve().parents[1] / "bot" / "scraper.py").read_text()
         self.assertIn("_fetch(page, retries=0)", src)    # no 12s backoff in discovery
         self.assertIn("def net_down", src)
+
+
+class TestRadarHuntJob(unittest.TestCase):
+    """Panel "Hunt now": background, guarded, never hangs the browser."""
+
+    def _client(self):
+        from bot.dashboard import create_app
+        tmp = Path(tempfile.mkdtemp())
+        cfg = Config(raw={
+            "storage": {"db_path": f"{tmp}/t.db", "media_dir": f"{tmp}/m"},
+            "dashboard": {"password": "", "secret_key": "t"},
+            "radar": {"min_score": 40, "hunt_count": 2, "budget_seconds": 5},
+        })
+        Path(tmp / "m").mkdir(parents=True, exist_ok=True)
+        return create_app(cfg, DB(cfg.db_path)).test_client()
+
+    def test_hunt_runs_in_background_and_reports(self):
+        import bot.radar as R
+        calls = {"n": 0}
+
+        def fake_hunt(cfg, engine, n=3, min_score=40):
+            calls["n"] += 1
+            return [{"title": "Kitchen Storage Organizer", "usefulness": 62,
+                     "product_id": 1}]
+
+        orig = R.radar_hunt
+        R.radar_hunt = fake_hunt
+        try:
+            c = self._client()
+            r = c.post("/api/radar/hunt")
+            self.assertEqual(r.status_code, 200)
+            self.assertTrue(r.get_json()["running"])
+            for _ in range(40):
+                st = c.get("/api/radar/hunt/status").get_json()
+                if not st["running"]:
+                    break
+                time.sleep(0.05)
+            self.assertFalse(st["running"])
+            self.assertEqual(st["added"], 1)
+            self.assertEqual(st["best"], 62)
+            self.assertEqual(calls["n"], 1)
+        finally:
+            R.radar_hunt = orig
+
+    def test_double_click_does_not_start_twice(self):
+        import bot.radar as R
+        started = {"n": 0}
+
+        def slow_hunt(cfg, engine, n=3, min_score=40):
+            started["n"] += 1
+            time.sleep(0.4)
+            return []
+
+        orig = R.radar_hunt
+        R.radar_hunt = slow_hunt
+        try:
+            c = self._client()
+            first = c.post("/api/radar/hunt").get_json()
+            second = c.post("/api/radar/hunt").get_json()
+            self.assertTrue(first["running"])
+            self.assertTrue(second["running"])           # second click acknowledged
+            self.assertIn("already", second["message"].lower())
+            for _ in range(40):
+                if not c.get("/api/radar/hunt/status").get_json()["running"]:
+                    break
+                time.sleep(0.05)
+            self.assertEqual(started["n"], 1)
+        finally:
+            R.radar_hunt = orig
+
+    def test_hunt_failure_is_reported_not_raised(self):
+        import bot.radar as R
+
+        def boom(*a, **k):
+            raise RuntimeError("stores exploded")
+
+        orig = R.radar_hunt
+        R.radar_hunt = boom
+        try:
+            c = self._client()
+            c.post("/api/radar/hunt")
+            for _ in range(40):
+                st = c.get("/api/radar/hunt/status").get_json()
+                if not st["running"]:
+                    break
+                time.sleep(0.05)
+            self.assertIn("stores exploded", st["error"])
+        finally:
+            R.radar_hunt = orig
