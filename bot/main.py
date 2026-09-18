@@ -559,7 +559,7 @@ def cmd_simulate(cfg) -> int:
         html = Template(LANDING_HTML).render(
             title=prod["title"], price=label, disc=prod["discount"],
             raw_price="1099", img="/media/x.jpg", buy=link, pid=99999,
-            wa=quote("deal"), wa_on=False, more="",
+            page_url="/go/99999", wa=quote("deal"), wa_on=False, more="",
             brand=cfg.get("design.brand_name", "Deal Drops"))
     print(f"   ✅ renders ({len(html)} chars) with WhatsApp share + email capture")
     print(f"   ✅ SEO schema present: og:title={'og:title' in html}, "
@@ -697,6 +697,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_music(cfg)
     if cmd == "simulate":
         return cmd_simulate(cfg)
+    if cmd == "pin-stats":
+        return cmd_pin_stats(cfg, rest)
+    if cmd == "trends" and rest and rest[0] == "--live":
+        return cmd_trends_live(cfg)
     if cmd == "platforms":
         return cmd_platforms(cfg)
     if cmd in ("yt-auth", "yt-auth-url"):
@@ -884,4 +888,56 @@ def cmd_platforms(cfg) -> int:
     print("  ✅ = configured & live   ⚪ = add creds to switch on")
     print("  Telegram deals channel: "
           f"{'✅ on' if __import__('os').getenv('TELEGRAM_DEALS_CHANNEL') else '⚪ off (optional)'}")
+    return 0
+
+
+def cmd_pin_stats(cfg, args: list[str]) -> int:
+    """Pull REAL Pinterest metrics for recent pins and show the funnel."""
+    from .db import DB
+    from .engine import Engine
+    db = DB(cfg.db_path)
+    e = Engine(cfg, db)
+    if not e.api.configured:
+        print("\n❌ Pinterest credentials missing — run `python -m bot auth` first\n")
+        return 1
+    limit = int(args[0]) if args and args[0].isdigit() else 20
+    print(f"\n📈 PIN PERFORMANCE — pulling up to {limit} pins from Pinterest…\n")
+    res = e.pin_performance(limit=limit)
+    print(f"  measured: {res.get('checked', 0)} pins"
+          f"{'  |  performing: ' + str(res.get('performing')) if res.get('performing') else ''}")
+    if res.get("best"):
+        print(f"  🏆 best: {res['best'][:60]}")
+    rows = []
+    for p in db.recent_posts(limit=40):
+        m = db.latest_pin_metrics(str(p.get("pin_id") or ""))
+        if m:
+            rows.append((p.get("title") or "", m))
+    if rows:
+        print(f"\n  {'IMPR':>7} {'SAVES':>6} {'CLICKS':>7} {'OUT':>5}  TITLE")
+        for title, m in rows[:15]:
+            print(f"  {int(m['impressions']):>7} {int(m['saves']):>6} "
+                  f"{int(m['pin_clicks']):>7} {int(m['outbound']):>5}  {title[:42]}")
+    else:
+        print("\n  (no metrics stored yet — they appear 24h+ after pins go live)")
+    print("\n  Adi Pinterest nunchi direct numbers — guess kaadu, real data.\n")
+    return 0
+
+
+def cmd_trends_live(cfg) -> int:
+    """Official Pinterest Trends keywords for your region."""
+    from .trends import live_keywords
+    region = str(cfg.get("trends.region", "IN"))
+    kws = live_keywords(cfg, limit=20, force=True)
+    if not kws:
+        print("\n⚠️  Live trends unavailable right now (needs the `trends:read`")
+        print("   scope — re-run `python -m bot auth` once — or Pinterest is")
+        print("   throttling). Built-in winner list stays active:\n")
+        from .trends import describe
+        print(describe())
+        return 0
+    print(f"\n📈 LIVE PINTEREST TRENDS — region {region} (official API)\n" + "-" * 54)
+    for i, kw in enumerate(kws, 1):
+        print(f"  {i:>2}. {kw}")
+    print("-" * 54)
+    print("   Ee keywords ippudu SEO titles/hashtags lo auto-inject avutayi.\n")
     return 0

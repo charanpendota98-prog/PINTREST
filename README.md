@@ -291,6 +291,25 @@ Every known leak path, audited & sealed:
 | Bio/DM/comment links | ✅ bridge/affiliate link per product |
 | Winners going stale | ✅ price-watch re-announces 📉 drops + rotation |
 
+## 📌 Pinterest power layer — top-0.1% mechanics (photos + videos)
+
+Pinterest is the main money surface, so every pin goes out with the best
+available mechanics — all via the official v5 API, verified by tests:
+
+| Mechanic | What we do | Why it wins |
+|---|---|---|
+| **API media upload** | `POST /v5/media` (register → S3 upload → poll `succeeded`) for images AND videos | `image_url` makes Pinterest fetch a store CDN that can block/404 — uploading our own designed file means the pin we designed is the pin that ships. Falls back to inline base64, then URL |
+| **Carousel pins** | 2–5 product photos, each item with its own link (`multiple_image_urls`) | Pinterest's highest-engagement pin format; buyer taps the exact variant they want; auto-falls back to a single pin if the product has one photo or the API refuses |
+| **Video pins** | real product video, else our auto-generated reel (`video_id` after upload), with `alt_text` | video pins get extra distribution; still the same affiliate link |
+| **Board sections** | optional per-niche sub-boards (`pinterest.sections`) | keeps a big board tidy and signals relevance to Pinterest |
+| **Live Trends API** | `GET /v5/trends/keywords/IN/top/growing|monthly` → cached 24h → injected into titles/hashtags | real regional demand instead of guesswork; `bot trends --live` |
+| **Pin analytics** | `GET /v5/pins/{id}/analytics` → impressions, saves, pin clicks, outbound clicks, stored per pin | honest funnel data; drives the winners-rotation (Pinterest-verified winners get reshared first) |
+| **Rich Pins** | landing pages ship `og:type=product` + `product:price:amount` + `product:price:currency` + `og:availability` + absolute `og:image`/`og:url` | price + availability can appear on the pin itself; better click-through |
+| **Scheduling** | `created_time` (±14-day window) or the local human-like scheduler | organic-looking cadence, no API abuse |
+
+Verify any time: `python -m bot pin-stats` (real numbers), `python -m bot trends --live`
+(real keywords), `python -m bot features` (what's switched on).
+
 ## 🛍 Meesho affiliate — exactly how it works (no API needed)
 
 Meesho has **no public affiliate API**, and it doesn't need one: Meesho's own

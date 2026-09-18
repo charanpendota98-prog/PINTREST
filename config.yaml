@@ -5,6 +5,15 @@
 pinterest:
   board_name: "Best Deals"            # pins go into this board (auto-created)
   redirect_uri: "http://localhost:8888/callback"
+  upload_images: true     # ship the DESIGNED pin via API upload (no CDN fetch fails)
+  carousel: true          # 2+ product photos → carousel pin (highest engagement)
+  sections: false         # true → organise the board into per-niche sections
+  analytics: true         # daily REAL Pinterest metrics (impressions/saves/clicks)
+
+trends:
+  live: true              # official Pinterest Trends API keywords → SEO
+  region: IN
+  cache_hours: 24
 
 posting:
   pins_per_day: 8          # how many pins per day

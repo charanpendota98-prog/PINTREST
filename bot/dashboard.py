@@ -28,6 +28,17 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta property="og:title" content="{{ title }} — {{ price }}">
 <meta property="og:type" content="product">
 <meta property="og:description" content="Verified deal: {{ title }} at {{ price }}. Grab it before price jumps!">
+<meta property="og:url" content="{{ page_url }}">
+<meta property="og:image" content="{{ img }}">
+<meta property="og:image:width" content="1000">
+<meta property="og:image:height" content="1500">
+<meta property="og:site_name" content="{{ brand }}">
+<meta property="og:availability" content="instock">
+<meta property="product:price:amount" content="{{ raw_price }}">
+<meta property="product:price:currency" content="INR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ img }}">
+<meta name="description" content="{{ title }} at {{ price }} — verified deal, limited stock.">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Product","name":"{{ title }}",
  "offers":{"@type":"Offer","price":"{{ raw_price }}","priceCurrency":"INR",
@@ -205,11 +216,17 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                    f"{' (' + str(disc) + '% OFF)' if disc >= 15 else ''} 👉 "
                    f"{public}/go/{pid}")
         img_name = (p.get("pin_image") or "").split("/")[-1]
-        hero = f"/media/{img_name}" if img_name else (p.get("image_url") or "")
+        rel = f"/media/{img_name}" if img_name else (p.get("image_url") or "")
+        # Pinterest/Google need ABSOLUTE image + page URLs for rich results
+        if rel.startswith("/") and public:
+            hero = f"{public}{rel}"
+            page_url = f"{public}/go/{pid}"
+        else:
+            hero, page_url = rel, f"/go/{pid}"
         return render_template_string(LANDING_HTML,
                                       title=p["title"], price=price,
                                       raw_price=re.sub(r"[^0-9.]", "", p["price"]) or "0",
-                                      disc=disc, img=hero,
+                                      disc=disc, img=hero, page_url=page_url,
                                       buy=p["affiliate_url"], pid=pid, wa=wa,
                                       wa_on=bool(cfg.get("link.whatsapp_share", False)),
                                       more=str(cfg.get("affiliate.meesho_collection_link",

@@ -137,6 +137,39 @@ class Engine:
             self.db.log("WARN", f"per-platform Meesho link skipped: {exc}")
             return stored
 
+    def _gallery_urls(self, product: dict) -> list[str]:
+        """Public image URLs for this product (for carousel pins)."""
+        urls: list[str] = []
+        raw = product.get("images") or ""
+        if raw:
+            try:
+                import json as _json
+                urls += [u for u in _json.loads(raw) if isinstance(u, str)]
+            except (ValueError, TypeError):
+                urls += [u.strip() for u in str(raw).split(",") if u.strip()]
+        single = product.get("image_url") or ""
+        if single and single not in urls:
+            urls.insert(0, single)
+        out, seen = [], set()
+        for u in urls:
+            if u.startswith("http") and u not in seen:
+                seen.add(u)
+                out.append(u)
+        return out[:5]
+
+    def _section_for(self, board_id: str, product: dict) -> str:
+        """Board section per niche (keeps a big board tidy + more relevant)."""
+        if not self.cfg.get("pinterest.sections", False):
+            return ""
+        try:
+            from .pin_designer import pick_board
+            name = pick_board(product.get("title", ""), product.get("source", ""),
+                              str(self.cfg.get("pinterest.board_name", "Best Deals")))
+            return self.api.ensure_section(board_id, name)
+        except Exception as exc:  # noqa: BLE001 — sections are a bonus
+            self.db.log("WARN", f"board section skipped: {exc}")
+            return ""
+
     # ---------------------------------------------------------- ingestion
     def ingest_url(self, url: str, force: bool = False) -> int:
         """Scrape + enqueue one product as MULTIPLE pin variations.
@@ -219,8 +252,17 @@ class Engine:
 
         disc = prod.discount_pct
         _, fest_kw, _ = festival_boost(datetime.now(self.tz))
+        # 📈 live Pinterest Trends keywords (official API, cached 24h)
+        trend_kw = ""
+        try:
+            from .trends import cached_keywords
+            kws = cached_keywords(self.cfg, limit=6)
+            trend_kw = " ".join(kws[:3])
+        except Exception:  # noqa: BLE001
+            trend_kw = ""
         seo = build_seo_text(self.cfg, prod.title, prod.price, prod.currency,
-                             network, discount=disc, festival_kw=fest_kw)
+                             network, discount=disc,
+                             festival_kw=" ".join(x for x in (fest_kw, trend_kw) if x))
         first_id = -1
         for v in range(n_variants):
             tpl = self.pick_template()
@@ -240,6 +282,7 @@ class Engine:
                 price=prod.price,
                 currency=prod.currency,
                 image_url=prod.image_url,
+                images=",".join((prod.images or [])[:5]),
                 image_path=local_imgs[v],
                 pin_image=str(pin_path),
                 video_url=prod.video_url,
@@ -319,23 +362,53 @@ class Engine:
                 elif plat == "youtube":
                     self._post_youtube(product)
                 done.add(plat)
+            section_id = self._section_for(board_id, product)
             if video_file and Path(video_file).exists():
                 # video pin path — real / auto-generated reel uploaded to Pinterest
                 media_id = self.api.upload_video(video_file)
                 pin = self.api.create_video_pin(
                     board_id, media_id, link,
-                    seo_t, product["seo_text"], scheduled_for,
+                    seo_t, product["seo_text"],
+                    alt_text=product["title"][:500],
+                    scheduled_for=scheduled_for,
+                    board_section_id=section_id,
                 )
             else:
-                pin = self.api.create_image_pin(
-                    board_id=board_id,
-                    link=link,
-                    title=seo_t,
-                    description=product["seo_text"],
-                    alt_text=product["title"][:500],
-                    image_path=product.get("pin_image") or product.get("image_path"),
-                    scheduled_for=scheduled_for,
-                )
+                pin = None
+                # CAROUSEL first (highest engagement format) when the product
+                # has 2+ public photos; silently falls back to a single pin
+                if self.cfg.get("pinterest.carousel", True):
+                    urls = self._gallery_urls(product)
+                    if len(urls) >= 2:
+                        try:
+                            pin = self.api.create_carousel_pin(
+                                board_id=board_id,
+                                items=[{"url": u, "title": seo_t, "link": link}
+                                       for u in urls],
+                                link=link,
+                                title=seo_t,
+                                description=product["seo_text"],
+                                alt_text=product["title"][:500],
+                                scheduled_for=scheduled_for,
+                                board_section_id=section_id,
+                            )
+                            self.db.log("INFO",
+                                        f"🎠 Carousel pin created ({len(urls)} images)")
+                        except PinterestError as exc:
+                            self.db.log("WARN", f"carousel unavailable "
+                                                f"({str(exc)[:120]}) — single pin")
+                            pin = None
+                if pin is None:
+                    pin = self.api.create_image_pin(
+                        board_id=board_id,
+                        link=link,
+                        title=seo_t,
+                        description=product["seo_text"],
+                        alt_text=product["title"][:500],
+                        image_path=product.get("pin_image") or product.get("image_path"),
+                        scheduled_for=scheduled_for,
+                        board_section_id=section_id,
+                    )
             self.db.update_post(
                 post_id,
                 pin_id=str(pin.get("id", "")),
@@ -578,6 +651,20 @@ class Engine:
             min_clicks=int(self.cfg.get("reshare.min_clicks", 3)),
             rest_days=int(self.cfg.get("reshare.rest_days", 7)),
             max_shares=int(self.cfg.get("reshare.max_shares", 3)))
+        # 📈 Pinterest-reported engagement (saves/clicks) also qualifies a
+        # winner — even before our own landing counter sees traffic
+        try:
+            eng = self.db.engagement_by_product()
+            if eng:
+                known = {c["id"] for c in cands}
+                extra = [p for p in self.db.all_products(limit=200)
+                         if p["id"] in eng and eng[p["id"]] >= 25
+                         and p["id"] not in known
+                         and p.get("status") == "posted"]
+                extra.sort(key=lambda p: eng[p["id"]], reverse=True)
+                cands = extra[:1] + cands          # pinterest-proven first
+        except Exception as exc:  # noqa: BLE001
+            self.db.log("WARN", f"engagement rotation skipped: {exc}")
         n = 0
         for prod in cands[:2]:  # gentle: max 2 re-shares per cycle
             try:
@@ -626,6 +713,42 @@ class Engine:
         return n
 
     # -------------------------------------------------------- housekeeping
+    def pin_performance(self, limit: int = 20) -> dict:
+        """Pull REAL Pinterest metrics for recent pins (impressions, saves,
+        clicks) → stored in DB and used by the winners-rotation.
+
+        Honest source of truth: our landing counter only sees people who
+        reached the bridge page; Pinterest tells us the full funnel.
+        """
+        if not self.cfg.get("pinterest.analytics", True):
+            return {"checked": 0, "skipped": "disabled"}
+        if not self.api.configured:
+            return {"checked": 0, "skipped": "no credentials"}
+        checked = top = 0
+        best = None
+        for row in self.db.pins_needing_metrics(limit=limit):
+            try:
+                m = self.api.pin_analytics(str(row["pin_id"]), days=7)
+            except Exception as exc:  # noqa: BLE001 — analytics are a bonus
+                self.db.log("WARN", f"pin analytics skipped: {exc}")
+                break
+            self.db.save_pin_metrics(
+                str(row["pin_id"]), int(row["product_id"] or 0),
+                m.get("impression", 0), m.get("save", 0),
+                m.get("pin_click", 0), m.get("outbound_click", 0))
+            checked += 1
+            score = (m.get("impression", 0) + m.get("save", 0) * 3
+                     + m.get("pin_click", 0) * 5 + m.get("outbound_click", 0) * 8)
+            if score and (best is None or score > best[1]):
+                best = (row.get("title") or "", score)
+            if score >= 20:
+                top += 1
+        if best:
+            self.db.log("INFO", f"📈 Pin performance: {checked} pins measured, "
+                                f"{top} performing — best: {best[0][:40]}")
+        return {"checked": checked, "performing": top,
+                "best": best[0] if best else ""}
+
     def housekeep(self) -> None:
         """Long-runtime hygiene: prune old logs + stale media (months-safe)."""
         try:
@@ -732,6 +855,13 @@ class Engine:
                     self.price_watch()
                 except Exception as exc:  # noqa: BLE001
                     self.db.log("WARN", f"Price watch skipped: {exc}")
+            # daily Pinterest analytics pull (real impressions/saves/clicks)
+            if 11 <= now.hour <= 20 and getattr(self, "_perf_day", "") != today:
+                self._perf_day = today
+                try:
+                    self.pin_performance(limit=20)
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"pin performance job error: {exc}")
             if now.hour >= 21 and self._report_day != today:
                 self._report_day = today
                 try:

@@ -58,7 +58,18 @@ CREATE TABLE IF NOT EXISTS subscribers (
     email TEXT NOT NULL UNIQUE,
     ts    TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pin_metrics (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    pin_id      TEXT NOT NULL,
+    product_id  INTEGER NOT NULL DEFAULT 0,
+    ts          TEXT NOT NULL,
+    impressions REAL NOT NULL DEFAULT 0,
+    saves       REAL NOT NULL DEFAULT 0,
+    pin_clicks  REAL NOT NULL DEFAULT 0,
+    outbound    REAL NOT NULL DEFAULT 0
+);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_metrics_pin ON pin_metrics(pin_id);
 """
 
 MIGRATIONS = [
@@ -70,6 +81,7 @@ MIGRATIONS = [
     "ALTER TABLE products ADD COLUMN score INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE products ADD COLUMN discount INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE products ADD COLUMN template TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE products ADD COLUMN images TEXT NOT NULL DEFAULT ''",
 ]
 
 
@@ -207,6 +219,78 @@ class DB:
                 (media_id,),
             ).fetchone()
         return dict(row) if row else None
+
+    # --------------------------------------------------------- pin analytics
+    def save_pin_metrics(self, pin_id: str, product_id: int,
+                         impressions: float, saves: float,
+                         pin_clicks: float, outbound: float) -> None:
+        with _lock, self._conn() as c:
+            c.execute(
+                """INSERT INTO pin_metrics(pin_id, product_id, ts, impressions,
+                       saves, pin_clicks, outbound)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (str(pin_id), int(product_id or 0), utcnow(),
+                 float(impressions or 0), float(saves or 0),
+                 float(pin_clicks or 0), float(outbound or 0)))
+
+    def latest_pin_metrics(self, pin_id: str) -> dict[str, Any] | None:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT * FROM pin_metrics WHERE pin_id=? ORDER BY id DESC LIMIT 1",
+                (str(pin_id),)).fetchone()
+        return dict(row) if row else None
+
+    def pins_needing_metrics(self, limit: int = 20,
+                             min_age_hours: int = 24) -> list[dict[str, Any]]:
+        """Posted pins whose latest metrics snapshot is older than 24h."""
+        with self._conn() as c:
+            rows = c.execute(
+                """SELECT p.pin_id, p.product_id, p.posted_at, pr.title, pr.source
+                   FROM posts p LEFT JOIN products pr ON pr.id = p.product_id
+                   WHERE p.status='posted' AND p.pin_id != ''
+                   ORDER BY p.posted_at DESC LIMIT 200""").fetchall()
+        out = []
+        now = datetime.now(timezone.utc)
+        for r in rows:
+            d = dict(r)
+            try:
+                posted = datetime.fromisoformat(d["posted_at"] or "")
+                if posted.tzinfo is None:
+                    posted = posted.replace(tzinfo=timezone.utc)
+            except (ValueError, TypeError):
+                continue
+            if (now - posted).total_seconds() < min_age_hours * 3600:
+                continue
+            m = self.latest_pin_metrics(d["pin_id"])
+            if m:
+                try:
+                    if (now - datetime.fromisoformat(m["ts"])).total_seconds() \
+                            < 23 * 3600:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+            out.append(d)
+            if len(out) >= limit:
+                break
+        return out
+
+    def engagement_by_product(self, limit: int = 200) -> dict[int, float]:
+        """product_id → Pinterest engagement score (impressions+saves+clicks).
+
+        Used by the winners-rotation: a pin that Pinterest itself reports as
+        performing gets reshared with a fresh design; dead pins are retired.
+        """
+        with self._conn() as c:
+            rows = c.execute(
+                """SELECT product_id, MAX(impressions) imp, MAX(saves) sv,
+                          MAX(pin_clicks) pc, MAX(outbound) ob
+                   FROM pin_metrics GROUP BY product_id
+                   ORDER BY imp DESC LIMIT ?""", (limit,)).fetchall()
+        return {int(r["product_id"]): (float(r["imp"] or 0) +
+                                       float(r["sv"] or 0) * 3 +
+                                       float(r["pc"] or 0) * 5 +
+                                       float(r["ob"] or 0) * 8)
+                for r in rows}
 
     def prune_logs(self, keep: int = 3000) -> None:
         """Cap log growth for months-long 24×7 runs."""

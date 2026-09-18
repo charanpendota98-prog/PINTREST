@@ -178,3 +178,61 @@ def describe() -> str:
             f"  {n['priority']}. {n['name']:<28} sweet price ₹{lo}-₹{hi}"
         )
     return "\n".join(lines)
+
+
+# ------------------------------------------------------------------ live API
+_CACHE_FILE = "data/trends_cache.json"
+
+
+def live_keywords(cfg, limit: int = 12, region: str = "", force: bool = False
+                  ) -> list[str]:
+    """REAL Pinterest Trends keywords for your region (official Trends API).
+
+    Cached on disk (default 24h) so the trend call happens once a day, not
+    once a pin. Returns [] on any problem — callers fall back to the built-in
+    winner list, so trends being unavailable never blocks posting.
+    """
+    import json
+    import time as _time
+    from pathlib import Path as _P
+    region = region or str(cfg.get("trends.region", "IN"))
+    cache_hours = float(cfg.get("trends.cache_hours", 24))
+    root = _P(__file__).resolve().parent.parent
+    cache = root / _CACHE_FILE
+    if not force and cache.exists():
+        try:
+            data = json.loads(cache.read_text())
+            if (data.get("region") == region
+                    and _time.time() - float(data.get("ts", 0)) < cache_hours * 3600):
+                return list(data.get("keywords", []))[:limit]
+        except (OSError, ValueError):
+            pass
+    try:
+        from .pinterest_api import PinterestAPI, PinterestError
+        api = PinterestAPI(cfg)
+        if not api.configured:
+            return []
+        kws: list[str] = []
+        for trend_type in ("growing", "monthly"):
+            try:
+                items = api.trends_top(region=region, trend_type=trend_type,
+                                       limit=limit)
+            except PinterestError:
+                continue
+            for it in items:
+                kw = str(it.get("keyword") or it.get("name") or "").strip()
+                if kw and kw.lower() not in [k.lower() for k in kws]:
+                    kws.append(kw)
+        if kws:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(
+                {"region": region, "ts": _time.time(), "keywords": kws[:40]},
+                indent=1))
+        return kws[:limit]
+    except Exception:  # noqa: BLE001 — trends are a bonus, never fatal
+        return []
+
+
+def cached_keywords(cfg, limit: int = 12) -> list[str]:
+    """Read-only view of the trend cache (no network) — safe for SEO calls."""
+    return live_keywords(cfg, limit=limit) if cfg.get("trends.live", True) else []

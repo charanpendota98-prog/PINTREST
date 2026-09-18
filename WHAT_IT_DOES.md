@@ -110,6 +110,13 @@ line chupistundi.
 | **YouTube Shorts** | optional uploader (your reel → Short + link in description) | affiliate link in the description — evergreen search traffic |
 | **Telegram deals channel** | optional broadcast of every deal | affiliate link in the message |
 
+**Pinterest mechanics (main platform):** API media upload (our own designed
+file, not a store-CDN hotlink) · carousel pins for multi-photo products ·
+video pins from real/auto-generated reels · optional per-niche board sections ·
+live Pinterest Trends keywords in SEO · per-pin analytics (impressions, saves,
+clicks) feeding the winners-rotation · Rich-Pin meta so price can show on the
+pin. Check with `python -m bot pin-stats` and `python -m bot trends --live`.
+
 **Meesho link per platform:** Meesho gives each platform its own
 `source token + campaign id`. The bot stores them all and publishes the
 platform-correct one (`instagram_stories` on IG, `facebook` on FB, ...) so
