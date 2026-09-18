@@ -169,9 +169,14 @@ class InstagramAPI:
     # ------------------------------------------------------- engagement
     def auto_reply_links(self, reply: str = "🔗 Link in bio! Tap our bio & grab "
                                              "the deal 😍",
-                         max_per_cycle: int = 5) -> int:
+                         max_per_cycle: int = 5,
+                         reply_for=None) -> int:
         """Auto-answer 'link?' comments — the engagement trick top pages use
         (boosts reach, drives bio clicks). NEEDS instagram_manage_comments.
+
+        reply_for(media_id) -> str : optional per-PRODUCT reply composer
+        (engine passes the product behind that media: "boAt Earbuds ₹1,099 —
+        link in bio!") so every answer is about THAT product, not generic.
 
         Safety-first (so we never get caught/throttled):
         - capped replies per cycle + random human delays between them
@@ -198,8 +203,14 @@ class InstagramAPI:
                 if n >= max_per_cycle:
                     break
                 if "link" in (c.get("text") or "").lower():
+                    msg = reply
+                    if reply_for:
+                        try:
+                            msg = reply_for(m["id"]) or reply
+                        except Exception:  # noqa: BLE001
+                            msg = reply
                     try:
-                        self._post(f"{m['id']}/comments", message=reply)
+                        self._post(f"{m['id']}/comments", message=msg)
                         n += 1
                         _t.sleep(3 + _r.random() * 5)  # human-ish delay
                     except InstagramError:

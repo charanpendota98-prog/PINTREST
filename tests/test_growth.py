@@ -304,3 +304,27 @@ class TestRoundup(unittest.TestCase):
             [{"title": "Women kurta", "pin_image": "a", "score": 9},
              {"title": "earbuds", "pin_image": "b", "score": 5}], "ladies", 2)
         self.assertEqual(items[0]["title"], "Women kurta")
+
+
+class TestPerProductReplies(unittest.TestCase):
+    def test_product_by_ig_media_and_reply(self):
+        import tempfile
+        from pathlib import Path
+        from bot.config import load_config
+        from bot.db import DB
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = load_config()
+            db = DB(Path(tmp) / "t.db")
+            e = Engine(cfg, db)
+            pid = db.add_product(source="amazon", url="http://x/1",
+                                 title="boAt Airdopes 141 Earbuds",
+                                 price="1099", currency="INR", image_url="")
+            db.add_post(product_id=pid, board_id="b")
+            db.update_post(1, ig_post_id="MEDIA_123")
+            p = db.product_by_ig_media("MEDIA_123")
+            self.assertEqual(p["title"], "boAt Airdopes 141 Earbuds")
+            reply = e._ig_reply_for("MEDIA_123")
+            self.assertIn("Airdopes", reply)
+            self.assertIn("1,099", reply)
+            self.assertIn("bio", reply)

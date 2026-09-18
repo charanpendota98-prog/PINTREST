@@ -198,6 +198,16 @@ class DB:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def product_by_ig_media(self, media_id: str) -> dict | None:
+        """Which product is behind an IG post? (for per-product replies)."""
+        with self._conn() as c:
+            row = c.execute(
+                """SELECT pr.* FROM posts p JOIN products pr ON pr.id = p.product_id
+                   WHERE p.ig_post_id = ? ORDER BY p.id DESC LIMIT 1""",
+                (media_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
     def oldest_activity(self) -> datetime | None:
         """First-ever activity timestamp (for warm-up ramp calculations)."""
         with self._conn() as c:

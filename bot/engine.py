@@ -351,6 +351,16 @@ class Engine:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
 
+    def _ig_reply_for(self, media_id: str) -> str:
+        """Per-PRODUCT comment reply: 'link?' on the earbuds reel gets an
+        earbuds answer (name + price + bio CTA) — never a generic one."""
+        p = self.db.product_by_ig_media(media_id)
+        if not p:
+            return ""
+        label = price_label(p["price"], p["currency"])
+        return (f"🔥 {p['title'][:60]} — only {label or 'best price'}! 😍 "
+                "Link in bio — grab it before price jumps!")
+
     def _post_facebook(self, product: dict) -> None:
         """Cross-post to your Facebook Page (official Graph API, best-effort)."""
         if not (self.fb.enabled and self.fb.configured):
@@ -582,7 +592,8 @@ class Engine:
             try:
                 self.post_next()
                 if self.ig.enabled and self.ig.configured:
-                    self.ig.auto_reply_links()  # answer "link?" comments (reach trick)
+                    self.ig.auto_reply_links(
+                        reply_for=self._ig_reply_for)  # per-product answers
             except PinterestError:
                 time.sleep(300)  # back off on API errors
                 continue

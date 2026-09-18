@@ -81,7 +81,9 @@ class AffiliateLinker:
         if self.MEESHO_MONETIZED.search(url):
             return url  # your generated link, passed through untouched
         if not self.meesho_affid:
-            return url
+            # Meesho has no simple public tag: route via an aggregator
+            # (EarnKaro/Cuelinks track Meesho commissions properly)
+            return self._wrap(url)
         parsed = urlparse(url)
         params = [
             (k, v)
