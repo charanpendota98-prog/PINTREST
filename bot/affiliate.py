@@ -172,6 +172,13 @@ class AffiliateLinker:
                 return wrapped
         return url  # nothing configured -> original link (better than nothing)
 
+    def is_monetized(self, url: str, source: str = "") -> bool:
+        """Commission-leak guard: does this link actually carry tracking?
+        A pin with an untracked link = clicks that pay nobody."""
+        markers = ("tag=", "affid=", "af_invite", "ekaro.in", "cuelinks",
+                   "earnkaro", "url=")
+        return any(mk in url for mk in markers)
+
     # --------------------------------------------------------------- main
     @staticmethod
     def _add_utm(url: str, source: str) -> str:

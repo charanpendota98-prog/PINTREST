@@ -272,6 +272,20 @@ Deep self-audit of every ban/flag risk, and the fix shipped for each:
 
 Everything above is automatic — you don't configure any of it.
 
+## 💸 Commission-Leak Audit — "ekkada commission miss avvaddu"
+
+Every known leak path, audited & sealed:
+
+| Leak path | Seal |
+|---|---|
+| Pin with untracked link (clicks pay nobody) | ✅ QA gate quarantines — "COMMISSION LEAK" |
+| Amazon pin carrying someone else's tag | ✅ amazonize replaces with YOURS |
+| Meesho plain links | ✅ direct af_invite (your IDs) → affid → aggregator |
+| Flipkart / other stores | ✅ affid → EarnKaro/Cuelinks wrap |
+| Link rewritten & broken | ✅ monetized links pass through UNTOUCHED |
+| Bio/DM/comment links | ✅ bridge/affiliate link per product |
+| Winners going stale | ✅ price-watch re-announces 📉 drops + rotation |
+
 ## 💰 Money Layer — deep-level revenue thinking
 
 1. **Commission-priority posting** (`COMMISSION_EST` in trends.py): products

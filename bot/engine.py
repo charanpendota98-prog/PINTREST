@@ -505,6 +505,42 @@ class Engine:
                 self.db.log("WARN", f"Reshare failed: {exc}")
         return n
 
+    # -------------------------------------------------------- price watch
+    def price_watch(self, limit: int = 5) -> int:
+        """Top-channel trick: re-check posted winners for PRICE DROPS and
+        re-announce them ("📉 price drop" pins convert hard). Polite + capped."""
+        import re as _re
+        n = 0
+        posted = [p for p in self.db.all_products(limit=150)
+                  if p.get("status") == "posted"][:limit]
+        for p in posted:
+            try:
+                fresh = self.scraper.scrape(p["url"])
+            except Exception:  # noqa: BLE001
+                continue
+            if not fresh.ok or not fresh.price:
+                continue
+            def val(s):
+                try:
+                    return float(_re.sub(r"[^\d.]", "", s.replace(",", "")) or 0)
+                except ValueError:
+                    return 0.0
+            old, new = val(p["price"]), val(fresh.price)
+            if old and new and new <= old * 0.90:  # ≥10% drop
+                self.db.update_product(p["id"], price=fresh.price,
+                                       discount=fresh.discount_pct)
+                self.db.log("INFO", f"📉 PRICE DROP #{p['id']}: {p['price']} → "
+                                    f"{fresh.price} — re-announcing")
+                try:
+                    self.post_product({**p, "price": fresh.price,
+                                       "discount": fresh.discount_pct,
+                                       "status": "queued"})
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"Price-drop re-post failed: {exc}")
+                n += 1
+            self.scraper.polite_wait()
+        return n
+
     # -------------------------------------------------------- housekeeping
     def housekeep(self) -> None:
         """Long-runtime hygiene: prune old logs + stale media (months-safe)."""
@@ -605,6 +641,13 @@ class Engine:
             if now.hour <= 4 and getattr(self, "_house_day", "") != today:
                 self._house_day = today
                 self.housekeep()
+            # daily price-drop radar (re-announce winners that got cheaper)
+            if 11 <= now.hour <= 19 and getattr(self, "_price_day", "") != today:
+                self._price_day = today
+                try:
+                    self.price_watch()
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"Price watch skipped: {exc}")
             if now.hour >= 21 and self._report_day != today:
                 self._report_day = today
                 try:

@@ -59,6 +59,11 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
         tag = str(cfg.get("affiliate.amazon_tag", "")).strip()
         if tag and "amazon" in u.netloc and f"tag={tag}" not in link:
             issues.append("amazon link missing your affiliate tag — revenue leak!")
+        # 💰 COMMISSION-LEAK GUARD: untracked link = clicks that pay nobody
+        from .affiliate import AffiliateLinker
+        if not AffiliateLinker(cfg).is_monetized(link, product.get("source", "")):
+            issues.append("COMMISSION LEAK: link carries no affiliate tracking — "
+                          "add your affiliate IDs (.env) — pin quarantined")
 
     # ---- title
     t = (seo_title or "").strip()

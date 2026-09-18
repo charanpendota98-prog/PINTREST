@@ -385,3 +385,42 @@ class TestAutoDM(unittest.TestCase):
             self.assertIn("amzn.to", dm)
             dm2 = e._ig_dm_for("link", "something random xyz")
             self.assertIn("bio", dm2)  # fallback
+
+
+class TestCommissionLeak(unittest.TestCase):
+    def _qa(self, link, source):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from bot.config import load_config
+        from bot.db import DB
+        from bot import qa
+        cfg = load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            img = Path(tmp) / "p.jpg"
+            Image.new("RGB", (900, 900), "white").save(img)
+            db = DB(Path(tmp) / "t.db")
+            prod = {"id": 1, "title": "Wireless Bluetooth Earbuds Gaming",
+                    "source": source}
+            seo_d = ("Wireless Bluetooth earbuds gaming edition deep bass "
+                     "42h playtime fast charging offer today! #ad")
+            return qa.qa_pin(cfg, db, prod, "Wireless Bluetooth Earbuds Gaming",
+                             seo_d, str(img), link)
+
+    def test_untracked_link_quarantined(self):
+        ok, issues = self._qa("https://www.flipkart.com/xyz/p/1", "flipkart")
+        self.assertFalse(ok)
+        self.assertTrue(any("COMMISSION LEAK" in i for i in issues))
+
+    def test_tracked_link_passes(self):
+        ok, issues = self._qa("https://www.flipkart.com/xyz/p/1?affid=ME1",
+                              "flipkart")
+        self.assertTrue(ok, issues)
+
+    def test_is_monetized(self):
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        lk = AffiliateLinker(load_config())
+        self.assertTrue(lk.is_monetized("https://amzn.to/x?tag=a-21"))
+        self.assertTrue(lk.is_monetized("https://www.meesho.com/af_invite/1:2:3?p_id=4"))
+        self.assertFalse(lk.is_monetized("https://www.flipkart.com/x/p/1"))
