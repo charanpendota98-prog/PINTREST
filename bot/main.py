@@ -646,6 +646,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_music(cfg)
     if cmd == "simulate":
         return cmd_simulate(cfg)
+    if cmd == "features":
+        from .features import print_report
+        print_report(cfg)
+        return 0
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":

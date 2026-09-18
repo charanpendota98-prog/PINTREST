@@ -32,6 +32,7 @@ DEFAULTS: dict[str, Any] = {
         "bridge": False,          # true = pins link to YOUR domain /go/<id> (tracked)
         "public_base": "",        # e.g. https://yourdeals.in (where dashboard is hosted)
         "landing": True,          # show a high-converting mini landing page (vs raw 302)
+        "whatsapp_share": False,  # WhatsApp share button on landing (owner said NO → off)
     },
     "scraping": {
         "delay_seconds": 4.0,
@@ -79,6 +80,11 @@ DEFAULTS: dict[str, Any] = {
             "🔥 {title}\n💰 Price: {price}\n✅ Best price guarantee — tap to grab "
             "this deal before it's gone!\n{hashtags}"
         ),
+    },
+    "facebook": {
+        "enabled": False,          # set true once FB page token is ready
+        "page_id": "",             # or FACEBOOK_PAGE_ID in .env
+        "mode": "photo",           # photo | link (landing page)
     },
     "instagram": {
         "enabled": False,          # set true once token is ready

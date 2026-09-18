@@ -200,6 +200,25 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🌐 Where we post — and platform truth
+
+| Platform | How | Status |
+|---|---|---|
+| Pinterest | Official Pins API (pins, video pins, boards) | ✅ primary |
+| Instagram | Official Graph API (reels, carousels, comment replies) | ✅ optional creds |
+| **Facebook Page** | Official Graph API (photo/link posts) | ✅ optional creds |
+| Telegram | Broadcast channel + private reports | ⚪ optional, off by default |
+| WhatsApp | Share button on landing | ⛔ owner said NO → disabled by default |
+
+`python -m bot features` prints the live inventory of ALL capabilities.
+
+**Meesho deep-analysis (honest):** Meesho ships nice in-app features
+(auto-comments, reseller tools) but exposes **no public API** — automating
+their app would mean app-internal hacks = account ban. The money move stays:
+we promote Meesho PRODUCTS (highest commission!) through Pinterest/IG/FB,
+where we ARE allowed to automate. If Meesho ever opens an API, adding it =
+one file + one FEATURES entry — the architecture is plug-ready.
+
 ## 🛡️ Safety Layer — "ekkada dorakakudadu" (never get caught)
 
 Deep self-audit of every ban/flag risk, and the fix shipped for each:

@@ -58,8 +58,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
     <li>💯 Secure checkout on the official store</li>
   </ul>
   <a class="buy" rel="nofollow sponsored" href="{{ buy }}">🛒 GRAB THE DEAL →</a>
-  <a class="wa" href="https://wa.me/?text={{ wa }}" target="_blank" rel="noopener">
-     💬 Share this deal on WhatsApp (family groups = free sales!)</a>
+  {% if wa_on %}<a class="wa" href="https://wa.me/?text={{ wa }}" target="_blank" rel="noopener">
+     💬 Share this deal on WhatsApp (family groups = free sales!)</a>{% endif %}
   <form method="post" action="/subscribe/{{ pid }}">
     <input type="email" name="email" required placeholder="Your email — get daily best deals free"
       style="width:100%;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:15px">
@@ -121,6 +121,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                                       title=p["title"], price=price,
                                       disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
                                       buy=p["affiliate_url"], pid=pid, wa=wa,
+                                      wa_on=bool(cfg.get("link.whatsapp_share", False)),
                                       brand=cfg.get("design.brand_name", "Deal Drops"))
 
     @app.post("/subscribe/<int:pid>")

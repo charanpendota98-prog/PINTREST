@@ -20,6 +20,7 @@ from .affiliate import AffiliateLinker, price_label
 from .db import DB
 from .growth import (festival_boost, hashtag_mix, hook_for, peak_window,
                      pick_board, seo_title)
+from .facebook import FacebookAPI, FacebookError
 from .instagram import InstagramAPI, InstagramError
 from .keywords import KeywordCache
 from .notify import Notifier
@@ -71,6 +72,7 @@ class Engine:
         self.reel = ReelMaker(cfg)
         self.api = PinterestAPI(cfg)
         self.ig = InstagramAPI(cfg)
+        self.fb = FacebookAPI(cfg)
         self.kw = KeywordCache(self.db)
         self.notify = Notifier()
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
@@ -292,6 +294,7 @@ class Engine:
                              price_label(product["price"], product["currency"]),
                              link, product.get("image_url", ""))
             self._post_instagram(product, post_id)
+            self._post_facebook(product)
             return pin
         except PinterestError as exc:
             attempts = int(product.get("attempts", 0) or 0) + 1
@@ -346,6 +349,24 @@ class Engine:
         except InstagramError as exc:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
+
+    def _post_facebook(self, product: dict) -> None:
+        """Cross-post to your Facebook Page (official Graph API, best-effort)."""
+        if not (self.fb.enabled and self.fb.configured):
+            return
+        try:
+            caption = build_ig_caption(self.cfg, product["title"], product["price"],
+                                       product["currency"])
+            mode = str(self.cfg.get("facebook.mode", "photo"))
+            if mode == "link":
+                base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
+                url = f"{base}/go/{product['id']}" if base else product["affiliate_url"]
+                fid = self.fb.post_link(url, caption)
+            else:
+                fid = self.fb.post_photo(product.get("image_url", ""), caption)
+            self.db.log("INFO", f"Facebook post {fid} — {product['title'][:40]}")
+        except FacebookError as exc:
+            self.db.log("WARN", f"Facebook cross-post failed: {exc}")
 
     def post_next(self) -> dict | None:
         """Post the single oldest queued product. Returns pin dict or None."""

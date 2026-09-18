@@ -254,3 +254,18 @@ class TestAntiBan(unittest.TestCase):
         for age, expect_hi in [(0, 0.3), (7, 1.0), (30, 1.0)]:
             ramp = min(1.0, 0.3 + 0.1 * age)
             self.assertLessEqual(ramp, 1.0)
+
+
+class TestPlatforms(unittest.TestCase):
+    def test_facebook_and_features_inventory(self):
+        from bot.config import load_config
+        from bot.facebook import FacebookAPI
+        from bot.features import report
+        cfg = load_config()
+        fb = FacebookAPI(cfg)
+        self.assertFalse(fb.configured)          # no creds → safely off
+        rows = report(cfg)
+        self.assertGreaterEqual(len(rows), 15)
+        names = {r["name"] for r in rows}
+        self.assertIn("Facebook Page posting", names)
+        self.assertIn("Pinterest posting", names)
