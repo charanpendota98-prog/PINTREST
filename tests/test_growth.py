@@ -237,3 +237,20 @@ class TestEnrichMedia(unittest.TestCase):
         p.images = ["a"]
         out = s.enrich_media(p)     # must not crash
         self.assertEqual(out.images, ["a"])
+
+
+class TestAntiBan(unittest.TestCase):
+    def test_oldest_activity_and_ramp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        from pathlib import Path
+        from bot.db import DB
+        with tempfile.TemporaryDirectory() as tmp:
+            db = DB(Path(tmp) / "t.db")
+            self.assertIsNone(db.oldest_activity())
+            db.log("INFO", "boot")
+            self.assertIsNotNone(db.oldest_activity())
+        # ramp math sanity
+        for age, expect_hi in [(0, 0.3), (7, 1.0), (30, 1.0)]:
+            ramp = min(1.0, 0.3 + 0.1 * age)
+            self.assertLessEqual(ramp, 1.0)

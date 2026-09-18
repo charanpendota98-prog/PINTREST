@@ -200,6 +200,23 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🛡️ Safety Layer — "ekkada dorakakudadu" (never get caught)
+
+Deep self-audit of every ban/flag risk, and the fix shipped for each:
+
+| Risk | How we stay safe |
+|---|---|
+| New account blasting pins = flagged | **Warm-up ramp**: ~30% volume on day 1, +10%/day, full by week 1 |
+| Robotic identical daily volume | **±15% daily jitter** + human-like 40–65 min gaps with random jitter |
+| IG comment-reply spam = throttled | **Capped 5 replies/cycle**, 3–8s human delays, duplicate-reply skip |
+| Spammy identical pins | Fresh design per post + winners re-pinned only after rest window |
+| Affiliate policy violations | `#ad #affiliate` disclosure baked into every description |
+| Scraping bans | Rotating real UAs, retries, polite delays; graceful manual-add fallback |
+| Leaked credentials | `.env` + `data/` git-ignored — tokens NEVER in the repo |
+| Broken content going live | Pin-by-Pin QA gate quarantines anything wrong |
+
+Everything above is automatic — you don't configure any of it.
+
 ## 💰 Money Layer — deep-level revenue thinking
 
 1. **Commission-priority posting** (`COMMISSION_EST` in trends.py): products

@@ -198,6 +198,15 @@ class DB:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def oldest_activity(self) -> datetime | None:
+        """First-ever activity timestamp (for warm-up ramp calculations)."""
+        with self._conn() as c:
+            row = c.execute("SELECT MIN(ts) AS t FROM logs").fetchone()
+        try:
+            return datetime.fromisoformat(row["t"]) if row and row["t"] else None
+        except (ValueError, TypeError):
+            return None
+
     # ------------------------------------------------------------- reshare
     def reshare_candidates(self, min_clicks: int = 3, rest_days: int = 7,
                            max_shares: int = 3, limit: int = 5) -> list[dict]:

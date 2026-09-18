@@ -168,24 +168,40 @@ class InstagramAPI:
 
     # ------------------------------------------------------- engagement
     def auto_reply_links(self, reply: str = "🔗 Link in bio! Tap our bio & grab "
-                                             "the deal 😍") -> int:
+                                             "the deal 😍",
+                         max_per_cycle: int = 5) -> int:
         """Auto-answer 'link?' comments — the engagement trick top pages use
-        (boosts reach, drives bio clicks). Needs instagram_manage_comments."""
+        (boosts reach, drives bio clicks). NEEDS instagram_manage_comments.
+
+        Safety-first (so we never get caught/throttled):
+        - capped replies per cycle + random human delays between them
+        - skips media we already answered (no duplicate replies)
+        """
+        import random as _r
+        import time as _t
         n = 0
         try:
             medias = self._get(f"{self.ig_user_id}/media", fields="id").get("data", [])[:8]
         except InstagramError:
             return 0
         for m in medias:
+            if n >= max_per_cycle:
+                break
             try:
                 comments = self._get(f"{m['id']}/comments", fields="id,text").get("data", [])
             except InstagramError:
                 continue
+            # already answered this media? skip (anti-duplicate)
+            if any("link in bio" in (c.get("text") or "").lower() for c in comments):
+                continue
             for c in comments:
+                if n >= max_per_cycle:
+                    break
                 if "link" in (c.get("text") or "").lower():
                     try:
                         self._post(f"{m['id']}/comments", message=reply)
                         n += 1
+                        _t.sleep(3 + _r.random() * 5)  # human-ish delay
                     except InstagramError:
                         continue
         if n:

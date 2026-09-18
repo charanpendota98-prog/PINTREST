@@ -463,7 +463,19 @@ class Engine:
             w_start, w_end = peak_window(now) if peak else (start_h, end_h)
             # festival / payday volume boost (India shopping spikes)
             fest_name, _, mult = festival_boost(now)
-            eff_per_day = int(per_day * mult)
+            eff_per_day = per_day * mult
+
+            # 🛡️ ANTI-BAN WARM-UP: brand-new accounts blasting 8 pins/day
+            # get flagged. Ramp: ~30% on day 1, +10%/day, full by week 1.
+            started = self.db.oldest_activity()
+            age_days = (now - started).days if started else 0
+            ramp = min(1.0, 0.3 + 0.1 * age_days)
+            if ramp < 1.0:
+                self.db.log("INFO", f"🛡️ Warm-up day {age_days}: volume at "
+                                    f"{int(ramp*100)}% (anti-flag ramp)")
+            eff_per_day = eff_per_day * ramp
+            # human-like daily variance (±15%) — no robotic identical volume
+            eff_per_day = max(1, int(eff_per_day * random.uniform(0.85, 1.15)))
             queue = self.db.pending_products(limit=100)
 
             # ZERO-TOUCH: queue running dry? go hunt trending products itself
