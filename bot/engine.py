@@ -1221,6 +1221,13 @@ class Engine:
             if sum(days.values()) >= 10:
                 avg_d = sum(days.values()) / max(1, len(days))
                 gap_s *= 0.7 if days.get(now.weekday(), 0) > avg_d else 1.2
+            # owner control plane: pause / daily cap / quiet hours
+            from . import control
+            hold = control.gate(self.db, self.cfg, now.hour, tz=self.tz)
+            if hold:
+                self.db.log("INFO", f"⏳ Holding off — {hold}")
+                time.sleep(600)
+                continue
             paused = self.api_paused()
             if paused:
                 wait = min(900.0, max(30.0, float(paused["until"]) - time.time()))

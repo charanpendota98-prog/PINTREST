@@ -532,6 +532,115 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         engine.scraper.polite_wait()
         return jsonify({"ok": True, "results": results})
 
+    # ---------------------------------------------- owner control (R45)
+    @app.get("/api/control")
+    @_api_check
+    def control_get():
+        """Pause state, daily count, quiet hours, and WHY posting is waiting."""
+        from . import control as _ctl
+        from datetime import datetime as _dt
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
+        now_hour = _dt.now(tz).hour
+        capped, posted, cap = _ctl.cap_reached(db, cfg, tz=tz)
+        state = _ctl.is_paused(db)
+        return jsonify({
+            "ok": True,
+            "paused": bool(state),
+            "reason": _ctl.human_pause(state) if state else "",
+            "gate": _ctl.gate(db, cfg, now_hour, tz=tz),
+            "daily": {"posted": posted, "cap": cap, "capped": capped},
+            "quiet_hours": str(cfg.get("posting.quiet_hours", "")),
+        })
+
+    @app.post("/api/control")
+    @_api_check
+    def control_set():
+        """Pause / resume the scheduler. The owner is always the boss."""
+        from . import control as _ctl
+        data = request.get_json(force=True, silent=True) or {}
+        action = str(data.get("action", "")).lower()
+        if action == "pause":
+            state = _ctl.pause(db, str(data.get("reason", "") or "panel"))
+            return jsonify({"ok": True, "paused": True,
+                            "message": f"Paused — {state['reason']}"})
+        if action == "resume":
+            was = _ctl.resume(db)
+            return jsonify({"ok": True, "paused": False,
+                            "message": "Resumed" if was else "Was not paused"})
+        raise ValueError("action must be 'pause' or 'resume'")
+
+    @app.get("/api/report")
+    @_api_check
+    def report_api():
+        """Real numbers for the period + honest estimate (same as bot report)."""
+        from . import report as _rep
+        try:
+            days = max(1, min(int(request.args.get("days", 7)), 365))
+        except (TypeError, ValueError):
+            days = 7
+        return jsonify({"ok": True, "lines": _rep.lines(cfg, db, days=days),
+                        "days": days})
+
+    @app.get("/api/earnings")
+    @_api_check
+    def earnings_api():
+        """Honest estimate from real clicks + configurable assumptions."""
+        from . import earnings as _earn
+        try:
+            days = max(1, min(int(request.args.get("days", 30)), 365))
+        except (TypeError, ValueError):
+            days = 30
+        est = _earn.estimate(cfg, _earn.click_rows_since(db, days=days))
+        return jsonify({"ok": True, "days": days, **est})
+
+    _links_job: dict = {"running": False, "checked": 0, "broken": 0,
+                        "started": "", "last": "", "error": "", "results": []}
+
+    @app.post("/api/links/check")
+    @_api_check
+    def links_check():
+        import threading
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            limit = max(1, min(int(data.get("limit", 8)), 25))
+        except (TypeError, ValueError):
+            limit = 8
+        if _links_job["running"]:
+            return jsonify({"ok": True, "running": True,
+                            "message": "Link check already running."})
+
+        def _work(n: int) -> None:
+            from . import health as _health
+            _links_job.update({"running": True, "checked": 0, "broken": 0,
+                               "started": time.strftime("%H:%M:%S"),
+                               "last": "", "error": "", "results": []})
+            try:
+                results = _health.audit_links(cfg, db, limit=n)
+                _links_job["checked"] = len(results)
+                _links_job["broken"] = sum(1 for r in results
+                                           if not (r["ok"] and r["monetized"]))
+                _links_job["results"] = [
+                    {"product_id": r.get("product_id"), "title": r["title"][:60],
+                     "status": r["status"], "ok": r["ok"],
+                     "monetized": r["monetized"], "note": r["note"]}
+                    for r in results]
+            except Exception as exc:  # noqa: BLE001 — job must always end
+                _links_job["error"] = str(exc)[:200]
+            finally:
+                _links_job["running"] = False
+                _links_job["last"] = time.strftime("%H:%M:%S")
+
+        threading.Thread(target=_work, args=(limit,), daemon=True,
+                         name="links-check").start()
+        return jsonify({"ok": True, "running": True,
+                        "message": f"Checking {limit} link(s) in the background…"})
+
+    @app.get("/api/links/status")
+    @_api_check
+    def links_status():
+        return jsonify({"ok": True, **_links_job})
+
     @app.get("/api/radar")
     @_api_check
     def radar_api():

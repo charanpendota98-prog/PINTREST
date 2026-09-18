@@ -16,6 +16,11 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot pause [reason]           # ⏸ stop posting (kill switch)
+  python -m bot resume                   # ▶️ start posting again
+  python -m bot links [N]                # 💸 are affiliate links alive + tagged?
+  python -m bot earnings [--days N]      # 💰 honest commission estimate
+  python -m bot report [--days N] [--telegram]   # 📊 period report
 """
 from __future__ import annotations
 
@@ -85,7 +90,14 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
 
 
 def _pause_note(db) -> str:
-    """Human line when the API breaker has posting paused ('' when healthy)."""
+    """Human line when posting is paused (owner pause or API breaker)."""
+    try:
+        from . import control as _ctl
+        state = _ctl.is_paused(db)
+        if state:
+            return f"owner pause — {_ctl.human_pause(state)}"
+    except Exception:  # noqa: BLE001
+        pass
     try:
         import time as _t
         from . import breaker
@@ -444,6 +456,12 @@ def cmd_doctor(cfg) -> int:
                 f"{_st.get('hint', '')}"))
         else:
             checks.append(("Posting not paused (API healthy)", True, ""))
+        from . import control as _ctl
+        if _ctl.is_paused(db):
+            checks.append(("Posting paused by OWNER (kill switch)", False,
+                           "python -m bot resume  (or the panel Money tab)"))
+        else:
+            checks.append(("Kill switch: running", True, ""))
     except Exception:  # noqa: BLE001 — doctor must never crash
         pass
 
@@ -848,6 +866,86 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
     return 0
 
 
+
+def cmd_pause(cfg, reason: str = "") -> int:
+    """⏸ Kill switch — stop the scheduler (state persists through restarts)."""
+    from . import control
+    db = DB(cfg.db_path)
+    state = control.pause(db, reason or "owner")
+    print(f"⏸ Posting PAUSED — {state['reason']}")
+    print("   Resume any time: python -m bot resume   (panel: Pause/Resume)")
+    return 0
+
+
+def cmd_resume(cfg) -> int:
+    from . import control
+    db = DB(cfg.db_path)
+    was = control.resume(db)
+    print("▶️ Posting resumed." if was else "ℹ️  Posting was not paused.")
+    return 0
+
+
+def cmd_links(cfg, rest: list[str]) -> int:
+    """💸 Money-path health — are the affiliate links alive AND still tagged?"""
+    from . import health
+    db = DB(cfg.db_path)
+    limit = 10
+    for a in rest:
+        if a.isdigit():
+            limit = max(1, min(int(a), 50))
+    results = health.audit_links(cfg, db, limit=limit)
+    print(f"\n💸 LINK HEALTH — {health.summary(results)}\n" + "-" * 58)
+    broken = 0
+    for r in results:
+        mark = "✅" if (r["ok"] and r["monetized"]) else ("⚠️" if r["ok"] else "❌")
+        if mark != "✅":
+            broken += 1
+        print(f" {mark} #{r.get('product_id')} {r.get('source', ''):<8} "
+              f"{r['title'][:44]}")
+        if r.get("note"):
+            print(f"      {r['note']}")
+        if r.get("final"):
+            print(f"      → {r['final'][:90]}")
+    print("-" * 58)
+    if not results:
+        print("   queue is empty — nothing to check yet")
+    return 0 if broken == 0 else 1
+
+
+def cmd_earnings(cfg, rest: list[str]) -> int:
+    """💰 Honest estimate: clicks × assumptions × your commission rates."""
+    from . import earnings
+    days = 30
+    for i, a in enumerate(rest):
+        if a in ("--days", "-d") and i + 1 < len(rest) and rest[i + 1].isdigit():
+            days = int(rest[i + 1])
+    db = DB(cfg.db_path)
+    est = earnings.estimate(cfg, earnings.click_rows_since(db, days=days))
+    print(f"\n💰 EARNINGS ESTIMATE (last {days} days)\n" + "-" * 58)
+    for line in earnings.report_lines(cfg, est):
+        print(" " + line.strip())
+    print("-" * 58)
+    return 0
+
+
+def cmd_report(cfg, rest: list[str]) -> int:
+    """📊 Period report — real numbers + honest estimate, optional Telegram."""
+    from . import report as rep
+    days, telegram = 7, False
+    for i, a in enumerate(rest):
+        if a in ("--days", "-d") and i + 1 < len(rest) and rest[i + 1].isdigit():
+            days = int(rest[i + 1])
+        if a == "--telegram":
+            telegram = True
+    db = DB(cfg.db_path)
+    lines = rep.lines(cfg, db, days=days)
+    print("\n" + "\n".join(lines) + "\n")
+    if telegram:
+        ok = rep.send_telegram(cfg, "\n".join(lines))
+        print("📨 Telegram: sent" if ok else "📨 Telegram not configured (optional)")
+    return 0
+
+
 def cmd_queue(cfg) -> int:
     db = DB(cfg.db_path)
     stats = db.stats()
@@ -971,6 +1069,16 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd == "pause":
+        return cmd_pause(cfg, " ".join(rest).strip())
+    if cmd == "resume":
+        return cmd_resume(cfg)
+    if cmd == "links":
+        return cmd_links(cfg, rest)
+    if cmd == "earnings":
+        return cmd_earnings(cfg, rest)
+    if cmd == "report":
+        return cmd_report(cfg, rest)
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":

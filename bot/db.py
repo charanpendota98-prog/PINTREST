@@ -283,6 +283,17 @@ class DB:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def count_posts_since(self, iso_ts: str) -> int:
+        """How many pins/posts went out at or after `iso_ts` (UTC string)."""
+        with self._conn() as c:
+            row = c.execute(
+                """SELECT COUNT(*) AS n FROM posts
+                    WHERE status='posted'
+                      AND (posted_at >= ? OR (posted_at='' AND scheduled_for >= ?))""",
+                (str(iso_ts), str(iso_ts)),
+            ).fetchone()
+        return int(row["n"] if row else 0)
+
     def product_by_ig_media(self, media_id: str) -> dict | None:
         """Which product is behind an IG post? (for per-product replies)."""
         with self._conn() as c:

@@ -51,6 +51,22 @@ video:
   lang: en-IN              # voiceover: en-IN | hi-IN | te-IN (free neural TTS)
   music: ""                # optional BGM mp3 path, ducked under the voiceover
 
+posting:
+  max_per_day: 25          # hard cap per day (anti-spam; 0 disables)
+  quiet_hours: "0-6"       # no posting while you sleep (your local time)
+
+money:
+  # 💰 honest estimator inputs — see: python -m bot earnings
+  click_to_order: 0.02     # 2% of clicks become orders (adjust with real data)
+  aov: 599                 # average order value, ₹
+  confirm_days: 45         # typical Meesho payout confirmation cycle
+  rates:                   # your real commission % per network
+    meesho: 8
+    amazon: 3
+    flipkart: 5
+    cuelinks: 6
+    earnkaro: 6
+
 autopilot:
   auto_source: true        # ZERO-TOUCH: hunt trending products when queue is low
   min_queue: 5

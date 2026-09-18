@@ -81,6 +81,7 @@
     <div class="tab" data-tab="logs">🧾 Logs</div>
     <div class="tab" data-tab="analytics">📊 Analytics</div>
     <div class="tab" data-tab="radar">🧭 Radar</div>
+    <div class="tab" data-tab="money">💰 Money</div>
   </div>
 
   <div class="panel" id="tab-add">
@@ -149,6 +150,30 @@
     <table><thead><tr><th>Pin</th><th>Source</th><th>👆 Clicks</th></tr></thead>
     <tbody id="topBody"></tbody></table>
   </div>
+  <div class="panel" id="tab-money" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px">
+      <button id="ctlBtn" onclick="togglePause()">⏸ Pause posting</button>
+      <span id="ctlState" style="color:#666;font-size:13px"></span>
+    </div>
+    <div class="cards" style="margin-bottom:16px">
+      <div class="card blue"><div class="num" id="mCommission">₹0</div><div class="lbl">Est. commission (30d)</div></div>
+      <div class="card"><div class="num" id="mClicks">0</div><div class="lbl">Clicks (30d)</div></div>
+      <div class="card"><div class="num" id="mOrders">0</div><div class="lbl">Est. orders</div></div>
+      <div class="card"><div class="num" id="mPayout">–</div><div class="lbl">Payout around</div></div>
+    </div>
+    <p id="mAssump" style="color:#666;font-size:12.5px;margin:0 0 4px"></p>
+    <p style="color:#8a6d3b;font-size:12.5px;margin:0 0 18px" id="mDisc"></p>
+    <h3 style="margin:0 0 8px">💸 Link health
+      <button style="float:right;font-size:12px" id="linkBtn"
+              onclick="checkLinks()">🔎 Check links</button></h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 8px">
+      A dead link or a missing tracking tag = silent money loss. This follows
+      each link and verifies your tag survives the redirect.</p>
+    <table><thead><tr><th>#</th><th>Product</th><th>Status</th><th>Tagged</th><th>Note</th></tr></thead>
+    <tbody id="linkBody"></tbody></table>
+    <h3 style="margin:20px 0 8px">📊 Last 7 days</h3>
+    <pre id="reportBox" style="background:#f7f7f9;border-radius:8px;padding:12px;font-size:12.5px;white-space:pre-wrap"></pre>
+  </div>
   <div class="panel" id="tab-radar" style="display:none">
     <h3 style="margin:6px 0 4px">🧭 Radar — most USEFUL products (0-100)
       <button id="radarHunt" style="float:right;font-size:12px"
@@ -183,8 +208,8 @@ function toast(msg, isErr){
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['add','queue','posted','logs','analytics','radar'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
-  refresh(); refreshRadar();
+  ['add','queue','posted','logs','analytics','radar','money'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
+  refresh(); refreshRadar(); refreshMoney();
 });
 
 async function api(path, opts){
@@ -296,6 +321,70 @@ async function huntNow(){
   }catch(e){ toast('Hunt failed: ' + e, true); }
   if(b) { b.disabled = false; b.textContent = '🔍 Hunt now'; }
   refreshRadar();
+}
+
+async function refreshMoney(){
+  const c = await api('/api/control');
+  if(c && c.ok){
+    $('#ctlBtn').textContent = c.paused ? '▶️ Resume posting' : '⏸ Pause posting';
+    const d = c.daily || {};
+    $('#ctlState').textContent = c.paused
+      ? `PAUSED — ${c.reason}`
+      : (c.gate ? `waiting: ${c.gate}` : 'posting normally') +
+        ` · today ${d.posted || 0}/${d.cap || 0}`;
+  }
+  const e = await api('/api/earnings');
+  if(e && e.ok){
+    $('#mCommission').textContent = '₹' + Math.round(e.commission);
+    $('#mClicks').textContent = e.clicks;
+    $('#mOrders').textContent = e.orders;
+    $('#mPayout').textContent = e.expected_payout_on;
+    const a = e.assumptions || {};
+    const nets = Object.entries(e.per_network || {})
+      .map(([k, v]) => `${k} ×${v.rate}%`).join(' · ');
+    $('#mAssump').textContent =
+      `Assumptions: ${(a.click_to_order * 100).toFixed(1)}% clicks→orders · ₹${a.aov} avg order · ${nets}`;
+    $('#mDisc').textContent = e.disclaimer || '';
+  }
+  const rep = await api('/api/report?days=7');
+  if(rep && rep.ok) $('#reportBox').textContent = (rep.lines || []).join('\n');
+}
+
+async function togglePause(){
+  const btn = $('#ctlBtn');
+  const pausing = btn.textContent.indexOf('Pause') >= 0;
+  btn.disabled = true;
+  try{
+    const r = await api('/api/control', {method:'POST', body:{
+      action: pausing ? 'pause' : 'resume',
+      reason: pausing ? 'panel' : ''}});
+    toast(r.message || 'done');
+  }catch(e){ toast('Failed: ' + e, true); }
+  btn.disabled = false;
+  refreshMoney();
+}
+
+async function checkLinks(){
+  const btn = $('#linkBtn');
+  btn.disabled = true; btn.textContent = '🔎 checking…';
+  try{
+    const r = await api('/api/links/check', {method:'POST', body:{limit:8}});
+    toast(r.message || 'checking…');
+    for(let i = 0; i < 40; i++){
+      await new Promise(res => setTimeout(res, 2000));
+      const st = await api('/api/links/status');
+      if(!st.running){
+        const rows = (st.results || []).map(x => `
+          <tr><td>${x.product_id ?? ''}</td><td>${esc(x.title)}</td>
+          <td>${x.ok ? '✅ ' + x.status : '❌ ' + (x.status || 'fail')}</td>
+          <td>${x.monetized ? '✅' : '⚠️'}</td><td>${esc(x.note || '')}</td></tr>`).join('');
+        $('#linkBody').innerHTML = rows || '<tr><td colspan="5" style="color:#999">nothing to check (queue empty)</td></tr>';
+        toast(st.checked ? `checked ${st.checked} · issues ${st.broken}` : (st.error || 'no links'));
+        break;
+      }
+    }
+  }catch(e){ toast('Check failed: ' + e, true); }
+  btn.disabled = false; btn.textContent = '🔎 Check links';
 }
 
 async function refreshRadar(){

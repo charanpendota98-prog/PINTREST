@@ -358,8 +358,13 @@ available mechanics — all via the official v5 API, verified by tests:
 
 Verify any time: `python -m bot pin-stats` (real numbers), `python -m bot trends --live`
 (real keywords), `python -m bot features` (what's switched on),
-`python -m bot radar` (most useful products, scored 0-100) and `python -m bot playbook`
-(the 2026 hook/carousel/timing playbook the bot follows automatically).
+`python -m bot radar` (most useful products, scored 0-100), `python -m bot playbook`
+(the 2026 hook/carousel/timing playbook the bot follows automatically),
+`python -m bot links` (are the affiliate links alive and still tagged?),
+`python -m bot earnings` (honest commission estimate from real clicks) and
+`python -m bot report --days 7 [--telegram]` (period report). Owner control:
+`python -m bot pause "reason"` / `python -m bot resume` — also on the panel's
+💰 Money tab together with Pause/Resume, earnings and link-health buttons.
 
 ## 🛍 Meesho affiliate — exactly how it works (no API needed)
 

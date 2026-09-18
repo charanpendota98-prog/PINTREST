@@ -222,13 +222,31 @@ def print_how_it_works() -> None:
      signal + audience fatigue): post time lo different topic prefer chestundi,
      radar hunt lo kuda 3+ same-topic unte skip (queue variety guard).
 
-9) SAFETY (account safe, money safe)
+9) OWNER CONTROL + MONEY HEALTH (R45)
+   ⏸ KILL SWITCH — `python -m bot pause "reason"` → scheduler next cycle lo
+     aagutundi (mid-API-call kaadu), `bot resume` → malli start. Panel 💰
+     Money tab lo Pause/Resume button. State DB lo persist.
+   📊 DAILY CAP + QUIET HOURS — posting.max_per_day (default 25) + "0-6"
+     quiet window: ratri lo posting ledu, spam cap eppudu undadu.
+   💸 LINK HEALTH — `bot links [N]` / panel "Check links": prathi affiliate
+     link ni follow chesi 200 aa + **mana tracking tag redirect tarvata kuda
+     unda** ani verify chestundi (dead link = silent money loss).
+   💰 EARNINGS ESTIMATOR — `bot earnings [--days N]` / panel card: real
+     clicks × configurable assumptions (%clicks→orders, AOV, network rates)
+     → estimate + payout date. Assumptions screen lo kanipistayi (fake ledu).
+   📊 PERIOD REPORT — `bot report [--days N] [--telegram]`: posts, clicks,
+     subscribers, store mix, best hour/weekday, top pins, estimate, pause
+     state — okate screen lo.
+   🔐 SECRETS AUDIT — health.audit_secrets: .env / token / password files
+     group-world readable unte warn (600 cheyyamani).
+
+10) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   246 automated tests.
+   277 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
