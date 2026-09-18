@@ -203,12 +203,16 @@ class Engine:
             return ""
 
     # ---------------------------------------------------------- ingestion
-    def ingest_url(self, url: str, force: bool = False) -> int:
+    def ingest_url(self, url: str, force: bool = False, prefetched=None) -> int:
         """Scrape + enqueue one product as MULTIPLE pin variations.
 
         Downloads the whole photo gallery (+ video when available), designs a
         different pin template per photo and queues each as its own pin — all
         carrying the same affiliate link. Returns first product id.
+
+        `prefetched` (optional Product) skips the scrape — the radar already
+        fetched it while ranking candidates, and re-scraping would waste a
+        request (and risk a rate-limit block).
         """
         url = url.strip()
         if not url:
@@ -217,7 +221,7 @@ class Engine:
             self.db.log("WARN", f"Duplicate skipped: {url}")
             return -1
 
-        prod = self.scraper.scrape(url)
+        prod = prefetched if prefetched is not None else self.scraper.scrape(url)
         if not prod.ok:
             self.db.log("ERROR", f"Scrape failed (blocked or bad page): {url}")
             raise ValueError(
@@ -356,6 +360,14 @@ class Engine:
         else:
             board_name = default_board
         link = self._pin_link(product)
+        # 🧠 self-learning hook: pick the archetype that earns clicks, record
+        # it on the row so clicks can be attributed back to it later
+        if not product.get("hook"):
+            product["hook"] = self._pick_hook()
+            try:
+                self.db.update_product(product["id"], hook=product["hook"])
+            except Exception:  # noqa: BLE001
+                pass
 
         days_ahead = self.cfg.get_int("posting.schedule_days_ahead", 0)
         scheduled_for = None
@@ -510,6 +522,16 @@ class Engine:
             return
         caption = build_ig_caption(self.cfg, product["title"], product["price"],
                                    product["currency"])
+        try:
+            from . import playbook as pb
+            label_h = price_label(product["price"], product["currency"])
+            hook = pb.hook_line(product["title"], label_h,
+                                archetype=product.get("hook") or "auto",
+                                seed=product.get("id"))
+            if hook:
+                caption = f"{hook}\n\n{caption}"
+        except Exception:  # noqa: BLE001 — caption is never worth a failure
+            pass
         mode = self.cfg.get("instagram.mode", "carousel")
         try:
             urls: list[str] = []
@@ -576,18 +598,38 @@ class Engine:
             return
         link = self._aff_link(product, "youtube")
         label = price_label(product["price"], product["currency"])
-        title = build_seo_text(self.cfg, product["title"], product["price"],
-                               product["currency"], "amazon", discount=0)
-        title = (title.splitlines()[0] if title else product["title"])
-        desc = (f"🔥 {product['title']}\n💰 {label}\n\n"
-                f"🛒 Buy here: {link}\n\n"
-                f"#Shorts #Deals #India #Shopping #Offer "
-                f"#{(product.get('source') or 'deal')}")
+        # 📚 playbook: PAS/Hinglish hook first, on-screen text for muted
+        # viewers, max 3 products, 3-5 hashtags, pinned comment with the link.
+        from . import playbook as pb
+        row = {**product, "price_label": label}
+        script = pb.shorts_script([row], seed=product.get("id"))
+        if product.get("hook") and product["hook"] != "auto":
+            script["hook"] = pb.hook_line(product["title"], label,
+                                          archetype=product["hook"],
+                                          seed=product.get("id")) or script["hook"]
+        hook = script["hook"] or product["title"]
+        # title: keyword-rich (YouTube search is a discovery lever, and long
+        # hooks would overflow the 100-char limit); the hook drives the
+        # description + on-screen text where it actually stops the scroll.
+        title = script.get("title") or product["title"]
+        bullets = "\n".join(f"• {b}" for b in script["beats"])
+        onscreen = " | ".join(script["onscreen"][:3])
+        desc = (f"{hook}\n\n{bullets}\n\n"
+                f"🛒 Buy here (live price): {link}\n"
+                f"📌 More deals every day: "
+                f"{str(self.cfg.get('link.public_base', '') or '').rstrip('/')}\n\n"
+                f"On-screen: {onscreen}\n\n"
+                f"{' '.join(script['hashtags'])} #Shopping #Offer")
         try:
             vid = yt.upload_short(video, title, desc,
-                                  tags=["deals", "india", "shopping",
-                                        "offer", "shorts"])
+                                  tags=[t.lstrip("#").lower()
+                                        for t in script["hashtags"]] +
+                                       ["deals", "india", "shopping"])
             self.db.log("INFO", f"YouTube Short uploaded: {vid}")
+            # pinned comment = +10-15% conversion (research) — best effort
+            pinned = f"{script['pinned_comment']}\n{link}"
+            if vid and yt.comment_on_video(vid, pinned):
+                self.db.log("INFO", f"📌 Pinned product comment on Short {vid}")
         except YouTubeError as exc:
             self.db.log("WARN", f"YouTube upload failed: {exc}")
 
@@ -708,6 +750,8 @@ class Engine:
                 try:
                     pid = self.ingest_url(u)
                     added += pid > 0
+                    if pid > 0:
+                        self._score_usefulness(pid)
                 except ValueError:
                     continue
                 self.scraper.polite_wait()
@@ -717,6 +761,40 @@ class Engine:
             self.db.log("INFO", f"🏆 Winner-clone sourced {added} new product(s) "
                                 "from top niches")
         return added
+
+    def _pick_hook(self) -> str:
+        """Choose a hook archetype, biased by what earned clicks so far.
+
+        Reads `db.hook_performance()` (clicks per archetype) and lets the
+        playbook balance explore/exploit. Never raises — falls back to 'auto'.
+        """
+        try:
+            from . import playbook as pb
+            perf = self.db.hook_performance()
+            return pb.pick_archetype(perf)
+        except Exception:  # noqa: BLE001 — choosing a hook must never fail
+            return "auto"
+
+    def _score_usefulness(self, pid: int) -> int:
+        """Re-rank one queued product by the radar's usefulness score.
+
+        `pending_products()` posts HIGHEST score first, so this is what makes
+        the most USEFUL products go out before random cheap fillers.
+        """
+        try:
+            from . import radar
+            row = next((p for p in self.db.all_products(limit=500)
+                        if p["id"] == pid), None)
+            if not row:
+                return 0
+            score, why = radar.usefulness(row)
+            self.db.update_product(pid, score=score)
+            self.db.log("INFO", f"🧭 Radar score {score}/100 for #{pid}"
+                                f"{' — ' + why[0] if why else ''}")
+            return score
+        except Exception as exc:  # noqa: BLE001 — never break sourcing
+            self.db.log("WARN", f"radar scoring skipped for #{pid}: {exc}")
+            return 0
 
     # ----------------------------------------------------------- reshare
     def reshare_winners(self) -> int:
@@ -864,6 +942,64 @@ class Engine:
         except Exception as exc:  # noqa: BLE001
             self.db.log("WARN", f"Housekeeping skipped: {exc}")
 
+    # ----------------------------------------------------------- list posts
+    def post_ig_list(self, segment: str | None = None) -> str | None:
+        """Instagram CAROUSEL list post — the highest-engagement IG format.
+
+        2026 data: carousels beat Reels on engagement (0.50-0.55% vs 0.50%)
+        and earn ~3x the saves; slide 1 carries ~80% of the engagement, so it
+        is a hook card, then one product per slide, then a save-CTA slide.
+        Runs at most once a day (a wall of list posts kills reach).
+        """
+        from . import playbook as pb
+        from . import roundup as ru
+        if not (self.ig.enabled and self.ig.configured):
+            return None
+        today = datetime.now(self.tz).date().isoformat()
+        if getattr(self, "_ig_list_day", "") == today:
+            return None
+        prods = [p for p in self.db.all_products(limit=300)
+                 if (p.get("pin_image") or p.get("image_path"))]
+        seg = segment or random.choice(list(ru.SEGMENTS))
+        items = ru.pick_roundup(prods, seg,
+                                self.cfg.get_int("instagram.list_count", 6))
+        if len(items) < 3:
+            self.db.log("INFO", "IG list post skipped — not enough products")
+            return None
+        plan = pb.ig_carousel_plan(items)
+        urls: list[str] = []
+        # slide 1: the designed hook card (text-forward = 80% of engagement)
+        try:
+            hook_img = self.cfg.media_dir / f"ig_hook_{int(time.time()*1000)}.jpg"
+            self.designer.design_roundup(items, plan["slide1"], hook_img)
+            hosted = self.ig.upload_imgbb(str(hook_img)) or \
+                self.ig.upload_catbox(str(hook_img))
+            if hosted:
+                urls.append(hosted)
+        except Exception as exc:  # noqa: BLE001 — slide 1 is best-effort
+            self.db.log("WARN", f"IG hook slide skipped: {exc}")
+        for p in items:
+            img = p.get("pin_image") or p.get("image_path")
+            try:
+                hosted = self.ig.upload_imgbb(img) or self.ig.upload_catbox(img)
+            except Exception:  # noqa: BLE001
+                hosted = ""
+            if hosted:
+                urls.append(hosted)
+        if len(urls) < 2:
+            self.db.log("WARN", "IG list post skipped — media hosting failed")
+            return None
+        caption = plan["caption"] + " " + " ".join(plan["hashtags"])
+        try:
+            media_id = self.ig.post_carousel(urls, caption)
+        except InstagramError as exc:
+            self.db.log("WARN", f"IG list post failed: {exc}")
+            return None
+        self._ig_list_day = today
+        self.db.log("INFO", f"📚 IG carousel list posted ({len(urls)} slides, "
+                            f"{ru.SEGMENTS[seg]['label']}): {media_id}")
+        return media_id
+
     # ----------------------------------------------------------- roundups
     def post_roundup(self, segment: str | None = None) -> dict | None:
         """'Deals of the Day' list pin — the viral-save format top channels use.
@@ -938,6 +1074,16 @@ class Engine:
                 except Exception as exc:  # noqa: BLE001
                     self.db.log("WARN", f"Roundup failed: {exc}")
 
+            # 📚 daily Instagram CAROUSEL list post — highest-engagement IG
+            # format; slide 1 hook, one product per slide, save-CTA last.
+            if self.cfg.get("instagram.list_posts", True):
+                try:
+                    from . import playbook as _pb
+                    if _pb.in_best_window("instagram", now.hour):
+                        self.post_ig_list()
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"IG list post failed: {exc}")
+
             # daily auto-report at 9 PM IST ("roju post chestunnava" — proof!)
             today = now.date().isoformat()
             if now.hour <= 4 and getattr(self, "_house_day", "") != today:
@@ -987,9 +1133,25 @@ class Engine:
             # ZERO-TOUCH: queue running dry? go hunt trending products itself
             min_q = self.cfg.get_int("autopilot.min_queue", 5)
             if len(queue) < min_q and self.cfg.get("autopilot.auto_source", True):
-                self.db.log("INFO", f"Queue low ({len(queue)}) — autopilot hunting "
-                                    "trending products on Amazon/Meesho/Flipkart…")
-                self.auto_source()
+                # 🧭 RADAR FIRST: hunt, SCORE, and queue only genuinely useful
+                # products (problem-solvers, impulse-priced, repeat-purchase).
+                hunted = []
+                if self.cfg.get("radar.enabled", True):
+                    try:
+                        from . import radar as _radar
+                        hunted = _radar.radar_hunt(self.cfg, self,
+                                                   n=self.cfg.get_int("radar.hunt_count", 3))
+                    except Exception as exc:  # noqa: BLE001 — never break the loop
+                        self.db.log("WARN", f"radar hunt failed, falling back: {exc}")
+                if hunted:
+                    best = hunted[0]
+                    self.db.log("INFO", f"🧭 Radar queued {len(hunted)} top product(s) "
+                                        f"— best {best['usefulness']}/100 "
+                                        f"({best['title'][:40]})")
+                else:
+                    self.db.log("INFO", f"Queue low ({len(queue)}) — autopilot hunting "
+                                        "trending products on Amazon/Meesho/Flipkart…")
+                    self.auto_source()
                 queue = self.db.pending_products(limit=100)
 
             if not queue:

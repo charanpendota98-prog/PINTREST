@@ -13,6 +13,9 @@ Usage:
   python -m bot run                      # start 24x7 human-like scheduler
   python -m bot design-test              # generate a sample pin graphic
   python -m bot dashboard                # web control panel
+  python -m bot radar                    # 🧭 most useful products (0-100 score)
+  python -m bot radar --hunt             # find + queue the top ones right now
+  python -m bot playbook                 # 📕 2026 content playbook the bot follows
 """
 from __future__ import annotations
 
@@ -414,6 +417,59 @@ def cmd_doctor(cfg) -> int:
     else:
         print(" 🎉 FULLY SET! Run:  ./run.sh   (24×7 autopilot)\n")
     return 0 if bad == 0 else 1
+
+
+def cmd_radar(cfg, rest: list[str]) -> int:
+    """🧭 Product radar — the most USEFUL products, ranked, always hunting."""
+    from . import radar
+    hunt = any(a in ("--hunt", "-H") for a in rest)
+    top = cfg.get_int("radar.min_score", 40)
+    db = DB(cfg.db_path)
+    if hunt:
+        from .engine import Engine
+        eng = Engine(cfg, db)
+        print("\n🧭 RADAR HUNT — discovering → scoring → queueing top products…\n")
+        added = radar.radar_hunt(cfg, eng,
+                                 n=cfg.get_int("radar.hunt_count", 3),
+                                 min_score=top)
+        if not added:
+            print("  ⚠️  Nothing added (network blocked from this machine, or all")
+            print("     candidates already queued). Your phone/VPS can reach stores.")
+            print("     Manual: python -m bot add <product-url>\n")
+            return 1
+        for a in added:
+            print(f"  ✅ {a['usefulness']:3d}/100  {a['title'][:52]}")
+            for why in a["why"][:3]:
+                print(f"        • {why}")
+        print(f"\n  {len(added)} product(s) queued — they will post FIRST "
+              "(queue is usefulness-ranked).\n")
+        return 0
+
+    view = radar.radar_view(cfg, db, n=cfg.get_int("radar.show_count", 8))
+    print("\n🧭 PRODUCT RADAR — what people actually need (0-100 usefulness)")
+    print("-" * 62)
+    if view["best"]:
+        print("\n🏆 TOP PICKS (post these first):")
+        for p in view["best"][:5]:
+            print(f"  {p['usefulness']:3d}  {p['title'][:52]}")
+            for why in p["why"][:2]:
+                print(f"        • {why}")
+    if view["queued"]:
+        print("\n📦 IN QUEUE (ranked):")
+        for p in view["queued"][:6]:
+            print(f"  {p['usefulness']:3d}  [{p['status']}] {p['title'][:46]}")
+    if view["posted"]:
+        print("\n📌 ALREADY POSTED (your proven shelf):")
+        for p in view["posted"][:5]:
+            print(f"  {p['usefulness']:3d}  {p['title'][:46]}")
+    for note in view["notes"]:
+        print(f"\n  ℹ️  {note}")
+    if not (view["queued"] or view["posted"]):
+        print("\n  Queue khali — `python -m bot radar --hunt` tho top products "
+              "vethukondi.\n")
+        return 0
+    print(f"\n  Next: python -m bot radar --hunt   (find more top products)\n")
+    return 0
 
 
 def cmd_dashboard_pass(cfg) -> int:
@@ -889,6 +945,12 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_dashboard_pass(cfg)
     if cmd in ("deploy-check", "preflight"):
         return cmd_deploy_check(cfg)
+    if cmd == "playbook":
+        from .playbook import report
+        print(report())
+        return 0
+    if cmd == "radar":
+        return cmd_radar(cfg, rest)
 
     print(f"Unknown command: {cmd}\n")
     print(__doc__)

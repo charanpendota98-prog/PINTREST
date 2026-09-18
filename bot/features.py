@@ -189,13 +189,32 @@ def print_how_it_works() -> None:
    - Winners rotation: manchi click vachina pin 7 days tarvata
      fresh design tho re-post
 
-7) SAFETY (account safe, money safe)
+7) RADAR + SELF-LEARNING HOOKS (R43)
+   🔭 RADAR — "top most useful products" ni bot ne vethukutundi:
+   - usefulness score 0-100: problem-solver + demand + impulse price
+     (₹299-999) + repeat-purchase + timely festival + gift/wedding + social
+     proof. Score ekkuva unna product mundhe post avutundi.
+   - python -m bot radar          → live ranking + enduku aa score
+   - python -m bot radar --hunt   → real hunt (discover → scrape → score →
+     queue only winners). Time-bounded: dead network aithe seconds lo aagi
+     "stores unreachable" ani chepthundi — loop eppudu stall avvadu.
+   - Panel lo 🧭 Radar tab → best products + queue rank + hook learning.
+   🧠 SELF-LEARNING HOOKS — click vachina hook style ni bot nerchukuntundi:
+   - 3 archetypes: PAS (problem), LIST (top-N), POV (story). Prathi post ki
+     okati pick avutundi, product row lo record avutundi, clicks aa style
+     ki attribute avutayi.
+   - 3+ posts tarvata clicks/post batti weights — winner ki ekkuva chance,
+     migatha rendu ki exploration (lucky one-off trap lo padadu).
+   - python -m bot playbook → 2026 research playbook (hooks, best times,
+     Shorts script rules, IG carousel plan).
+
+8) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   174 automated tests.
+   218 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

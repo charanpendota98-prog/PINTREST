@@ -56,6 +56,13 @@ autopilot:
   min_queue: 5
   discover_limit: 4        # products per store per hunt cycle
 
+radar:
+  enabled: true
+  budget_seconds: 120      # a hunt can never stall the run loop longer than this
+  min_score: 40            # 🧭 hunt → SCORE (0-100) → queue only useful products            # below this = filler; radar prefers problem-solvers,
+                           # impulse prices (₹299-999), repeat-purchase items
+  hunt_count: 3            # how many top products to queue per hunt
+
 design:
   width: 1000
   height: 1500             # Pinterest's ideal 2:3 vertical ratio
@@ -93,6 +100,9 @@ instagram:
   ig_user_id: ""            # or IG_USER_ID in .env
   mode: carousel            # single | carousel | reel
   posts_per_day: 3
+  list_posts: true         # 📚 daily CAROUSEL list post (highest IG engagement:
+                           # slide-1 hook → one product/slide → save CTA)
+  list_count: 6
   host_designed_pins: false # true → upload designed pins to ImgBB (IMGBB_KEY in .env)
   caption_template: |
     🔥 {title}

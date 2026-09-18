@@ -80,6 +80,7 @@
     <div class="tab" data-tab="posted">📌 Posted</div>
     <div class="tab" data-tab="logs">🧾 Logs</div>
     <div class="tab" data-tab="analytics">📊 Analytics</div>
+    <div class="tab" data-tab="radar">🧭 Radar</div>
   </div>
 
   <div class="panel" id="tab-add">
@@ -148,6 +149,22 @@
     <table><thead><tr><th>Pin</th><th>Source</th><th>👆 Clicks</th></tr></thead>
     <tbody id="topBody"></tbody></table>
   </div>
+  <div class="panel" id="tab-radar" style="display:none">
+    <h3 style="margin:6px 0 4px">🧭 Radar — most USEFUL products (0-100)</h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 12px">
+      Problem-solvers, impulse prices (₹299-999), repeat-purchase items rank high.
+      The queue posts the highest score first, so these go out before fillers.</p>
+    <div id="radarBest"></div>
+    <h3 style="margin:18px 0 8px">📦 Queue (ranked)</h3>
+    <table><thead><tr><th>Score</th><th>Product</th></tr></thead>
+    <tbody id="radarQueue"></tbody></table>
+    <h3 style="margin:18px 0 8px">🧠 Hook learning — clicks per hook style</h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 8px">
+      The bot favours the hook that earns clicks (and keeps testing the others).</p>
+    <table><thead><tr><th>Hook</th><th>Posts</th><th>Clicks</th><th>Clicks/post</th></tr></thead>
+    <tbody id="radarHooks"></tbody></table>
+    <p id="radarNotes" style="color:#8a6d3b;font-size:12.5px;margin:12px 0 0"></p>
+  </div>
 </main>
 <div class="toast" id="toast"></div>
 
@@ -164,8 +181,8 @@ function toast(msg, isErr){
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['add','queue','posted','logs','analytics'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
-  refresh();
+  ['add','queue','posted','logs','analytics','radar'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
+  refresh(); refreshRadar();
 });
 
 async function api(path, opts){
@@ -255,10 +272,31 @@ async function addProducts(){
       `<div class="hint">${x.ok?'✅':'❌'} <a href="${esc(x.url)}" target="_blank">${esc(x.url.slice(0,70))}</a> — ${esc(x.note || x.error || '')}</div>`).join('');
     $('#urls').value = '';
     toast(`${r.results.filter(x=>x.ok).length} product(s) added to queue`);
-    refresh();
+    refresh(); refreshRadar();
   }catch(e){ toast('Failed: '+e, true); }
   btn.disabled = false; btn.innerHTML = '🔍 Scrape & Add to Queue';
 }
+async function refreshRadar(){
+  const r = await api('/api/radar');
+  if(!r.ok) return;
+  const best = (r.best || []).map(p => `
+    <div class="card" style="text-align:left;margin-bottom:8px;width:auto">
+      <b>${esc(p.title)}</b>
+      <span class="pill ok" style="margin-left:6px">${p.usefulness}/100</span>
+      ${p.price ? `<span style="color:#666;margin-left:6px">${esc(p.price)}</span>` : ''}
+      <div style="color:#666;font-size:12px;margin-top:4px">${(p.why||[]).map(esc).join(' · ')}</div>
+    </div>`).join('');
+  $('#radarBest').innerHTML = best || '<p style="color:#999">Nothing scored yet — add products or run: <code>python -m bot radar --hunt</code></p>';
+  $('#radarQueue').innerHTML = (r.queued || []).map(p =>
+    `<tr><td>${p.usefulness}</td><td>${esc(p.title)}</td></tr>`).join('')
+    || '<tr><td colspan="2" style="color:#999">queue empty</td></tr>';
+  const hooks = Object.entries(r.hooks || {});
+  $('#radarHooks').innerHTML = hooks.map(([k,v]) =>
+    `<tr><td>${esc(k)}</td><td>${v.posts}</td><td>${v.clicks}</td><td>${v.cpc}</td></tr>`).join('')
+    || '<tr><td colspan="4" style="color:#999">no data yet — posts will teach it</td></tr>';
+  $('#radarNotes').textContent = (r.notes || []).join(' ');
+}
+
 async function postNow(count){
   try{
     const r = await api('/api/post', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});

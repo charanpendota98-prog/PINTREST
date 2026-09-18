@@ -31,7 +31,11 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 UPLOAD_URL = ("https://www.googleapis.com/upload/youtube/v3/videos"
               "?uploadType=multipart&part=snippet,status")
-SCOPES = "https://www.googleapis.com/auth/youtube.upload"
+# upload = post Shorts; force-ssl = pin the product comment (research: a
+# pinned comment with the product list adds ~10-15% conversion). A token
+# created BEFORE this change still works — it just cannot pin comments.
+SCOPES = ("https://www.googleapis.com/auth/youtube.upload "
+          "https://www.googleapis.com/auth/youtube.force-ssl")
 
 
 class YouTubeError(RuntimeError):
@@ -161,6 +165,34 @@ class YouTubeAPI:
         return self._cached_token
 
     # ------------------------------------------------------------- upload
+    def comment_on_video(self, video_id: str, text: str) -> str:
+        """Pin-worthy comment under our own Short (product list + link).
+
+        Returns the comment id, or "" when the token lacks `force-ssl` (owner
+        can re-run `python -m bot yt-auth` to grant it). Never raises.
+        """
+        if not (video_id and text):
+            return ""
+        try:
+            token = self._access_token()
+            resp = requests.post(
+                "https://www.googleapis.com/youtube/v3/commentThreads",
+                params={"part": "snippet"},
+                headers={"Authorization": f"Bearer {token}"},
+                json={"snippet": {"videoId": video_id,
+                                  "topLevelComment": {"snippet": {"textOriginal": text[:9000]}}}},
+                timeout=int(self.cfg.get_int("youtube.timeout_seconds", 25)),
+            )
+            if resp.status_code in (401, 403):
+                log.info("YouTube comment needs the force-ssl scope "
+                         "(re-run: python -m bot yt-auth)")
+                return ""
+            resp.raise_for_status()
+            return str(resp.json().get("id", ""))
+        except Exception as exc:  # noqa: BLE001 — comment is a bonus
+            log.info("YouTube comment skipped: %s", exc)
+            return ""
+
     def upload_short(self, video_path: str, title: str, description: str,
                      tags: list[str] | None = None) -> str:
         """Upload a vertical reel as a Short. Returns the video id."""
@@ -168,8 +200,17 @@ class YouTubeAPI:
         if not p.is_file():
             raise YouTubeError(f"video file missing: {video_path!r}")
         token = self._access_token()
+        # YouTube hard-limits titles to 100 chars — a long playbook hook plus
+        # the " #Shorts" suffix used to overflow (95 + 8 = 103) and the upload
+        # failed with a 400. Reserve room for the suffix first.
+        suffix = " #Shorts"
+        base = (title or "Deal").strip()
+        room = 100 - len(suffix)
+        if len(base) > room:
+            cut = base[:room - 1].rsplit(" ", 1)[0] or base[:room - 1]
+            base = cut.rstrip(" ,.-") + "…"
         snippet = {
-            "title": (title or "Deal")[:95] + " #Shorts",
+            "title": base + suffix,
             "description": description[:4900],
             "tags": (tags or [])[:15],
             "categoryId": str(self.cfg.get("youtube.category_id", "26")),  # 26 = Howto/Style

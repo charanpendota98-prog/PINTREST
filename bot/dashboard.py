@@ -520,6 +520,25 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         engine.scraper.polite_wait()
         return jsonify({"ok": True, "results": results})
 
+    @app.get("/api/radar")
+    @_api_check
+    def radar_api():
+        """🧭 What is genuinely worth posting right now (+ why), and which
+        hook archetype is winning — the owner sees the bot's brain."""
+        from . import radar as _radar
+        view = _radar.radar_view(cfg, db, n=8)
+        return jsonify({
+            "ok": True,
+            "best": [{"id": p["id"], "title": p["title"][:70],
+                      "usefulness": p["usefulness"], "price": p.get("price", ""),
+                      "why": p["why"][:3]} for p in view["best"]],
+            "queued": [{"id": p["id"], "title": p["title"][:70],
+                        "usefulness": p["usefulness"]} for p in view["queued"]],
+            "notes": view["notes"],
+            "hooks": db.hook_performance(),
+            "min_score": cfg.get_int("radar.min_score", 40),
+        })
+
     @app.get("/api/analytics")
     def analytics():
         """Pin-to-pin performance: every stage, every number, one screen."""

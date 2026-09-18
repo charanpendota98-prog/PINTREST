@@ -82,6 +82,9 @@ class Product:
 class Scraper:
     def __init__(self, cfg):
         self.cfg = cfg
+        # consecutive failed fetches — lets autopilot/radar give up quickly
+        # when the network (or a store) is unreachable instead of grinding
+        self.net_failures = 0
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -117,19 +120,30 @@ class Scraper:
                 i = html.find(pat, i + 1)
         return None
 
-    def _fetch(self, url: str) -> str | None:
-        retries = self.cfg.get_int("scraping.max_retries", 2)
+    def _fetch(self, url: str, retries: int | None = None) -> str | None:
+        """GET a page. `retries=None` → config default; pass 0 to
+        fast-fail (used for speculative discovery so a dead store costs ~1s,
+        not ~12s of backoff, while product pages keep full retries)."""
+        if retries is None:
+            retries = self.cfg.get_int("scraping.max_retries", 2)
         timeout = self.cfg.get_int("scraping.timeout_seconds", 25)
         for attempt in range(retries + 1):
             try:
                 resp = self.session.get(url, timeout=timeout)
                 if resp.status_code == 200:
+                    self.net_failures = 0
                     return resp.text
                 log.warning("HTTP %s for %s (attempt %d)", resp.status_code, url, attempt + 1)
             except requests.RequestException as exc:
                 log.warning("Fetch error %s: %s", url, exc)
             time.sleep(2 * (attempt + 1) + random.random() * 2)
+        self.net_failures += 1
         return None
+
+    @property
+    def net_down(self) -> bool:
+        """True when the last few fetches all failed (store/network unreachable)."""
+        return self.net_failures >= 2
 
     def polite_wait(self) -> None:
         delay = self.cfg.get_float("scraping.delay_seconds", 4.0)
@@ -393,7 +407,7 @@ class Scraper:
         page = urls.get(source)
         if not page:
             return []
-        html = self._fetch(page)
+        html = self._fetch(page, retries=0)
         if not html:
             return []
         found: list[str] = []

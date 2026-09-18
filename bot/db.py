@@ -85,6 +85,9 @@ MIGRATIONS = [
     # TWO processes (scheduler + dashboard "post now") posting the same
     # product twice — duplicate pins are spam signals.
     "ALTER TABLE products ADD COLUMN claim_ts TEXT NOT NULL DEFAULT ''",
+    # which hook archetype (pas/list/pov) was used for this product's posts —
+    # clicks per archetype feed the self-learning hook chooser
+    "ALTER TABLE products ADD COLUMN hook TEXT NOT NULL DEFAULT ''",
 ]
 
 
@@ -417,6 +420,37 @@ class DB:
                 "INSERT INTO clicks(product_id, ts, ua) VALUES(?,?,?)",
                 (product_id, utcnow(), ua[:200]),
             )
+
+    def hook_performance(self, min_samples: int = 3) -> dict[str, dict]:
+        """Clicks per hook archetype — the self-learning signal.
+
+        Returns {"pas": {"posts": 12, "clicks": 40, "cpc": 3.33}, ...}.
+        Only archetypes with >= `min_samples` posts are reported, so one lucky
+        pin cannot hijack the chooser.
+        """
+        out: dict[str, dict] = {}
+        try:
+            with self._conn() as c:
+                rows = c.execute(
+                    """SELECT p.hook AS hook,
+                              COUNT(DISTINCT p.id) AS posts,
+                              (SELECT COUNT(*) FROM clicks cl
+                                 JOIN products p2 ON p2.id = cl.product_id
+                                WHERE p2.hook = p.hook) AS clicks
+                         FROM products p
+                        WHERE p.hook != '' AND p.status = 'posted'
+                        GROUP BY p.hook"""
+                ).fetchall()
+        except Exception:  # noqa: BLE001 — learning must never break posting
+            return out
+        for r in rows:
+            posts = int(r["posts"] or 0)
+            clicks = int(r["clicks"] or 0)
+            if posts < max(1, min_samples):
+                continue
+            out[str(r["hook"])] = {"posts": posts, "clicks": clicks,
+                                   "cpc": round(clicks / posts, 3)}
+        return out
 
     def click_counts(self) -> dict[int, int]:
         with self._conn() as c:
