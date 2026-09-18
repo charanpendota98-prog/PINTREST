@@ -115,17 +115,36 @@ DEALS_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 
 def create_app(cfg, db: DB | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
+    app.config["MAX_CONTENT_LENGTH"] = 250 * 1024 * 1024  # 250MB uploads max
     db = db or DB(cfg.db_path)
     engine = Engine(cfg, db)
     media_dir = cfg.media_dir
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    # every error = clean JSON (frontend never breaks, no tracebacks)
+    @app.errorhandler(404)
+    def _nf(e):
+        return jsonify({"ok": False, "error": "not found"}), 404
+
+    @app.errorhandler(413)
+    def _big(e):
+        return jsonify({"ok": False, "error": "file too large (max 250MB)"}), 413
+
+    @app.errorhandler(500)
+    def _se(e):
+        return jsonify({"ok": False, "error": "internal error"}), 500
 
     def _api_check(fn):
-        """Wrapper: run heavy work in a thread-safe way and report errors."""
+        """Wrapper: run heavy work in a thread-safe way and report errors.
+        EVERY failure becomes clean JSON — the frontend never sees a crash."""
         def wrapper(*a, **kw):
             try:
                 return fn(*a, **kw)
             except (ValueError, PinterestError) as exc:
                 return jsonify({"ok": False, "error": str(exc)}), 400
+            except Exception as exc:  # noqa: BLE001 — never a raw 500 traceback
+                db.log("ERROR", f"API error in {fn.__name__}: {exc}")
+                return jsonify({"ok": False, "error": f"server error: {exc}"}), 500
         wrapper.__name__ = fn.__name__
         return wrapper
 
@@ -209,7 +228,10 @@ def create_app(cfg, db: DB | None = None) -> Flask:
 
     @app.get("/media/<path:name>")
     def media(name: str):
-        return send_file(media_dir / name)
+        p = (media_dir / name).resolve()
+        if not str(p).startswith(str(media_dir.resolve())) or not p.is_file():
+            return jsonify({"ok": False, "error": "not found"}), 404
+        return send_file(p)
 
     # ------------------------------------------------------------------ api
     @app.get("/api/status")
@@ -354,7 +376,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         aff_url, network = linker.convert(url, src)
         prod = type("P", (), {"image_url": image_url, "title": title,
                               "price": price, "currency": "INR"})()
-        img_path = engine.scraper.download_image(prod, cfg.media_dir)
+        img_path = engine.scraper.download_image_url(image_url, cfg.media_dir, title)
         if not img_path:
             raise ValueError("Could not download the image — check the image URL")
         video_path = ""
