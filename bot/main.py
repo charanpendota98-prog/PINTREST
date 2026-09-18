@@ -765,7 +765,14 @@ def cmd_meesho(cfg, args: list[str]) -> int:
             print(f"   {'✅' if v else '❌'} {k}")
         ok = all(checks.values())
     else:
+        has_collection = any("affiliate.meesho.com/collection/" in l
+                             for l in lk.meesho_template_links)
         print("\n  ❌ No usable Meesho link yet — paste your share link:")
+        if has_collection:
+            print("     NOTE: nuvvu paste chesindi COLLECTION link (list page).")
+            print("     Adi 'naa picks' page ki use avutundi kani, PER-PRODUCT")
+            print("     commission link build cheyyalem. Oka product page open")
+            print("     chesi → Share → copy link (af_invite format) → paste.")
         print("     affiliate.meesho.com → any product → Share → copy link")
         print("     → .env: MEESHO_TEMPLATE_LINK=<that link>   (comma-separate many)")
         ok = False

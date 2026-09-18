@@ -505,3 +505,35 @@ class TestMeeshoLinkCorrectness(unittest.TestCase):
         out, _ = lk.convert("https://www.meesho.com/kurta/p/1k1b6", "meesho")
         self.assertIn("affid=charan123", out)   # still monetized
         self.assertIn("utm_source=affiliate", out)
+
+
+class TestMeeshoCollectionGuidance(unittest.TestCase):
+    """Collection links can't build per-product links — must say so, not guess."""
+
+    def test_collection_only_never_invents_product_link(self):
+        import os
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        os.environ.pop("MEESHO_TEMPLATE_LINK", None)
+        lk = AffiliateLinker(load_config())
+        lk.cfg.raw["affiliate"]["meesho_template_link"] = (
+            "https://affiliate.meesho.com/collection/MTEwNDEyMjY6Ojpub3JtYWw=")
+        h = lk.meesho_health()
+        self.assertFalse(h["parsed"])
+        self.assertFalse(h["ready"])
+        self.assertEqual(
+            lk.meesho_link_for("https://www.meesho.com/kurta-p/489088490"), "")
+
+    def test_mixed_links_use_the_af_invite_one(self):
+        import os
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        os.environ.pop("MEESHO_TEMPLATE_LINK", None)
+        lk = AffiliateLinker(load_config())
+        lk.cfg.raw["affiliate"]["meesho_template_link"] = (
+            "https://affiliate.meesho.com/collection/MTEwNDEyMjY6Ojpub3JtYWw=,"
+            "https://www.meesho.com/af_invite/24197020:instagram_stories:"
+            "11040673?p_id=1")
+        out = lk.meesho_link_for("https://www.meesho.com/kurta-p/489088490")
+        self.assertIn("af_invite/24197020:instagram_stories:11040673", out)
+        self.assertIn("p_id=489088490", out)

@@ -184,10 +184,15 @@ class AffiliateLinker:
         if built:
             return built
         if self.meesho_template_links:
+            is_collection = any("affiliate.meesho.com/collection/" in l
+                                for l in self.meesho_template_links)
             log.warning(
                 "MEESHO LINK WARNING: could not parse your af_invite link "
-                "(no publisher/campaign IDs found) — paste a fresh share link "
-                "from affiliate.meesho.com. Falling back to affid parameter.")
+                "(no publisher/campaign IDs found)%s — open any Meesho product "
+                "→ Share → copy link (af_invite format) → paste in .env. "
+                "Falling back to affid parameter for now.",
+                " [you pasted a COLLECTION link — it cannot build per-product "
+                "links]" if is_collection else "")
         elif not self.meesho_affid:
             log.warning("MEESHO LINK WARNING: no MEESHO_TEMPLATE_LINK and no "
                         "MEESHO_AFFID set — Meesho links are NOT monetized yet. "
