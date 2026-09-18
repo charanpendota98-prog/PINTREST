@@ -24,6 +24,7 @@ import http.server
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 import threading
 import urllib.parse
@@ -83,6 +84,33 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def _pause_note(db) -> str:
+    """Human line when the API breaker has posting paused ('' when healthy)."""
+    try:
+        import time as _t
+        from . import breaker
+        st = breaker.load(db.get_state(breaker.STATE_KEY))
+        if breaker.is_open(st, _t.time()):
+            return (f"{breaker.human(breaker.remaining(st, _t.time()))} left "
+                    f"— {st.get('hint', '')}")
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def _clear_api_breaker(cfg) -> None:
+    """Re-auth means the token problem is gone — resume posting immediately
+    instead of waiting out a 6h circuit-breaker pause."""
+    try:
+        from . import breaker
+        db = DB(cfg.db_path)
+        if db.get_state(breaker.STATE_KEY):
+            db.del_state(breaker.STATE_KEY)
+            print("🔓 API breaker cleared — posting can resume right away.")
+    except Exception:  # noqa: BLE001 — never block a successful login
+        pass
+
+
 def cmd_auth(cfg) -> int:
     """Automatic browser flow — works when you can open localhost in a browser."""
     api = PinterestAPI(cfg)
@@ -117,6 +145,7 @@ def cmd_auth(cfg) -> int:
         api.exchange_code(_CallbackHandler.code, verifier)
         acc = api.user_account()
         print(f"\n✅ Connected as @{acc.get('username')} — token saved to data/pinterest_token.json")
+        _clear_api_breaker(cfg)
         return 0
     except PinterestError as exc:
         print(f"❌ {exc}")
@@ -152,6 +181,7 @@ def cmd_auth_code(cfg, code: str) -> int:
         vp.unlink(missing_ok=True)
         acc = api.user_account()
         print(f"✅ Connected as @{acc.get('username')} — token saved to data/pinterest_token.json")
+        _clear_api_breaker(cfg)
         return 0
     except PinterestError as exc:
         print(f"❌ {exc}")
@@ -402,8 +432,25 @@ def cmd_doctor(cfg) -> int:
     ck("Queue has products", st["queued"] > 0, "bot add <url>  (or autopilot hunts)")
 
     print("\n🩺 PinDrop Pro doctor\n" + "-" * 58)
+    # API breaker: is posting paused (bad token / rate limit)? Owner must see it.
+    try:
+        from . import breaker as _br
+        _st = _br.load(db.get_state(_br.STATE_KEY))
+        _open = _br.is_open(_st, time.time())
+        if _open:
+            checks.append((
+                "Posting paused by API breaker", False,
+                f"{_br.human(_br.remaining(_st, time.time()))} left — "
+                f"{_st.get('hint', '')}"))
+        else:
+            checks.append(("Posting not paused (API healthy)", True, ""))
+    except Exception:  # noqa: BLE001 — doctor must never crash
+        pass
+
     bad = 0
-    for name, ok, fix in checks:
+    for item in checks:
+        name, ok = item[0], item[1]
+        fix = item[2] if len(item) > 2 else ""     # never crash on a short entry
         mark = "✅" if ok else "❌"
         if not ok and "optional" not in name:
             bad += 1
@@ -560,6 +607,18 @@ def cmd_deploy_check(cfg) -> int:
         ck("systemd: pindrop-dashboard.service (panel)", dash, "sudo ./deploy.sh")
     else:
         ck("systemd available (docker? use ./run.sh instead)", True)
+
+    # posting paused? (circuit breaker) — the owner must see this
+    try:
+        from . import breaker as _br
+        _dbx = DB(cfg.db_path)
+        _st = _br.load(_dbx.get_state(_br.STATE_KEY))
+        _open = _br.is_open(_st, time.time())
+        ck("Posting not paused by API breaker", not _open,
+           f"paused {_br.human(_br.remaining(_st, time.time()))}: "
+           f"{_st.get('hint', '')} — fix it and posting resumes automatically")
+    except Exception:  # noqa: BLE001
+        pass
 
     # panel lock — the big one
     pw = resolve_dashboard_password(cfg, auto=False)
@@ -792,6 +851,9 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 def cmd_queue(cfg) -> int:
     db = DB(cfg.db_path)
     stats = db.stats()
+    pause = _pause_note(db)
+    if pause:
+        print(f"🚧 Posting PAUSED: {pause}")
     print(f"📊 total={stats['total']} queued={stats['queued']} "
           f"posted={stats['posted']} failed={stats['failed']} skipped={stats['skipped']}\n")
     for p in db.all_products(limit=50):

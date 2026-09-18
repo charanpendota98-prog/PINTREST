@@ -477,8 +477,20 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                 ig_info["username"] = info.get("username")
             except IGE as exc:
                 ig_info["error"] = str(exc)[:150]
+        # 🚧 circuit breaker: is posting paused (bad token / rate limit)?
+        from . import breaker as _br
+        br_state = _br.load(db.get_state(_br.STATE_KEY))
+        br_open = _br.is_open(br_state, time.time())
         return jsonify({
             "ok": True,
+            "api_breaker": {
+                "open": br_open,
+                "kind": br_state.get("kind", ""),
+                "paused_for": _br.human(_br.remaining(br_state, time.time()))
+                              if br_open else "",
+                "hint": br_state.get("hint", "") if br_open else "",
+                "fails": int(br_state.get("fails", 0) or 0),
+            },
             "credentials_ok": api.configured,
             "amazon_tag": bool(cfg.amazon_tag),
             "earnkaro": bool(cfg.get("affiliate.earnkaro_prefix")),

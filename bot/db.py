@@ -57,6 +57,12 @@ CREATE TABLE IF NOT EXISTS subscribers (
     email TEXT NOT NULL UNIQUE,
     ts    TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS pin_metrics (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     pin_id      TEXT NOT NULL,
@@ -198,6 +204,31 @@ class DB:
                 "SELECT * FROM products ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------- state kv
+    def set_state(self, key: str, value: str) -> None:
+        """Small persistent key/value store (circuit breaker, day guards…)."""
+        with _lock, self._conn() as c:
+            c.execute(
+                """INSERT INTO state (key, value, updated_at) VALUES (?,?,?)
+                   ON CONFLICT(key) DO UPDATE SET value=excluded.value,
+                                                  updated_at=excluded.updated_at""",
+                (key, str(value), datetime.now(timezone.utc).isoformat(
+                    timespec="seconds")),
+            )
+
+    def get_state(self, key: str, default: str = "") -> str:
+        try:
+            with self._conn() as c:
+                row = c.execute("SELECT value FROM state WHERE key=?",
+                                (key,)).fetchone()
+        except Exception:  # noqa: BLE001 — state must never break a run
+            return default
+        return row["value"] if row else default
+
+    def del_state(self, key: str) -> None:
+        with _lock, self._conn() as c:
+            c.execute("DELETE FROM state WHERE key=?", (key,))
 
     def update_product(self, pid: int, **fields: Any) -> None:
         if not fields:

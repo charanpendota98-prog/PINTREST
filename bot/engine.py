@@ -695,11 +695,19 @@ class Engine:
         process claims the head product first, we simply take the next one
         instead of idling. QA-quarantined products are skipped the same way.
         """
-        pending = self.db.pending_products(limit=max(1, tries))
+        pending = self.db.pending_products(limit=max(5, tries))
         if not pending:
             self.db.log("INFO", "Queue is empty — nothing to post.")
             return None
-        for product in pending:
+        # feed variety: don't post 3 of the same topic in a row (spam signal)
+        try:
+            from . import topics
+            recent = [r.get("title", "") for r in
+                      (self.db.recent_posts(limit=2) or [])]
+            ordered = topics.order_for_variety(pending, recent)
+        except Exception:  # noqa: BLE001 — variety is a bonus, never a blocker
+            ordered = pending
+        for product in ordered[:max(1, tries)]:
             pin = self.post_product(product)
             if pin is not None:
                 return pin
@@ -761,6 +769,37 @@ class Engine:
             self.db.log("INFO", f"🏆 Winner-clone sourced {added} new product(s) "
                                 "from top niches")
         return added
+
+    # ------------------------------------------------ API circuit breaker
+    def api_paused(self) -> dict:
+        """Open breaker state (or {}) — persisted, survives restarts."""
+        from . import breaker
+        state = breaker.load(self.db.get_state(breaker.STATE_KEY))
+        if not state or not breaker.is_open(state, time.time()):
+            return {}
+        return state
+
+    def _api_failed(self, exc: Exception) -> float:
+        """Record an API failure; returns how long posting must pause."""
+        from . import breaker
+        prev = breaker.load(self.db.get_state(breaker.STATE_KEY))
+        state = breaker.record_failure(prev, str(exc), time.time())
+        try:
+            self.db.set_state(breaker.STATE_KEY, breaker.dump(state))
+        except Exception:  # noqa: BLE001 — breaker must never break the loop
+            pass
+        wait = breaker.remaining(state, time.time())
+        self.db.log("ERROR", f"🚧 API breaker OPEN ({state['kind']}) for "
+                             f"{breaker.human(wait)} — {state['hint']}")
+        return wait
+
+    def _api_ok(self) -> None:
+        from . import breaker
+        if self.db.get_state(breaker.STATE_KEY):
+            try:
+                self.db.del_state(breaker.STATE_KEY)
+            except Exception:  # noqa: BLE001
+                pass
 
     def _pick_hook(self) -> str:
         """Choose a hook archetype, biased by what earned clicks so far.
@@ -1182,14 +1221,24 @@ class Engine:
             if sum(days.values()) >= 10:
                 avg_d = sum(days.values()) / max(1, len(days))
                 gap_s *= 0.7 if days.get(now.weekday(), 0) > avg_d else 1.2
+            paused = self.api_paused()
+            if paused:
+                wait = min(900.0, max(30.0, float(paused["until"]) - time.time()))
+                self.db.log("INFO", f"🚧 Posting paused ({paused.get('hint', '')}) "
+                                    f"— retry in {int(wait)}s")
+                time.sleep(wait)
+                continue
             try:
                 self.post_next()
+                self._api_ok()          # success clears the breaker
                 if self.ig.enabled and self.ig.configured:
                     self.ig.auto_reply_links(
                         reply_for=self._ig_reply_for)  # per-product answers
                     self.ig.auto_dm(reply_for=self._ig_dm_for)  # ManyChat-grade DMs
-            except PinterestError:
-                time.sleep(300)  # back off on API errors
+            except PinterestError as exc:
+                # 401/403 → long pause (retrying cannot fix a token),
+                # 429 → escalating cooldown. Never hammer the API.
+                time.sleep(min(self._api_failed(exc), 1800))
                 continue
             except InstagramError:
                 pass

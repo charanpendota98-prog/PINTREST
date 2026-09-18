@@ -208,13 +208,27 @@ def print_how_it_works() -> None:
    - python -m bot playbook → 2026 research playbook (hooks, best times,
      Shorts script rules, IG carousel plan).
 
-8) SAFETY (account safe, money safe)
+8) BAN-PROOF SAFETY (R44)
+   🚧 API CIRCUIT BREAKER — token poyina/rate-limit aina bot API ni
+     hammer cheyyadu (ade accounts flag avvataniki main reason):
+   - 401/403 (token) → 6h pause + "python -m bot auth" hint (retry valla
+     prayojanam ledu, ban risk matrame).
+   - 429 (rate limit) → cooldown 15m → 1h → 4h → 12h escalate, success
+     vasthe reset.
+   - State DB lo persist (restart chesina marchipodu), panel /api/status lo
+     "api_breaker" + `bot queue` / `bot doctor` lo PAUSED line kanipistundi.
+   - Re-auth chesina ventane breaker clear → posting immediate resume.
+   📊 FEED VARIETY — okate category 3 pins back-to-back pettadu (spam
+     signal + audience fatigue): post time lo different topic prefer chestundi,
+     radar hunt lo kuda 3+ same-topic unte skip (queue variety guard).
+
+9) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   221 automated tests.
+   246 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
