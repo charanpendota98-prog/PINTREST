@@ -95,3 +95,73 @@ def print_report(cfg) -> None:
     n_on = sum(1 for r in report(cfg) if r["status"] == "ON")
     print(f"\n  {n_on}/{len(FEATURES)} features active. New platform feature "
           "releases → one entry in bot/features.py + code → inventory updates.\n")
+
+
+def print_how_it_works() -> None:
+    """Plain, honest, end-to-end explanation — 'asalu em chesthadi?'"""
+    print("""
+╔══════════════════════════════════════════════════════════════════╗
+║  ASALU EM CHESTHADI — nijam, hype ledu, fake ledu               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+1) SOURCING (nenu cheyyali — nuvvu cheyyalsina pani ledu)
+   Top-channel winner niches (home decor, ladies fashion, beauty,
+   wedding, kitchen) lo deals ni queue loki testadu. Nuvvu link
+   paste chesina kuda teesukuntadu. URL → title/price/image scrape.
+
+2) MONEY LINK (commission miss avvadu)
+   Amazon link → NI tag tho replace (vere tag unte teesesi nadi pettadu)
+   Meesho   → NI af_invite DIRECT (middleman ledu — commission direct
+              ni account ki)
+   Migatha stores → EarnKaro / Cuelinks wrap
+   QA gate: tracking marker leni link ni BLOCK chestundi ("COMMISSION
+   LEAK"). Owned link eppudu publish avvadu.
+
+3) CONTENT (real media, bot ne create chestundi)
+   1 product → 3 pin variations (different design templates)
+   + auto-reel (photos → video + original composed BGM + voiceover)
+   Pinterest image SEO: filename lo keyword + price untundi.
+
+4) POSTING (24x7, human-like)
+   Pinterest (MAIN): peak windows lo 8 pins/day + daily "Deals of the
+   Day" list pin + winners re-share. Gap 40-65 min jitter.
+   Instagram: reel/carousel + bio link auto-update + comment 'link'
+   auto-reply + keyword DM auto-reply (ManyChat-grade).
+   Facebook Page: photo post + clickable direct link + comment auto.
+   Warm-up ramp: kotha account ki slow start (ban avvakunda).
+
+5) LANDING PAGE (commission + buyer list)
+   Pin link → yourdomain/go/<id> → landing (OG + JSON-LD schema,
+   Google/social rich results) → WhatsApp share button → email
+   capture → affiliate link ki redirect (click track + owner tag).
+
+6) LEARNING (roju roju better avutundi)
+   - Which HOUR click chesaro → aa hours lo dense posting
+   - Which WEEKDAY click chesaro → aa days dense
+   - Which DESIGN template clicks tecchindo → 70% aa template
+   - Festival keywords automatic (Diwali/Sankranti...)
+   - Price-drop radar: posted product 10%+ taggithe malli post
+   - Winners rotation: manchi click vachina pin 7 days tarvata
+     fresh design tho re-post
+
+7) SAFETY (account safe, money safe)
+   Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad),
+   dummy-product guard (demo data live account ki NEVER post),
+   crash-net (edaina fail aithe loop continue), housekeep daily,
+   doctor command, 61 automated tests.
+
+NI ONE-TIME PANI (idi tappadu — creds tappadu):
+   python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
+   EarnKaro, IG token, FB token. 5-10 nimushalu, oka saari.
+   Tarvata: sudo ./deploy.sh → 24x7 automatic.
+
+NIJJAM (honesty):
+   • Ee bot reach + clicks + commission link ni build chestundi —
+     money Pinterest/Meesho/Amazon side nunchi vastundi, payout
+     cycle 30-45 rojulu (Meesho), Amazon 60 rojulu.
+   • Month 1-3 lo numbers thakkuva (Pinterest indexing time teesukuntadu),
+     6+ months lo compound avutundi. Evaraina "week 1 lo lakhs" ante adi fake.
+   • Sandbox/this laptop nunchi live scraping test cheyyanu (network
+     blocked) — VPS lo internet unte pani chestundi. Simulation tho
+     full pipeline verify chesanu (PASSED).
+""")

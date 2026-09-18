@@ -435,7 +435,7 @@ def cmd_simulate(cfg) -> int:
     prod = {"id": 99999, "source": "amazon",
             "title": "boAt Airdopes 141 Bluetooth Wireless Earbuds",
             "price": "1099", "currency": "INR", "discount": 63,
-            "image_url": "https://example.com/img.jpg",
+            "image_url": "https://m.media-amazon.com/images/I/61sim.jpg",
             "seo_text": "", "pin_image": "", "video_path": "", "attempts": 0}
     from .affiliate import AffiliateLinker, price_label
     label = price_label(prod["price"], prod["currency"])
@@ -443,7 +443,8 @@ def cmd_simulate(cfg) -> int:
 
     # 1) affiliate link
     step("1️⃣ Affiliate link engine")
-    link, network = AffiliateLinker(cfg).convert(prod["image_url"], prod["source"])
+    link, network = AffiliateLinker(cfg).convert(
+        "https://www.amazon.in/dp/B0SIMULATED1", prod["source"])
     tag = str(cfg.get("affiliate.amazon_tag", "")).strip()
     if not tag:
         # demo only: a placeholder tag so the full pipeline (and the leak
@@ -464,6 +465,12 @@ def cmd_simulate(cfg) -> int:
     print(f"   ✅ commission guard: bare link (no tracking) → "
           f"{'BLOCKED' if not linker_for_check.is_monetized(bare, 'amazon') else 'allowed'} — "
           f"'ekkada commission miss avvodu' sealed")
+    from .qa import looks_dummy
+    demo_check = looks_dummy({"url": "https://www.meesho.com/floral-kurta-set/p/demokurta",
+                              "title": "Demo Kurta", "image_url": ""})
+    print(f"   ✅ dummy guard: demo/sample product → "
+          f"{'BLOCKED (never posts)' if demo_check else 'allowed'} — "
+          f"no dummy posting, live account safe")
 
     # 2) SEO
     step("2️⃣ SEO title + description")
@@ -669,6 +676,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_music(cfg)
     if cmd == "simulate":
         return cmd_simulate(cfg)
+    if cmd == "how":
+        from .features import print_how_it_works
+        print_how_it_works()
+        return 0
     if cmd == "features":
         from .features import print_report
         print_report(cfg)

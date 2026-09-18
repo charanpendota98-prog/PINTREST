@@ -43,5 +43,6 @@ for url, src, title, price, mrp, img in DEMO:
                        price=price, image_url=img, image_path=img,
                        pin_image=str(pin), variant=v, seo_text=seo,
                        score=score_product(title, price, src), discount=disc,
-                       template=tpl)
-print("✅ demo queue seeded:", db.stats())
+                       template=tpl, status="demo")  # PREVIEW ONLY — never posts
+print("✅ demo queue seeded (PREVIEW ONLY — status=demo, autopilot "
+      "can never post these):", db.stats())

@@ -23,6 +23,28 @@ log = logging.getLogger("pindrop.qa")
 MIN_SIDE = 600          # px — Pinterest shrinks tiny images to nothing
 MAX_BYTES = 32_000_000  # API upload limit is ~32MB
 
+# 🔒 DUMMY-POSTING GUARD — owner's rule: "no dummy posting, ever".
+# Markers that only ever appear in demo/sample/placeholder products.
+_DUMMY_MARKERS = (
+    "demokurta", "itmdemo", "demo123", "b0cdear", "example-com",
+    "example-org", "test-product", "sample-product", "dummy",
+    "placeholder", "lorem-ipsum", "yourtag-21",
+)
+
+
+def looks_dummy(product: dict) -> bool:
+    """True when a product is clearly a demo/sample — must never post.
+
+    Protects against the worst failure mode: `scripts/seed_demo.py` (or a
+    pasted test link) accidentally going live on a real account.
+    """
+    import re as _re
+    blob = " ".join(str(product.get(k, "")) for k in
+                    ("url", "affiliate_url", "title", "image_url")).lower()
+    # normalise so 'Sample Product' and 'sample-product' both match
+    blob = _re.sub(r"[^a-z0-9]+", "-", blob)
+    return any(m in blob for m in _DUMMY_MARKERS)
+
 
 def _title_tokens(title: str) -> list[str]:
     return [w for w in title.lower().split() if len(w) >= 4][:8]
@@ -32,6 +54,12 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
            image_path: str, link: str) -> tuple[bool, list[str]]:
     """Run the checklist; returns (ok, issues)."""
     issues: list[str] = []
+
+    # ---- dummy / fake product guard (runs FIRST — never post demo data)
+    if looks_dummy(product):
+        issues.append("DUMMY PRODUCT: demo/sample link detected — "
+                      "never posts to a live account (remove seed_demo data)")
+        return False, issues
 
     # ---- media
     p = Path(image_path or "")

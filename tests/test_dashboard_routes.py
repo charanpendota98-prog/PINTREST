@@ -202,3 +202,56 @@ class TestFrontendRobustness(unittest.TestCase):
         self.assertIn("og:title", LANDING_HTML)
         self.assertIn("schema.org", LANDING_HTML)
         self.assertIn("priceCurrency", LANDING_HTML)
+
+
+class TestNoDummyPosting(unittest.TestCase):
+    """Owner rule: NO dummy posting. Demo/sample data must be unpostable."""
+
+    def test_looks_dummy_flags_seed_data(self):
+        from bot.qa import looks_dummy
+        for bad in ({"url": "https://www.meesho.com/x/p/demokurta"},
+                    {"url": "https://www.flipkart.com/p/itmdemo123"},
+                    {"url": "https://www.amazon.in/dp/B0CDEAR01"},
+                    {"image_url": "https://example.com/img.jpg"},
+                    {"title": "Sample Product"},  # normalised match
+                    {"title": "Test Product Lorem"}):
+            self.assertTrue(looks_dummy(bad), bad)
+
+    def test_real_product_passes(self):
+        from bot.qa import looks_dummy
+        self.assertFalse(looks_dummy({
+            "url": "https://www.meesho.com/women-kurta/p/8xk2m1",
+            "title": "Women Yellow Floral Cotton Kurta Set",
+            "image_url": "https://m.media-amazon.com/images/I/61abc.jpg"}))
+
+    def test_qa_blocks_dummy_before_anything_else(self):
+        from bot.qa import qa_pin
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            cfg = make_cfg(td)
+            db = DB(cfg.db_path)
+            ok, issues = qa_pin(cfg, db,
+                                {"id": 1, "url": "https://x/p/demokurta",
+                                 "title": "Demo Kurta Set", "source": "meesho"},
+                                "Demo Kurta", "x" * 200,
+                                str(Path(td) / "nope.jpg"), "https://x/y")
+            self.assertFalse(ok)
+            self.assertTrue(any("DUMMY PRODUCT" in i for i in issues), issues)
+
+    def test_seed_demo_marks_status_demo(self):
+        from pathlib import Path as P
+        src = (P(__file__).resolve().parent.parent /
+               "scripts" / "seed_demo.py").read_text()
+        self.assertIn('status="demo"', src)
+
+    def test_pending_queue_excludes_demo(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            cfg = make_cfg(td)
+            db = DB(cfg.db_path)
+            db.add_product(source="meesho", url="u1", affiliate_url="a1",
+                           title="t", status="demo")
+            db.add_product(source="meesho", url="u2", affiliate_url="a2",
+                           title="real one")
+            pend = db.pending_products()
+            self.assertEqual([p["url"] for p in pend], ["u2"])
