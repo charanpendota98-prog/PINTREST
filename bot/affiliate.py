@@ -80,20 +80,24 @@ class AffiliateLinker:
     def meeshoize(self, url: str) -> str:
         if self.MEESHO_MONETIZED.search(url):
             return url  # your generated link, passed through untouched
-        if not self.meesho_affid:
-            # Meesho has no simple public tag: route via an aggregator
-            # (EarnKaro/Cuelinks track Meesho commissions properly)
-            return self._wrap(url)
-        parsed = urlparse(url)
-        params = [
-            (k, v)
-            for k, v in parse_qsl(parsed.query)
-            if k not in ("affid", "utm_source", "source")
-        ]
-        params += [("utm_source", "affiliate"), ("affid", self.meesho_affid)]
-        return urlunparse(
-            (parsed.scheme, parsed.netloc, parsed.path, "", urlencode(params), "")
-        )
+        # Official-grade first: EarnKaro/Cuelinks are licensed Meesho
+        # partners — their converted links carry real commission tracking.
+        wrapped = self._wrap(url)
+        if wrapped != url:
+            return wrapped
+        # fallback: raw reseller-style affid param (works where supported)
+        if self.meesho_affid:
+            parsed = urlparse(url)
+            params = [
+                (k, v)
+                for k, v in parse_qsl(parsed.query)
+                if k not in ("affid", "utm_source", "source")
+            ]
+            params += [("utm_source", "affiliate"), ("affid", self.meesho_affid)]
+            return urlunparse(
+                (parsed.scheme, parsed.netloc, parsed.path, "", urlencode(params), "")
+            )
+        return url
 
     def flipkartize(self, url: str) -> str:
         """Use Flipkart affiliate id if present, else fall through to wrapper."""
