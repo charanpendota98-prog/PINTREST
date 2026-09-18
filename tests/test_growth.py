@@ -183,3 +183,18 @@ class TestQAGate(unittest.TestCase):
             self.assertFalse(ok2)
             self.assertTrue(any("media missing" in i for i in issues2))
             self.assertTrue(any("#ad" in i for i in issues2))
+
+
+class TestProScraper(unittest.TestCase):
+    def test_colorimages_extraction(self):
+        from bs4 import BeautifulSoup
+        from bot.config import load_config
+        from bot.scraper import Scraper, Product
+        s = Scraper(load_config())
+        s._last_html = ("{\"colorImages\": { \"initial\": [{\"hiRes\":"
+                        "\"https://m.media-amazon.com/images/I/x._SL1000_.jpg\","
+                        "\"videos\":[{\"videoUrl\":\"https://cdn/vid.mp4\"}]}]}}")
+        p = Product(url="https://www.amazon.in/dp/B0", source="amazon")
+        s._collect_images(BeautifulSoup("<html></html>", "lxml"), p)
+        self.assertTrue(p.images[0].endswith("_SL1500_.jpg"))  # hi-res forced
+        self.assertTrue(p.video_url.endswith("vid.mp4"))       # brand video found

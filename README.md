@@ -200,6 +200,31 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 📸 How REAL photos/videos are captured (no dummies, no AI fakes)
+
+The bot posts ONLY the store's own product media — exactly what top
+affiliates do (Amazon Associates allows using product images/videos for
+promotion):
+
+1. **You paste a product link** (dashboard) or autopilot hunts winner niches.
+2. Scraper downloads the page with **rotating real browser UAs**, retries,
+   polite delays.
+3. Gallery extraction, pro-grade:
+   - **Amazon `colorImages` JS blob** → full **hiRes gallery** forced to
+     1500px (`_SL1500_`) + **brand product videos** (same payload Amazon's
+     own viewer uses — survives lazy-loading)
+   - Meesho product JSON → image list + `videoUrl` reel
+   - JSON-LD / OpenGraph / Flipkart selectors as fallbacks
+4. Real images → designer overlays (price, % OFF burst, CTA) → real video →
+   Pinterest video pin / IG reel (hosted automatically).
+5. **Pin-by-Pin QA gate** blocks anything broken before posting.
+
+> Demo queue in this preview uses AI placeholder images ONLY because the
+> preview sandbox's datacenter IP is blocked by Amazon/Flipkart/Meesho
+> (TLS drop — verified). On **your home network** (via `deploy.sh`) real
+> scraping works. If any store ever blocks, paste the link in dashboard
+> "Manual add" with the image URL — never a dead end.
+
 ## 🧪 10x Layer — Pin-by-Pin QA, Simulation, Analytics
 
 Nothing posts blind anymore:

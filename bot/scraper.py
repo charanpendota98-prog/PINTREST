@@ -24,6 +24,16 @@ from bs4 import BeautifulSoup
 
 log = logging.getLogger("pindrop.scraper")
 
+# Professional UA rotation pool (real desktop browser strings). A single
+# static UA gets fingerprinted & throttled fast by Amazon/Flipkart anti-bot.
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+]
+
 DOMAIN_SOURCES = {
     "amazon": ("amazon.in", "amazon.com", "amazon.co.uk", "amazon.ae", "amzn.in", "amzn.to"),
     "meesho": ("meesho.com",),
@@ -75,7 +85,7 @@ class Scraper:
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": cfg.get("scraping.user_agent"),
+                "User-Agent": cfg.get("scraping.user_agent") or random.choice(USER_AGENTS),
                 "Accept": (
                     "text/html,application/xhtml+xml,application/xml;q=0.9,"
                     "image/avif,image/webp,*/*;q=0.8"
@@ -84,8 +94,29 @@ class Scraper:
                 "Upgrade-Insecure-Requests": "1",
             }
         )
+        self._last_html = ""
 
     # ------------------------------------------------------------- helpers
+    @staticmethod
+    def _extract_json_array(html: str, key: str) -> str | None:
+        """Bracket-balanced extraction of the JSON array after `key:` —
+        immune to nested arrays that break naive regex."""
+        for pat in (f"'{key}':", f"'{key}' :", f'"{key}":'):
+            i = html.find(pat)
+            while i != -1:
+                j = html.find("[", i)
+                if j != -1 and j - i < 80:
+                    depth = 0
+                    for k in range(j, min(len(html), j + 400_000)):
+                        if html[k] == "[":
+                            depth += 1
+                        elif html[k] == "]":
+                            depth -= 1
+                            if depth == 0:
+                                return html[j:k + 1]
+                i = html.find(pat, i + 1)
+        return None
+
     def _fetch(self, url: str) -> str | None:
         retries = int(self.cfg.get("scraping.max_retries", 2))
         timeout = int(self.cfg.get("scraping.timeout_seconds", 25))
@@ -111,6 +142,7 @@ class Scraper:
         html = self._fetch(url)
         if not html:
             return prod
+        self._last_html = html
         soup = BeautifulSoup(html, "lxml")
 
         self._from_jsonld(soup, prod)
@@ -131,8 +163,35 @@ class Scraper:
             u = (u or "").strip()
             if u.startswith("//"):
                 u = "https:" + u
+            # top-tier trick: force Amazon CDN to serve HI-RES (1500px)
+            if "m.media-amazon.com" in u:
+                u = re.sub(r"\._[^_]+_\.", "._SL1500_.", u)
             if u.startswith("http") and u not in imgs and ".svg" not in u:
                 imgs.append(u)
+
+        # PRO SOURCE #1: Amazon 'colorImages' JS blob — the REAL hiRes gallery
+        # (same data Amazon's own viewer uses; survives lazy-loading)
+        blob = self._extract_json_array(self._last_html, "initial")
+        if blob:
+            try:
+                items = json.loads(blob)
+                # guard: must look like Amazon's gallery payload
+                if items and isinstance(items[0], dict) and \
+                        ("hiRes" in items[0] or "large" in items[0]):
+                    for item in items:
+                        hi = item.get("hiRes") or item.get("large") or ""
+                        push(hi)
+                        if not prod.video_url:
+                            for v in (item.get("videos") or []):
+                                if v.get("videoUrl"):
+                                    prod.video_url = v["videoUrl"]
+                                    break
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # PRO SOURCE #2: Meesho product JSON
+        for mm in re.finditer(r'"images"\s*:\s*\[(.*?)\]', self._last_html):
+            for u in re.findall(r'"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', mm.group(1)):
+                push(u)
 
         if prod.image_url:
             push(prod.image_url)
@@ -178,6 +237,11 @@ class Scraper:
 
     # -- product videos -----------------------------------------------------
     def _collect_videos(self, soup: BeautifulSoup, prod: Product) -> None:
+        if not prod.video_url:
+            # Meesho embeds the reel URL in JSON — grab it directly
+            m = re.search(r'"videoUrl"\s*:\s*"(https?://[^"]+)"', self._last_html)
+            if m:
+                prod.video_url = m.group(1).replace("\\u002F", "/")
         if not prod.video_url:
             for tag in soup.find_all("meta", attrs={"property": re.compile(r"^og:video")}):
                 u = (tag.get("content") or "").strip()
