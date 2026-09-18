@@ -67,6 +67,13 @@ money:
     cuelinks: 6
     earnkaro: 6
 
+target:
+  # 🎯 your revenue goal — the bot converts it into clicks/posts/day (honest math)
+  monthly_commission: 100000   # ₹ per month (this is a BIG number: ~4,500 clicks/day)
+  months: 6                    # ramp runway you are willing to give it
+  auto_scale: false            # true → bot raises volume itself toward the goal
+  ceiling_per_day: 30          # hard safety ceiling for auto-scale (never above)
+
 autopilot:
   auto_source: true        # ZERO-TOUCH: hunt trending products when queue is low
   min_queue: 5

@@ -1238,8 +1238,26 @@ class Engine:
                 self.db.log("INFO", f"🛡️ Warm-up day {age_days}: volume at "
                                     f"{int(ramp*100)}% (anti-flag ramp)")
             eff_per_day = eff_per_day * ramp
+            # 📈 AUTO-SCALE (opt-in): raise volume toward the revenue target
+            # using MEASURED clicks-per-post, bounded by the safety ceiling.
+            try:
+                from . import scale as _scale
+                if self.cfg.get_bool("target.auto_scale", False):
+                    scaled = _scale.effective_per_day(self.db, self.cfg,
+                                                      int(eff_per_day))
+                    if scaled != int(eff_per_day):
+                        self.db.log("INFO", f"📈 Auto-scale: {int(eff_per_day)} "
+                                            f"→ {scaled} pins/day (target "
+                                            f"₹{self.cfg.get_float('target.monthly_commission', 0):,.0f})")
+                    eff_per_day = scaled
+                    _scale.apply_autoscale(self.db, self.cfg)
+            except Exception as exc:  # noqa: BLE001 — scaling is never fatal
+                self.db.log("WARN", f"auto-scale skipped: {exc}")
             # human-like daily variance (±15%) — no robotic identical volume
             eff_per_day = max(1, int(eff_per_day * random.uniform(0.85, 1.15)))
+            if self.cfg.get_int("posting.max_per_day", 25) > 0:
+                eff_per_day = min(eff_per_day,
+                                  self.cfg.get_int("posting.max_per_day", 25))
             queue = self.db.pending_products(limit=100)
 
             # ZERO-TOUCH: queue running dry? go hunt trending products itself

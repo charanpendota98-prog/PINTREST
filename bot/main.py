@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot scale [target]           # 🎯 ₹ target → clicks/posts/day math
   python -m bot ready                    # 🎯 what is left for YOU to do (one time)
   python -m bot pause [reason]           # ⏸ stop posting (kill switch)
   python -m bot resume                   # ▶️ start posting again
@@ -896,6 +897,21 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+
+def cmd_scale(cfg, rest: list[str]) -> int:
+    """🎯 Revenue target → honest clicks/posts/day math + what to do."""
+    from . import scale
+    db = DB(cfg.db_path)
+    if rest and rest[0].isdigit():
+        cfg.raw.setdefault("target", {})["monthly_commission"] = int(rest[0])
+    days = 30
+    for i, a in enumerate(rest):
+        if a in ("--days", "-d") and i + 1 < len(rest) and rest[i + 1].isdigit():
+            days = int(rest[i + 1])
+    print("\n" + "\n".join(scale.lines(cfg, db, days=days)) + "\n")
+    return 0
+
+
 def cmd_ready(cfg) -> int:
     """🎯 "Naaku em cheyyali migilindi?" — one honest screen, forever."""
     from . import ready
@@ -1106,6 +1122,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd == "scale":
+        return cmd_scale(cfg, rest)
     if cmd == "ready":
         return cmd_ready(cfg)
     if cmd == "pause":

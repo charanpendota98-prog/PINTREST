@@ -186,6 +186,14 @@
       each link and verifies your tag survives the redirect.</p>
     <table><thead><tr><th>#</th><th>Product</th><th>Status</th><th>Tagged</th><th>Note</th></tr></thead>
     <tbody id="linkBody"></tbody></table>
+    <h3 style="margin:20px 0 8px">🎯 Revenue target — honest math</h3>
+    <div class="cards" style="margin-bottom:10px">
+      <div class="card"><div class="num" id="scTarget">₹0</div><div class="lbl">Monthly target</div></div>
+      <div class="card blue"><div class="num" id="scNow">₹0</div><div class="lbl">Projected now</div></div>
+      <div class="card"><div class="num" id="scPct">0%</div><div class="lbl">Of target</div></div>
+      <div class="card"><div class="num" id="scEta">–</div><div class="lbl">ETA (at growth)</div></div>
+    </div>
+    <pre id="scaleBox" style="background:#f7f7f9;border-radius:8px;padding:12px;font-size:12.5px;white-space:pre-wrap"></pre>
     <h3 style="margin:20px 0 8px">📊 Last 7 days</h3>
     <pre id="reportBox" style="background:#f7f7f9;border-radius:8px;padding:12px;font-size:12.5px;white-space:pre-wrap"></pre>
   </div>
@@ -385,6 +393,16 @@ async function refreshMoney(){
     $('#mAssump').textContent =
       `Assumptions: ${(a.click_to_order * 100).toFixed(1)}% clicks→orders · ₹${a.aov} avg order · ${nets}`;
     $('#mDisc').textContent = e.disclaimer || '';
+  }
+  const sc = await api('/api/scale');
+  if(sc && sc.ok){
+    const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+    $('#scTarget').textContent = inr(sc.target_monthly);
+    $('#scNow').textContent = inr(sc.projected_monthly);
+    $('#scPct').textContent = (sc.percent || 0).toFixed(1) + '%';
+    $('#scEta').textContent = (sc.eta_months === null || sc.eta_months === undefined)
+      ? '–' : (sc.eta_months ? sc.eta_months + ' mo' : 'now!');
+    $('#scaleBox').textContent = (sc.lines || []).join('\n');
   }
   const rep = await api('/api/report?days=7');
   if(rep && rep.ok) $('#reportBox').textContent = (rep.lines || []).join('\n');

@@ -591,6 +591,23 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         return jsonify({"ok": True, "lines": _rep.lines(cfg, db, days=days),
                         "days": days})
 
+    @app.get("/api/scale")
+    @_api_check
+    def scale_api():
+        """Honest target math: needs vs measured, gap, ETA, suggestion."""
+        from . import scale as _scale
+        try:
+            days = max(1, min(int(request.args.get("days", 30)), 365))
+        except (TypeError, ValueError):
+            days = 30
+        g = _scale.gap(cfg, db, days=days)
+        g["ok"] = True
+        g["lines"] = _scale.lines(cfg, db, days=days)
+        g["eta_months"] = _scale.eta_months(cfg, db)
+        g["recommend"] = _scale.recommend_posts_per_day(cfg, db)
+        g["auto_scale"] = bool(cfg.get_bool("target.auto_scale", False))
+        return jsonify(g)
+
     @app.get("/api/earnings")
     @_api_check
     def earnings_api():

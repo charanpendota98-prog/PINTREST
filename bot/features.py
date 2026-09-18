@@ -266,13 +266,28 @@ def print_how_it_works() -> None:
      ledu. Scope missing aithe public reply ki fallback (crash ledu).
    `python -m bot ig-check` → DM/reply ON/OFF + triggers + inbox access probe.
 
-12) SAFETY (account safe, money safe)
+12) REVENUE SCALE ENGINE (R48) — "lakhs" ki nijamaina lekka
+   🎯 `python -m bot scale [target]` / panel 💰 Money tab card:
+   - Target (default ₹1,00,000/month) ni clicks → orders → posts/day ga
+     convert chestundi, ME assumptions tho (conversion %, AOV, network rates).
+   - Measured reality: posts/day, clicks/post, projected ₹/month, % of target,
+     gap, account age, growth ETA (2 weeks data unte matrame cheptundi).
+   - what-if table: ₹25k/₹50k/₹1L ki 1% / 2% / 5% conversion lo entha
+     clicks/day kavalo — honest ga (conversion penchadam kuda lever ani).
+   - Honest note: ee numbers arithmetic, promises kaadu. Volume + time leve.
+   📈 AUTO-SCALE (opt-in, target.auto_scale): measured clicks/post batti bot
+     ne volume penchutundi — kani eppudu ceiling (target.ceiling_per_day ≤
+     posting.max_per_day) datadu, warm-up ramp + daily cap intact.
+   🏪 STORE MIX: queue lo okate store 70%+ unte radar hunt vere store
+     products prefer chestundi (payout + platform risk taggadaniki).
+
+13) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   300 automated tests.
+   319 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

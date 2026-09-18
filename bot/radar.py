@@ -345,6 +345,11 @@ def radar_hunt(cfg, engine, n: int = 4, min_score: int = 40,
     except Exception:  # noqa: BLE001
         queued_titles = []
     taken_buckets = [_topics.bucket(t) for t in queued_titles]
+    try:
+        taken_stores = [str(p.get("source") or "") for p in
+                        (engine.db.pending_products(limit=50) or [])]
+    except Exception:  # noqa: BLE001
+        taken_stores = []
     for row, prod in candidates:
         if len(added) >= n:
             break
@@ -354,6 +359,13 @@ def radar_hunt(cfg, engine, n: int = 4, min_score: int = 40,
         if not _topics.allows_more(b, taken_buckets, queued_titles):
             _log(engine, "INFO", f"radar: skipped '{row['title'][:40]}' — queue "
                                  f"already has 3+ {b} items (feed variety)")
+            continue
+        # store mix: don't let ONE store own the queue (payout + platform risk)
+        from . import scale as _scale
+        if not _scale.mix_ok(row.get("source", ""), taken_stores):
+            _log(engine, "INFO", f"radar: skipped '{row['title'][:40]}' — queue "
+                                 f"is already mostly {row.get('source')} "
+                                 f"(store mix)")
             continue
         try:
             pid = engine.ingest_url(row["url"], prefetched=prod)
@@ -366,6 +378,7 @@ def radar_hunt(cfg, engine, n: int = 4, min_score: int = 40,
             except Exception:  # noqa: BLE001
                 pass
             taken_buckets.append(b)
+            taken_stores.append(str(row.get("source") or ""))
             added.append({**row, "product_id": pid})
     if added:
         _log(engine, "INFO", f"🧭 Radar queued {len(added)} top product(s) — "
