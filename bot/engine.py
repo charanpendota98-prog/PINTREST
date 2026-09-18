@@ -1176,6 +1176,15 @@ class Engine:
             if now.hour <= 4 and getattr(self, "_house_day", "") != today:
                 self._house_day = today
                 self.housekeep()
+            # 📋 daily self-audit — first cycle of the day, every day, even
+            # outside the posting window (this is the "nobody has to check"
+            # heartbeat: creds perms, setup %, queue, pause/breaker state)
+            if getattr(self, "_last_audit_day", "") != today:
+                self._last_audit_day = today
+                try:
+                    self._self_audit()
+                except Exception as exc:  # noqa: BLE001 — never breaks a run
+                    self.db.log("WARN", f"self-audit skipped: {exc}")
             # daily price-drop radar (re-announce winners that got cheaper)
             if 11 <= now.hour <= 19 and getattr(self, "_price_day", "") != today:
                 self._price_day = today
@@ -1269,14 +1278,6 @@ class Engine:
             if sum(days.values()) >= 10:
                 avg_d = sum(days.values()) / max(1, len(days))
                 gap_s *= 0.7 if days.get(now.weekday(), 0) > avg_d else 1.2
-            # 📋 daily self-audit — the bot checks itself and says so
-            try:
-                if getattr(self, "_last_audit_day", "") != now.date().isoformat():
-                    self._last_audit_day = now.date().isoformat()
-                    self._self_audit()
-            except Exception as exc:  # noqa: BLE001 — audit never breaks a run
-                self.db.log("WARN", f"self-audit skipped: {exc}")
-
             # owner control plane: pause / daily cap / quiet hours
             from . import control
             hold = control.gate(self.db, self.cfg, now.hour, tz=self.tz)
