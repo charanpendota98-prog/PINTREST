@@ -208,6 +208,12 @@ class DB:
             ).fetchone()
         return dict(row) if row else None
 
+    def prune_logs(self, keep: int = 3000) -> None:
+        """Cap log growth for months-long 24×7 runs."""
+        with _lock, self._conn() as c:
+            c.execute("DELETE FROM logs WHERE id NOT IN "
+                      "(SELECT id FROM logs ORDER BY id DESC LIMIT ?)", (keep,))
+
     def oldest_activity(self) -> datetime | None:
         """First-ever activity timestamp (for warm-up ramp calculations)."""
         with self._conn() as c:

@@ -493,6 +493,27 @@ class Engine:
                 self.db.log("WARN", f"Reshare failed: {exc}")
         return n
 
+    # -------------------------------------------------------- housekeeping
+    def housekeep(self) -> None:
+        """Long-runtime hygiene: prune old logs + stale media (months-safe)."""
+        try:
+            import os as _os
+            cutoff = time.time() - 14 * 86400
+            freed = 0
+            for f in self.cfg.media_dir.glob("*"):
+                try:
+                    if f.is_file() and not f.name.startswith("demo_") \
+                            and _os.path.getmtime(f) < cutoff:
+                        freed += f.stat().st_size
+                        f.unlink()
+                except OSError:
+                    continue
+            self.db.prune_logs(keep=3000)
+            self.db.log("INFO", f"🧹 Housekeeping: freed {freed // (1024*1024)} MB, "
+                                "logs pruned")
+        except Exception as exc:  # noqa: BLE001
+            self.db.log("WARN", f"Housekeeping skipped: {exc}")
+
     # ----------------------------------------------------------- roundups
     def post_roundup(self, segment: str | None = None) -> dict | None:
         """'Deals of the Day' list pin — the viral-save format top channels use.
@@ -569,6 +590,9 @@ class Engine:
 
             # daily auto-report at 9 PM IST ("roju post chestunnava" — proof!)
             today = now.date().isoformat()
+            if now.hour <= 4 and getattr(self, "_house_day", "") != today:
+                self._house_day = today
+                self.housekeep()
             if now.hour >= 21 and self._report_day != today:
                 self._report_day = today
                 try:
@@ -639,4 +663,9 @@ class Engine:
                 continue
             except InstagramError:
                 pass
+            except Exception as exc:  # noqa: BLE001 — 24×7 CRASH-NET:
+                # whatever surprise happens, the machine NEVER dies
+                self.db.log("ERROR", f"Cycle error (auto-recovered): {exc}")
+                time.sleep(120)
+                continue
             time.sleep(max(60, gap_s))

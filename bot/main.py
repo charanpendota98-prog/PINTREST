@@ -361,6 +361,12 @@ def cmd_doctor(cfg) -> int:
         cfg.get("affiliate.meesho_affid") or os.getenv("MEESHO_AFFID")
         or cfg.get("affiliate.earnkaro_prefix") or os.getenv("EARNKARO_PREFIX")
         or cfg.get("affiliate.cuelinks_template")), "see README affiliate guide")
+    ck("Meesho DIRECT af_invite (recommended)", bool(
+        os.getenv("MEESHO_TEMPLATE_LINK") or cfg.get("affiliate.meesho_template_link")),
+       "paste ONE af_invite link from affiliate.meesho.com → .env MEESHO_TEMPLATE_LINK")
+    fb_ok = bool(os.getenv("FACEBOOK_ACCESS_TOKEN") and os.getenv("FACEBOOK_PAGE_ID"))
+    ck("Facebook Page (optional)", fb_ok or not cfg.get("facebook.enabled"),
+       "FB Page → Meta app token → .env FACEBOOK_*")
     ig = InstagramAPI(cfg)
     ck("Instagram (optional)", ig.configured or not cfg.get("instagram.enabled"),
        "README → Instagram Automation")
