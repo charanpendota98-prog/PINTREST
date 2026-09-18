@@ -364,6 +364,17 @@ def cmd_doctor(cfg) -> int:
     ck("Meesho DIRECT af_invite (recommended)", bool(
         os.getenv("MEESHO_TEMPLATE_LINK") or cfg.get("affiliate.meesho_template_link")),
        "paste ONE af_invite link from affiliate.meesho.com → .env MEESHO_TEMPLATE_LINK")
+    # Meesho link correctness — parseable IDs + real product-id test
+    from .affiliate import AffiliateLinker as _AL
+    _mh = _AL(cfg).meesho_health()
+    if _mh["links_pasted"]:
+        ck(f"Meesho link parses (pub={_mh['publisher'] or '?'}, "
+           f"campaigns={len(_mh['campaigns'])})", _mh["parsed"],
+           "paste a FRESH share link from affiliate.meesho.com (format changed?)")
+        _pid = _AL.meesho_product_id(
+            "https://www.meesho.com/women-kurta-set/p/1k1b6")
+        ck("Meesho product-id parser (alphanumeric)", _pid == "1k1b6",
+           "run `python -m bot meesho <your product url>` to inspect")
     fb_ok = bool(os.getenv("FACEBOOK_ACCESS_TOKEN") and os.getenv("FACEBOOK_PAGE_ID"))
     ck("Facebook Page (optional)", fb_ok or not cfg.get("facebook.enabled"),
        "FB Page → Meta app token → .env FACEBOOK_*")
@@ -676,6 +687,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_music(cfg)
     if cmd == "simulate":
         return cmd_simulate(cfg)
+    if cmd == "meesho":
+        return cmd_meesho(cfg, rest)
     if cmd == "how":
         from .features import print_how_it_works
         print_how_it_works()
@@ -707,3 +720,66 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def cmd_meesho(cfg, args: list[str]) -> int:
+    """Verify EXACTLY what the bot will publish as your Meesho link."""
+    from .affiliate import AffiliateLinker
+    lk = AffiliateLinker(cfg)
+    h = lk.meesho_health()
+    print("\n🛍  MEESHO LINK CHECK — 'vasthaya correct ga?' nijam answer\n" + "-" * 62)
+    print(f"  links pasted      : {h['links_pasted']}")
+    print(f"  publisher id      : {h['publisher'] or '(none yet)'}")
+    print(f"  source token      : {h['source_token'] or '(none yet)'}")
+    print(f"  campaigns learned : {h['campaigns'] or '(none yet)'}")
+    print(f"  affid fallback    : {'yes' if h['affid_fallback'] else 'no'}")
+    print(f"  direction         : "
+          f"{'DIRECT af_invite (commission → YOUR Meesho account)' if h['parsed'] else 'NONE / fallback — commission at risk'}")
+
+    sample = (args[0] if args else
+              "https://www.meesho.com/women-floral-printed-kurta-set/p/1k1b6")
+    print(f"\n  sample product URL: {sample}")
+    pid = AffiliateLinker.meesho_product_id(sample)
+    print(f"  product id parsed : {pid or '❌ NOT FOUND (link cannot be built)'}")
+    built = lk.meesho_link_for(sample)
+    if built:
+        print(f"\n  LINK THE BOT WILL PUBLISH:\n  {built}")
+        from urllib.parse import parse_qsl as _pqs
+        from urllib.parse import urlparse as _up
+        tpl = lk.meesho_template_links[-1] if lk.meesho_template_links else ""
+        tparams = dict((k, v) for k, v in _pqs(_up(tpl).query)
+                       if k not in ("p_id", "ext_id")) if tpl else {}
+        bparams = dict(_pqs(_up(built).query))
+        preserved = all(bparams.get(k) == v for k, v in tparams.items())
+        fresh = built.count("ext_id=") == 1 and "ext_id=old" not in built
+        checks = {
+            "af_invite present": "af_invite" in built,
+            "your publisher id in link": bool(h["publisher"]) and h["publisher"] in built,
+            "latest campaign used": bool(h["campaigns"]) and h["campaigns"][-1] in built,
+            "product p_id correct": bool(pid) and f"p_id={pid}" in built,
+            "fresh ext_id per click (old id replaced)": fresh,
+            f"template params preserved ({len(tparams)} checked)": preserved,
+        }
+        print("\n  STRUCTURAL CHECKS")
+        for k, v in checks.items():
+            print(f"   {'✅' if v else '❌'} {k}")
+        ok = all(checks.values())
+    else:
+        print("\n  ❌ No usable Meesho link yet — paste your share link:")
+        print("     affiliate.meesho.com → any product → Share → copy link")
+        print("     → .env: MEESHO_TEMPLATE_LINK=<that link>   (comma-separate many)")
+        ok = False
+
+    print("\n  PHONE LO TEST (only your phone can confirm — server nunchi")
+    print("  meesho.com reach avvadu, so idi real proof):")
+    print("   1. Copy the link above, WhatsApp yourself ki pampu")
+    print("   2. PHONE lo ad-blocker OFF chesi (Brave/AdGuard unte pause)")
+    print("   3. Click → Meesho app/site lo SAME PRODUCT open avvali")
+    print("   4. 'meesho.onelink.me' ERR_BLOCKED_BY_CLIENT vaste → ad-blocker")
+    print("      problem, link format kaadu (redirect reach avvadam chusi)")
+    print("   5. Tarvata: affiliate.meesho.com dashboard → Reports →")
+    print("      Clicks/Orders lo ee click kanipisthe → 100% CORRECT ✅")
+    print("\n  📊 nijam: clicks dashboard lo kanipinchaka mundu 'correct' ani")
+    print("     anataniki reason ledu — ee 5 steps ne proof.")
+    print("-" * 62)
+    return 0 if ok else 0

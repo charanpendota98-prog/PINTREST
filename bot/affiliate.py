@@ -11,6 +11,7 @@ Priority: amazon > meesho > flipkart > configured default_wrapper.
 """
 from __future__ import annotations
 
+import logging
 import os
 import random
 import re
@@ -18,6 +19,8 @@ import string
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 from .scraper import detect_source
+
+log = logging.getLogger("pindrop.affiliate")
 
 ASIN_RE = re.compile(r"(?:/dp/|/gp/product/|/gp/aw/d/|/product/)([A-Z0-9]{10})")
 FLIPKART_PID_RE = re.compile(r"pid=([A-Z0-9]+)")
@@ -80,6 +83,13 @@ class AffiliateLinker:
         r"af_invite|affiliate\.meesho\.com|affid=|ext_id=|/collection/")
 
     @property
+    def meesho_template_links(self) -> list[str]:
+        """Every share link the owner has pasted (comma/newline separated)."""
+        raw = (os.getenv("MEESHO_TEMPLATE_LINK", "") or
+               self.cfg.get("affiliate.meesho_template_link", "") or "").strip()
+        return [p.strip() for p in re.split(r"[,\n;]+", raw) if p.strip()]
+
+    @property
     def meesho_ids(self) -> tuple[str, str, list[str]]:
         """Your Meesho publisher + source-token + ALL campaign IDs.
 
@@ -87,32 +97,101 @@ class AffiliateLinker:
         over time (comma/newline separated in MEESHO_TEMPLATE_LINK); the bot
         learns every campaign and builds new links with the LATEST one.
         """
-        sample = (os.getenv("MEESHO_TEMPLATE_LINK", "") or
-                  self.cfg.get("affiliate.meesho_template_link", "") or "").strip()
         pub = src = ""
         camps: list[str] = []
-        for m in re.finditer(r"af_invite/(\d+):([^:/]+):(\d+)", sample):
+        for lnk in self.meesho_template_links:
+            m = re.search(r"af_invite/([^:/?]+):([^:/?]+):([^:/?&]+)", lnk)
+            if not m:
+                continue
             pub, src = m.group(1), m.group(2)
             if m.group(3) not in camps:
                 camps.append(m.group(3))
         return pub, src, camps
 
+    @staticmethod
+    def meesho_product_id(url: str) -> str:
+        """Real Meesho product IDs are ALPHANUMERIC short codes.
+
+        Handles every shape Meesho actually serves:
+          /women-kurta-set/p/1k1b6        ← standard
+          /women-kurta-set-p-1k1b6        ← search-result style (-p-<id>)
+          /product/p/1k1b6
+          ?p_id=1k1b6                     ← already-tagged links
+        """
+        parsed = urlparse(url)
+        # matches: /p/<id>, -p/<id>, -p-<id>  (all shapes Meesho serves)
+        m = re.search(r"[-/]p[-/]([A-Za-z0-9_-]{3,})", parsed.path)
+        if not m:
+            for k, v in parse_qsl(parsed.query):
+                if k in ("p_id", "product_id", "pid") and v:
+                    return v.strip()
+            return ""
+        return m.group(1).strip().strip("-")
+
+    def meesho_health(self) -> dict:
+        """Diagnostics for `bot doctor` / `bot meesho` — honest status."""
+        links = self.meesho_template_links
+        pub, src, camps = self.meesho_ids
+        return {
+            "links_pasted": len(links),
+            "parsed": bool(pub and camps),
+            "publisher": pub,
+            "source_token": src,
+            "campaigns": camps,
+            "affid_fallback": bool(self.meesho_affid),
+            "ready": bool((pub and camps) or self.meesho_affid),
+        }
+
+    def meesho_link_for(self, url: str) -> str:
+        """Build the exact link the bot would publish for this product URL.
+
+        Faithful by design: the af_invite base + every parameter from YOUR
+        latest share link are copied verbatim; only p_id (this product) and
+        ext_id (fresh click id) change. Nothing is invented.
+        """
+        pid = self.meesho_product_id(url)
+        pub, src, camps = self.meesho_ids
+        template = self.meesho_template_links[-1] if self.meesho_template_links else ""
+        m = re.search(r"(https?://[^?\s]*af_invite/[^?\s]+)", template)
+        if m:
+            base = m.group(1)
+            tparams = [(k, v) for k, v in
+                       parse_qsl(urlparse(template).query)
+                       if k not in ("p_id", "ext_id")]
+            if pid:
+                tparams.append(("p_id", pid))
+            tparams.append(("ext_id", "".join(
+                random.choices(string.ascii_lowercase + string.digits, k=6))))
+            # your source token stays visible as utm_source (Meesho report
+            # reads the af_invite path token; this keeps it consistent)
+            if src and not any(k == "utm_source" for k, _ in tparams):
+                tparams.append(("utm_source", src))
+            return f"{base}?{urlencode(tparams)}"
+        if pub and camps and pid:
+            ext = "".join(random.choices(string.ascii_lowercase + string.digits,
+                                         k=6))
+            return (f"https://www.meesho.com/af_invite/{pub}:{src}:{camps[-1]}"
+                    f"?p_id={pid}&ext_id={ext}&utm_source={src}")
+        return ""
+
     def meeshoize(self, url: str) -> str:
         if self.MEESHO_MONETIZED.search(url):
             return url  # your generated link, passed through untouched
         # DIRECT Meesho affiliate: build af_invite with YOUR publisher +
-        # campaign IDs and the product's p_id (from its URL) — commission
-        # lands in YOUR Meesho account, no middleman.
-        pub, src, camps = self.meesho_ids
-        if pub and camps:
-            pid = re.search(r"-p/(\d+)", urlparse(url).path)
-            if pid:
-                ext = "".join(random.choices(string.ascii_lowercase + string.digits,
-                                             k=6))
-                camp = camps[-1]  # latest campaign the owner generated
-                return (f"https://www.meesho.com/af_invite/{pub}:{src}:"
-                        f"{camp}?p_id={pid.group(1)}&ext_id={ext}"
-                        f"&utm_source={src}")
+        # campaign IDs and the product's p_id — commission lands in YOUR
+        # Meesho account, no middleman. Verbatim template params preserved.
+        built = self.meesho_link_for(url)
+        if built:
+            return built
+        if self.meesho_template_links:
+            log.warning(
+                "MEESHO LINK WARNING: could not parse your af_invite link "
+                "(no publisher/campaign IDs found) — paste a fresh share link "
+                "from affiliate.meesho.com. Falling back to affid parameter.")
+        elif not self.meesho_affid:
+            log.warning("MEESHO LINK WARNING: no MEESHO_TEMPLATE_LINK and no "
+                        "MEESHO_AFFID set — Meesho links are NOT monetized yet. "
+                        "Paste your af_invite link in .env (see `bot meesho`).")
         # fallbacks: raw reseller affid param, then aggregator
         if self.meesho_affid:
             parsed = urlparse(url)

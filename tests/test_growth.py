@@ -424,3 +424,84 @@ class TestCommissionLeak(unittest.TestCase):
         self.assertTrue(lk.is_monetized("https://amzn.to/x?tag=a-21"))
         self.assertTrue(lk.is_monetized("https://www.meesho.com/af_invite/1:2:3?p_id=4"))
         self.assertFalse(lk.is_monetized("https://www.flipkart.com/x/p/1"))
+
+
+class TestMeeshoLinkCorrectness(unittest.TestCase):
+    """Owner: 'meesho vi vasthaya correct ga?' — pin-to-pin proof.
+
+    Real Meesho product IDs are ALPHANUMERIC (/p/1k1b6). A digits-only
+    parser silently fell back to affid/EarnKaro, breaking the direct
+    commission rule. These tests pin every real URL shape.
+    """
+
+    def _lk(self, template: str, affid: str = ""):
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        lk = AffiliateLinker(load_config())
+        lk.cfg.raw["affiliate"]["meesho_template_link"] = template
+        lk.cfg.raw["affiliate"]["meesho_affid"] = affid
+        import os
+        os.environ.pop("MEESHO_TEMPLATE_LINK", None)
+        os.environ.pop("MEESHO_AFFID", None)
+        return lk
+
+    TPL = ("https://www.meesho.com/af_invite/24197020:instagram_stories:"
+           "11049016?p_id=2&ext_id=oldid&utm_source=instagram_stories")
+
+    def test_product_id_shapes(self):
+        from bot.affiliate import AffiliateLinker as A
+        cases = {
+            "https://www.meesho.com/women-kurta-set/p/1k1b6": "1k1b6",
+            "https://www.meesho.com/women-kurta-set-p-1k1b6": "1k1b6",
+            "https://www.meesho.com/product/p/abc123/": "abc123",
+            "https://www.meesho.com/x/p/987654321": "987654321",
+            "https://www.meesho.com/x?p_id=zz99": "zz99",
+        }
+        for url, want in cases.items():
+            self.assertEqual(A.meesho_product_id(url), want, url)
+        self.assertEqual(A.meesho_product_id("https://www.meesho.com/"), "")
+
+    def test_alphanumeric_id_builds_direct_af_invite(self):
+        lk = self._lk(self.TPL)
+        out = lk.meesho_link_for("https://www.meesho.com/kurta/p/1k1b6")
+        self.assertIn("af_invite/24197020:instagram_stories:11049016", out)
+        self.assertIn("p_id=1k1b6", out)
+        self.assertNotIn("p_id=2&", out)          # template's own p_id dropped
+        self.assertIn("ext_id=", out)
+        self.assertNotIn("ext_id=oldid", out)     # fresh click id every time
+        self.assertIn("utm_source=instagram_stories", out)  # params preserved
+
+    def test_earnkaro_never_used_for_meesho_when_template_present(self):
+        lk = self._lk(self.TPL)
+        lk.cfg.raw["affiliate"]["earnkaro_prefix"] = "https://earnkaro.com/?r=x"
+        out, net = lk.convert("https://www.meesho.com/kurta/p/1k1b6", "meesho")
+        self.assertEqual(net, "meesho")
+        self.assertIn("af_invite", out)
+        self.assertNotIn("earnkaro", out)
+
+    def test_owner_generated_link_verbatim(self):
+        lk = self._lk(self.TPL)
+        mine = ("https://www.meesho.com/af_invite/24197020:instagram_stories:"
+                "11049016?p_id=394590772&ext_id=abc123")
+        out, net = lk.convert(mine, "meesho")
+        self.assertEqual(out, mine)
+        self.assertEqual(net, "meesho")
+
+    def test_health_reports_truthfully(self):
+        lk = self._lk(self.TPL)
+        h = lk.meesho_health()
+        self.assertTrue(h["ready"] and h["parsed"])
+        self.assertEqual(h["publisher"], "24197020")
+        self.assertEqual(h["campaigns"], ["11049016"])
+        bad = self._lk("https://meesho.onelink.me/abc?af_x=1", affid="")
+        hb = bad.meesho_health()
+        self.assertFalse(hb["parsed"])
+        self.assertFalse(hb["ready"])
+        self.assertEqual(bad.meesho_link_for(
+            "https://www.meesho.com/x/p/1k1b6"), "")  # never invents a link
+
+    def test_no_template_falls_back_with_warning(self):
+        lk = self._lk("", affid="charan123")
+        out, _ = lk.convert("https://www.meesho.com/kurta/p/1k1b6", "meesho")
+        self.assertIn("affid=charan123", out)   # still monetized
+        self.assertIn("utm_source=affiliate", out)

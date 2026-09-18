@@ -281,6 +281,9 @@ Every known leak path, audited & sealed:
 | Pin with untracked link (clicks pay nobody) | ✅ QA gate quarantines — "COMMISSION LEAK" |
 | Amazon pin carrying someone else's tag | ✅ amazonize replaces with YOURS |
 | Meesho plain links | ✅ direct af_invite (your IDs) → affid → aggregator |
+| Meesho ALPHANUMERIC product ids (`/p/1k1b6`, `-p/489088490`, `-p-1k1b6`) | ✅ all 3 shapes parsed — digits-only parsing used to silently fall back (fixed R35) |
+| Meesho template params (utm/extra) dropped when rebuilding | ✅ your latest share link's params are copied VERBATIM; only `p_id` + `ext_id` change |
+| Meesho template unparseable (format changed) | ✅ loud warning + `bot doctor` + `bot meesho` structural report |
 | Flipkart / other stores | ✅ affid → EarnKaro/Cuelinks wrap |
 | Link rewritten & broken | ✅ monetized links pass through UNTOUCHED |
 | Bio/DM/comment links | ✅ bridge/affiliate link per product |
