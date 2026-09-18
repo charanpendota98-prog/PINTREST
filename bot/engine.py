@@ -78,6 +78,7 @@ class Engine:
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
         self._last_reshare = 0.0  # daily winners-rotation timer
         self._report_day = ""     # daily report guard
+        self._roundup_day = ""    # daily list-pin guard
 
     # ------------------------------------------------------------- links
     def pick_template(self) -> str:
@@ -443,6 +444,45 @@ class Engine:
                 self.db.log("WARN", f"Reshare failed: {exc}")
         return n
 
+    # ----------------------------------------------------------- roundups
+    def post_roundup(self, segment: str | None = None) -> dict | None:
+        """'Deals of the Day' list pin — the viral-save format top channels use.
+
+        One pin lists your best N products (segment-aware: Ladies Special,
+        Home & Kitchen, Kids, Gadgets); the pin links to a deals page where
+        every item carries its affiliate link. Posted once a day.
+        """
+        from . import roundup as ru
+        if not self.cfg.get("roundup.enabled", True):
+            return None
+        prods = self.db.all_products(limit=300)
+        for p in prods:
+            p["score"] = score_product(p["title"], p["price"], p["source"])
+        seg = segment or random.choice(list(ru.SEGMENTS))
+        items = ru.pick_roundup(prods, seg, int(self.cfg.get("roundup.count", 5)))
+        if len(items) < 3:
+            self.db.log("INFO", "Roundup skipped — not enough products yet")
+            return None
+        now = datetime.now(self.tz)
+        title = ru.roundup_title(seg, len(items), now)
+        out = self.cfg.media_dir / f"roundup_{int(time.time()*1000)}.jpg"
+        self.designer.design_roundup(items, title, out)
+        base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
+        link = (f"{base}/deals/today"
+                if (self.cfg.get("link.bridge", False) and base)
+                else items[0]["affiliate_url"])
+        seo = build_seo_text(self.cfg, title, "", "", "amazon", discount=0,
+                             festival_kw=ru.trending_tag(now))
+        board_name = "Deals of the Day"
+        board_id = self.api.ensure_board(board_name,
+            f"{board_name} — daily hand-picked list of best deals & offers "
+            "India: fashion, home, kitchen, gadgets at lowest prices.")
+        pin = self.api.create_image_pin(board_id, link, title, seo,
+                                        alt_text=title, image_path=str(out))
+        self.db.log("INFO", f"📋 Roundup pin posted ({ru.SEGMENTS[seg]['label']}): "
+                            f"{title[:60]}")
+        return pin
+
     # ----------------------------------------------------------- scheduler
     def _human_gap(self) -> float:
         mins = float(self.cfg.get("posting.min_gap_minutes", 40))
@@ -469,6 +509,15 @@ class Engine:
                     self.reshare_winners()
                 except Exception as exc:  # noqa: BLE001
                     self.db.log("WARN", f"Reshare cycle error: {exc}")
+            # daily "Deals of the Day" list pin (viral-save format)
+            if 10 <= now.hour <= 20 and self._roundup_day != now.date().isoformat():
+                self._roundup_day = now.date().isoformat()
+                try:
+                    if self.api.configured:
+                        self.post_roundup()
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"Roundup failed: {exc}")
+
             # daily auto-report at 9 PM IST ("roju post chestunnava" — proof!)
             today = now.date().isoformat()
             if now.hour >= 21 and self._report_day != today:

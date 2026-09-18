@@ -84,6 +84,10 @@ DEFAULTS: dict[str, Any] = {
             "this deal before it's gone!\n{hashtags}"
         ),
     },
+    "roundup": {
+        "enabled": True,   # daily "Deals of the Day" list pin (viral format)
+        "count": 5,        # products per list pin
+    },
     "facebook": {
         "enabled": False,          # set true once FB page token is ready
         "page_id": "",             # or FACEBOOK_PAGE_ID in .env

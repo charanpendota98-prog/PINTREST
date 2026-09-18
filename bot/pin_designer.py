@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import math
 import random
+import re
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -317,3 +318,85 @@ class PinDesigner:
             y += 72
         self._cta_button(draw, max(y + 34, H - 150), source_name)
         return canvas
+
+    # ================================================== list-pin (roundup)
+    def design_roundup(self, items: list[dict], title: str, out_path) -> str:
+        """'Deals of the Day' list pin: header + N numbered product rows.
+
+        items: dicts with title, price (label), pin_image/image_path.
+        These list pins are what top channels ride to viral saves.
+        """
+        from .affiliate import price_label as _pl  # local import avoids cycle
+
+        def clean(t: str) -> str:
+            # DejaVu fonts have no emoji glyphs → strip pictographs & VS16
+            return re.sub(r"[\u2600-\u27BF\U0001F000-\U0001FAFF️‍]", "", t).strip()
+
+        W, H = self.W, self.H
+        canvas = Image.new("RGB", (W, H), (250, 246, 240))
+        draw = ImageDraw.Draw(canvas)
+
+        # header band
+        title = clean(title)
+        draw.rectangle((0, 0, W, 320), fill=self.accent)
+        hf = _font(True, 64)
+        y = 70
+        for ln in _wrap_text(draw, title, hf, W - 120, 2):
+            draw.text((W / 2, y), ln, font=hf, fill=(255, 255, 255), anchor="ma")
+            y += 84
+        sf = _font(False, 30)
+        draw.text((W / 2, 262), "today's best — hand-picked & price-checked",
+                  font=sf, fill=(255, 235, 235), anchor="ma")
+
+        # product rows (spread evenly across the body)
+        rows = items[:5]
+        top, bottom = 370, H - 170
+        rh = max(150, (bottom - top) // max(1, len(rows)))
+        tf = _font(True, 38)
+        pf = _font(True, 34)
+        nf = _font(True, 44)
+        for i, p in enumerate(rows):
+            ry = top + i * rh
+            _rounded(draw, (50, ry + 8, W - 50, ry + rh - 8), 26,
+                     fill=(255, 255, 255))
+            # number badge
+            draw.ellipse((74, ry + rh // 2 - 30, 134, ry + rh // 2 + 30),
+                         fill=self.accent)
+            draw.text((104, ry + rh // 2), str(i + 1), font=nf,
+                      fill=(255, 255, 255), anchor="mm")
+            # thumbnail
+            img_path = p.get("pin_image") or p.get("image_path") or ""
+            tx1, tx2 = W - 210, W - 70
+            try:
+                if img_path and Path(img_path).exists():
+                    with Image.open(img_path) as im:
+                        th = _cover(im.convert("RGB"), tx2 - tx1, rh - 40)
+                    canvas.paste(th, (tx1, ry + 20))
+                else:
+                    _rounded(draw, (tx1, ry + 20, tx2, ry + rh - 20), 16,
+                             fill=(235, 230, 224))
+            except Exception:  # noqa: BLE001 — cosmetic only
+                _rounded(draw, (tx1, ry + 20, tx2, ry + rh - 20), 16,
+                         fill=(235, 230, 224))
+            # title + price
+            ttl = clean(str(p.get("title", ""))[:46])
+            for j, ln in enumerate(_wrap_text(draw, ttl, tf, tx1 - 160, 2)):
+                draw.text((156, ry + 34 + j * 46), ln, font=tf, fill=(35, 30, 28))
+            price = (p.get("price_label")
+                     or _pl(str(p.get("price", "")), str(p.get("currency", "INR")))
+                     or str(p.get("price", "")))
+            if price:
+                draw.text((156, ry + rh - 62), clean(price), font=pf,
+                          fill=self.accent)
+
+        # footer CTA
+        fy = H - 120
+        _rounded(draw, (90, fy, W - 90, fy + 90), 30, fill=self.accent)
+        draw.text((W / 2, fy + 45), "SHOP THE FULL LIST — LINK IN PIN",
+                  font=_font(True, 40), fill=(255, 255, 255), anchor="mm")
+        if self.brand:
+            draw.text((W / 2, H - 18), self.brand, font=_font(False, 24),
+                      fill=(150, 145, 140), anchor="ma")
+        canvas.save(str(out_path), quality=92)
+        log.info("Roundup pin designed (%d items): %s", len(rows), out_path)
+        return str(out_path)

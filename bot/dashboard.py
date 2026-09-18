@@ -75,6 +75,35 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 </div></div></body></html>"""
 
 
+DEALS_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deals of the Day — {{ brand }}</title>
+<style>
+ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222}
+ .wrap{max-width:560px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 40px rgba(0,0,0,.08);padding:20px 16px}
+ h1{color:#E60023;text-align:center;font-size:22px;margin:8px 0 2px}
+ .sub{text-align:center;color:#888;font-size:13px;margin-bottom:18px}
+ .card{display:flex;gap:12px;border:1px solid #eee;border-radius:14px;padding:10px;margin-bottom:12px;align-items:center}
+ .card img{width:76px;height:76px;object-fit:cover;border-radius:10px}
+ .card .t{font-size:14px;font-weight:600;line-height:1.3}
+ .card .p{color:#E60023;font-weight:800;margin-top:4px}
+ a.btn{background:#E60023;color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;text-decoration:none;white-space:nowrap}
+ .disc{color:#999;font-size:11px;text-align:center;padding:12px}
+</style></head><body><div class="wrap">
+<h1>🔥 Deals of the Day</h1>
+<div class="sub">{{ brand }} — hand-picked, price-checked, updated daily</div>
+{% for p in deals %}
+<div class="card">
+  <img src="/media/{{ p.img }}" alt="{{ p.title }}">
+  <div style="flex:1"><div class="t">{{ p.title }}</div>
+    <div class="p">{{ p.price }}{% if p.disc >= 15 %} · {{ p.disc }}% OFF{% endif %}</div></div>
+  <a class="btn" rel="nofollow sponsored" href="{{ p.buy }}">GRAB →</a>
+</div>
+{% endfor %}
+<div class="disc">As an affiliate partner we may earn from qualifying purchases.</div>
+</div></body></html>"""
+
+
 def create_app(cfg, db: DB | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
     db = db or DB(cfg.db_path)
@@ -95,6 +124,32 @@ def create_app(cfg, db: DB | None = None) -> Flask:
     @app.get("/")
     def index():
         return send_from_directory(ROOT / "templates", "index.html")
+
+    @app.get("/deals/today")
+    def deals_today():
+        """The Deals-of-the-Day page that roundup pins link to — every item
+        carries its own tracked affiliate link."""
+        from flask import render_template_string
+        from .affiliate import price_label
+        from .trends import score_product
+        base = str(cfg.get("link.public_base", "") or "").rstrip("/")
+        bridge = bool(cfg.get("link.bridge", False)) and base
+        deals = []
+        for p in sorted(db.all_products(limit=300),
+                        key=lambda x: score_product(x["title"], x["price"],
+                                                    x["source"]), reverse=True)[:10]:
+            if not (p.get("pin_image") or p.get("image_path")):
+                continue
+            deals.append({
+                "title": p["title"][:70],
+                "price": price_label(p["price"], p["currency"]) or "Best price",
+                "disc": int(p.get("discount", 0) or 0),
+                "img": (p.get("pin_image") or p.get("image_path")).split("/")[-1],
+                "buy": (f"{base}/go/{p['id']}" if bridge else p["affiliate_url"]),
+            })
+        return render_template_string(
+            DEALS_HTML, deals=deals,
+            brand=cfg.get("design.brand_name", "Deal Drops"))
 
     @app.get("/go/<int:pid>")
     def go(pid: int):

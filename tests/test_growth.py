@@ -288,3 +288,19 @@ class TestMeeshoRealLinks(unittest.TestCase):
         # plain product URL still auto-monetized
         plain, _ = lk.convert("https://www.meesho.com/kurta/p/xyz", "meesho")
         self.assertIn("affid=charan123", plain)
+
+
+class TestRoundup(unittest.TestCase):
+    def test_titles_and_segments(self):
+        from datetime import datetime
+        from bot.roundup import (SEGMENTS, pick_roundup, roundup_title,
+                                 segment_for)
+        self.assertEqual(segment_for("Women floral kurta set"), "ladies")
+        self.assertEqual(segment_for("kitchen storage organizer"), "home")
+        t = roundup_title("ladies", 5, datetime(2026, 9, 18))
+        self.assertIn("Ladies", t)
+        self.assertGreaterEqual(len(SEGMENTS), 4)
+        items = pick_roundup(
+            [{"title": "Women kurta", "pin_image": "a", "score": 9},
+             {"title": "earbuds", "pin_image": "b", "score": 5}], "ladies", 2)
+        self.assertEqual(items[0]["title"], "Women kurta")

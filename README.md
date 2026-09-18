@@ -200,6 +200,26 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 📋 Deals-of-the-Day Roundups — the list-post weapon
+
+Top channels ride LIST pins (viral saves); we generate them daily,
+automatically:
+
+- **Segments** (audience-aware, women-first like Pinterest itself):
+  Ladies Special ✨ · Home & Kitchen 🏠 · Kids Corner 🧸 · Gadget Deals 📱
+- **Smart picks**: segment match + winner score + commission priority
+- **Trend-aware titles**: seasonal tag (festive/gifting/summer/monsoon) +
+  festival calendar + your own CTR learning
+- **List pin design**: numbered rows, thumbs, ₹ prices, % OFF, CTA footer
+- **Deals page** `/deals/today`: the pin links to a page where EVERY item
+  carries its own tracked affiliate link
+- Posted once daily (10 AM–8 PM) to a "Deals of the Day" SEO board; also
+  available on demand via `engine.post_roundup()`.
+
+Autopilot needs NO manual links from you: it hunts Meesho/Amazon/Flipkart
+winner-niche products itself, monetizes them (affid or your generated links
+pass through untouched) and posts. Manual links = optional boost.
+
 ## 🌐 Where we post — and platform truth
 
 | Platform | How | Status |
