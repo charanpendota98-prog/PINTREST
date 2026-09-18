@@ -155,3 +155,31 @@ class TestReshare(unittest.TestCase):
             # rested too recently → excluded
             db.update_post(1, posted_at=datetime.now(timezone.utc).isoformat())
             self.assertEqual(len(db.reshare_candidates()), 0)
+
+
+class TestQAGate(unittest.TestCase):
+    def test_qa_pin(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from bot.config import load_config
+        from bot.db import DB
+        from bot import qa
+        cfg = load_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            img = Path(tmp) / "p.jpg"
+            Image.new("RGB", (900, 900), "white").save(img)
+            db = DB(Path(tmp) / "t.db")
+            prod = {"id": 1, "title": "Wireless Bluetooth Earbuds Gaming"}
+            seo_t = "Wireless Bluetooth Earbuds Gaming | best deal 2026"
+            seo_d = ("Wireless Bluetooth earbuds gaming edition — deep bass, "
+                     "42h playtime, fast charging. Grab the offer today! #ad")
+            ok, issues = qa.qa_pin(cfg, db, prod, seo_t, seo_d, str(img),
+                                   "https://www.amazon.in/dp/B0X?tag=me-21")
+            self.assertTrue(ok, issues)
+            # broken: missing image + thin description + missing disclosure
+            ok2, issues2 = qa.qa_pin(cfg, db, prod, seo_t, "short", "/nope.jpg",
+                                     "https://www.amazon.in/dp/B0X?tag=me-21")
+            self.assertFalse(ok2)
+            self.assertTrue(any("media missing" in i for i in issues2))
+            self.assertTrue(any("#ad" in i for i in issues2))

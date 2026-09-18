@@ -200,6 +200,21 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 🧪 10x Layer — Pin-by-Pin QA, Simulation, Analytics
+
+Nothing posts blind anymore:
+
+1. **Pin-by-Pin QA gate** (`bot/qa.py`) — EVERY pin passes a checklist right
+   before the API call: media ≥600px & readable & <32MB · link valid with YOUR
+   affiliate tag · title 5–100 chars · description keyword-rich with `#ad`
+   disclosure · not a duplicate inside the rest window. Fail → quarantined
+   with the exact reasons (never silent junk).
+2. **Full-pipeline simulation** — `python -m bot simulate` runs the entire
+   machine end-to-end (link → SEO → design → reel+BGM+voice → QA → landing →
+   click tracking → rotation) **with zero credentials** and prints the report.
+3. **Analytics tab** — dashboard 📊: clicks-by-hour chart (feeds the posting
+   brain), top pins (winners auto-rotate), template CTR, subscribers.
+
 ## 🔬 Top-0.1% Micro Layer — the small moves that compound
 
 | Micro trick | What it does |

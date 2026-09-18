@@ -79,6 +79,7 @@
     <div class="tab" data-tab="queue">📋 Queue</div>
     <div class="tab" data-tab="posted">📌 Posted</div>
     <div class="tab" data-tab="logs">🧾 Logs</div>
+    <div class="tab" data-tab="analytics">📊 Analytics</div>
   </div>
 
   <div class="panel" id="tab-add">
@@ -126,6 +127,19 @@
   <div class="panel" id="tab-logs" style="display:none">
     <div class="console" id="console"></div>
   </div>
+
+  <div class="panel" id="tab-analytics" style="display:none">
+    <div class="cards" style="margin-bottom:18px">
+      <div class="card"><div class="num" id="anClicks">0</div><div class="lbl">Total Clicks</div></div>
+      <div class="card blue"><div class="num" id="anSubs">0</div><div class="lbl">Subscribers</div></div>
+      <div class="card"><div class="num" id="anTpl">–</div><div class="lbl">Best Template</div></div>
+    </div>
+    <h3 style="margin:6px 0 10px">🕐 Clicks by hour (UTC) — bot posts denser in YOUR proven hours</h3>
+    <div id="hourChart" style="display:flex; align-items:flex-end; gap:3px; height:110px; margin-bottom:22px"></div>
+    <h3 style="margin:0 0 10px">🏆 Top pins by clicks (winners get auto re-posted)</h3>
+    <table><thead><tr><th>Pin</th><th>Source</th><th>👆 Clicks</th></tr></thead>
+    <tbody id="topBody"></tbody></table>
+  </div>
 </main>
 <div class="toast" id="toast"></div>
 
@@ -140,7 +154,7 @@ function toast(msg, isErr){
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['add','queue','posted','logs'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
+  ['add','queue','posted','logs','analytics'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
   refresh();
 });
 
@@ -197,6 +211,20 @@ async function refresh(){
       const logs = await api('/api/logs');
       $('#console').innerHTML = logs.map(l =>
         `<div class="${l.level}">[${l.ts.slice(11,19)}] ${l.level.padEnd(5)} ${esc(l.message)}</div>`).join('');
+    }
+    if(active==='analytics'){
+      const a = await api('/api/analytics');
+      $('#anClicks').textContent = a.clicks_total;
+      $('#anSubs').textContent = a.subscribers;
+      const tc = Object.entries(a.templates_ctr||{});
+      $('#anTpl').textContent = tc.length ? tc.sort((x,y)=>y[1]-x[1])[0][0] : '–';
+      const max = Math.max(1, ...a.clicks_by_hour);
+      $('#hourChart').innerHTML = a.clicks_by_hour.map((v,h)=>
+        `<div title="${h}:00 → ${v} clicks" style="flex:1;background:${v?'#E60023':'#3a3a45'};height:${Math.max(4, v/max*100)}%;border-radius:4px 4px 0 0"></div>`).join('');
+      $('#topBody').innerHTML = a.top_pins.filter(p=>p.clicks>0).map(p=>`<tr>
+        <td>${esc(p.title)}</td><td><span class="badge b-${p.source}">${p.source}</span></td>
+        <td style="font-weight:800;color:var(--green)">${p.clicks}</td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">No clicks yet — pins start earning once posted.</td></tr>';
     }
   }catch(e){ console.error(e); }
 }

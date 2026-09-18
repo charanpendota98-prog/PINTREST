@@ -207,6 +207,21 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         engine.scraper.polite_wait()
         return jsonify({"ok": True, "results": results})
 
+    @app.get("/api/analytics")
+    def analytics():
+        """Pin-to-pin performance: every stage, every number, one screen."""
+        hours = {int(k): v for k, v in db.click_hours().items()}
+        top = sorted(db.recent_posts(limit=500), key=lambda r: r.get("clicks", 0),
+                     reverse=True)[:10]
+        return jsonify({
+            "clicks_total": sum(db.click_counts().values()),
+            "clicks_by_hour": [hours.get(h, 0) for h in range(24)],
+            "templates_ctr": db.template_clicks(),
+            "subscribers": db.subscriber_count(),
+            "top_pins": [{"title": r["title"][:60], "clicks": r.get("clicks", 0),
+                          "source": r.get("source", "")} for r in top],
+        })
+
     @app.post("/api/upload-audio")
     def upload_audio():
         """Manual step for YOU: upload trending audio once.

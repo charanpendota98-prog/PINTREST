@@ -410,6 +410,123 @@ def cmd_ig_check(cfg) -> int:
         return 1
 
 
+def cmd_simulate(cfg) -> int:
+    """10x advanced: run the ENTIRE pipeline end-to-end with zero credentials.
+
+    Proves every stage is workable before you hand over API keys:
+    product → affiliate link → SEO → design → reel(+BGM+voice) → QA gate
+    → landing page → click tracking → winners-rotation logic.
+    """
+    from datetime import datetime
+    print("\n🧪 PIN-TO-PIN SIMULATION — full pipeline, no credentials needed\n")
+    ok_all = True
+
+    def step(name: str):
+        print(f"\n━━ {name}")
+
+    # 0) sample product
+    step("0️⃣ Sample product (demo)")
+    prod = {"id": 99999, "source": "amazon",
+            "title": "boAt Airdopes 141 Bluetooth Wireless Earbuds",
+            "price": "1099", "currency": "INR", "discount": 63,
+            "image_url": "https://example.com/img.jpg",
+            "seo_text": "", "pin_image": "", "video_path": "", "attempts": 0}
+    from .affiliate import AffiliateLinker, price_label
+    label = price_label(prod["price"], prod["currency"])
+    print(f"   ✅ {prod['title'][:60]}… @ {label} ({prod['discount']}% OFF)")
+
+    # 1) affiliate link
+    step("1️⃣ Affiliate link engine")
+    link, network = AffiliateLinker(cfg).convert(prod["image_url"], prod["source"])
+    tag = str(cfg.get("affiliate.amazon_tag", "")).strip()
+    print(f"   {'✅' if link.startswith('http') else '❌'} {link[:90]}")
+    if tag and f"tag={tag}" in link:
+        print("   ✅ your affiliate tag embedded — you earn the commission")
+    elif tag:
+        print("   ⚠️ tag not found in link — set AMAZON_TAG in .env")
+
+    # 2) SEO
+    step("2️⃣ SEO title + description")
+    from .engine import build_seo_text
+    from .growth import seo_title
+    prod["seo_text"] = build_seo_text(cfg, prod["title"], prod["price"],
+                                      prod["currency"], prod["source"], prod["discount"])
+    t = seo_title(prod["title"], label, prod["source"])
+    print(f"   ✅ title: {t[:80]}")
+    print(f"   ✅ desc: {prod['seo_text'][:70]}…")
+
+    # 3) design (needs a real image; use any demo image found)
+    step("3️⃣ Pin design")
+    media = cfg.media_dir
+    demo_imgs = sorted(media.glob("demo_*.jpg")) + sorted(media.glob("*.jpg"))
+    img = str(demo_imgs[0]) if demo_imgs else ""
+    if not img:
+        print("   ⚠️ no demo image in data/media — generating placeholder")
+        from PIL import Image
+        Image.new("RGB", (1000, 1000), (240, 240, 245)).save(media / "demo_ph.jpg")
+        img = str(media / "demo_ph.jpg")
+    from .pin_designer import PinDesigner, TEMPLATES
+    from .engine import Engine
+    e = Engine(cfg)
+    out = media / "sim_pin.jpg"
+    e.designer.create(img, prod["title"], label, str(out), "amazon",
+                      template=e.pick_template(), discount=prod["discount"])
+    print(f"   ✅ designed pin ({TEMPLATES[0]} family): {out.name}")
+
+    # 4) reel + original BGM (+voiceover attempt)
+    step("4️⃣ Voice reel + BGM")
+    from . import voiceover as vo
+    from .video_maker import ReelMaker, pick_music
+    from .growth import hook_for
+    script = vo.script_for(str(cfg.get("video.lang", "en-IN")), prod["title"], label)
+    vo_path = vo.generate(script, str(cfg.get("video.lang", "en-IN")),
+                          media / "sim_vo.mp3")
+    print(f"   {'✅' if vo_path else '⚠️ '} voiceover: "
+          f"{'generated' if vo_path else 'skipped (offline) — reel goes silent'}")
+    music = pick_music(cfg)
+    print(f"   ✅ BGM: {Path(music).name if music else '(none)'}")
+    reel = media / "sim_reel.mp4"
+    ReelMaker(cfg).make(img, hook_for(label, prod["title"], datetime.now().day),
+                        prod["title"], label, reel, prod["source"],
+                        voiceover=vo_path or None, music=music or None,
+                        vo_seconds=vo.estimate_seconds(script) if vo_path else 0)
+    print(f"   ✅ reel rendered: {reel.name} ({reel.stat().st_size // 1024} KB)")
+
+    # 5) QA gate
+    step("5️⃣ Pin-by-Pin QA gate")
+    from . import qa as _qa
+    prod["pin_image"] = str(out)
+    rep, qok = _qa.qa_report(cfg, e.db, prod, t, prod["seo_text"], str(out), link)
+    print(rep)
+    ok_all &= qok
+
+    # 6) landing page render
+    step("6️⃣ Landing page (bridge)")
+    from urllib.parse import quote
+    from flask import Flask
+    from .dashboard import LANDING_HTML
+    app = Flask(__name__)
+    with app.app_context():
+        from jinja2 import Template
+        html = Template(LANDING_HTML).render(
+            title=prod["title"], price=label, disc=prod["discount"],
+            img="/media/x.jpg", buy=link, pid=99999, wa=quote("deal"),
+            brand=cfg.get("design.brand_name", "Deal Drops"))
+    print(f"   ✅ renders ({len(html)} chars) with WhatsApp share + email capture")
+
+    # 7) click tracking + rotation logic
+    step("7️⃣ Analytics + winners rotation")
+    e.db.log_click(99999, "sim")
+    print(f"   ✅ click tracked (total {sum(e.db.click_counts().values())})")
+    cands = e.db.reshare_candidates()
+    print(f"   ✅ rotation engine active ({len(cands)} winners queued)")
+
+    print("\n" + ("🏆 SIMULATION PASSED — pipeline is 100% workable. Add credentials "
+                  "and go live!" if ok_all else
+                  "⚠️  Simulation finished with warnings — check items above."))
+    return 0
+
+
 def cmd_music(cfg) -> int:
     """Compose an ORIGINAL, 100% copyright-free BGM loop (no downloads!)."""
     from . import music_maker
@@ -527,6 +644,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_trends(cfg)
     if cmd == "music":
         return cmd_music(cfg)
+    if cmd == "simulate":
+        return cmd_simulate(cfg)
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":

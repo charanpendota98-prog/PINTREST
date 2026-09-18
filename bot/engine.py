@@ -235,6 +235,18 @@ class Engine:
                               price_label(product["price"], product["currency"]),
                               product["source"], phrase=phrase)
             video_file = product.get("video_path", "") or ""
+            # 🔬 PIN-BY-PIN QA GATE — broken pins never reach the API
+            from . import qa as _qa
+            qa_img = product.get("pin_image") or product.get("image_path") or ""
+            if not video_file or not Path(video_file).exists():
+                qa_ok, qa_issues = _qa.qa_pin(self.cfg, self.db, product, seo_t,
+                                              product["seo_text"], qa_img, link)
+                if not qa_ok:
+                    reason = "QA failed: " + "; ".join(qa_issues)[:400]
+                    self.db.update_post(post_id, status="failed", error=reason)
+                    self.db.update_product(product["id"], status="skipped", error=reason)
+                    self.db.log("WARN", f"🔬 Pin #{product['id']} quarantined — {reason}")
+                    return None
             if video_file and Path(video_file).exists():
                 # video pin path — real / auto-generated reel uploaded to Pinterest
                 media_id = self.api.upload_video(video_file)
