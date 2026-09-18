@@ -117,6 +117,12 @@ class Engine:
                 f"Could not scrape product from {url}. The site may have blocked "
                 "the request — try again later or add it via CSV / manual add."
             )
+        # you never make media: bot enriches thin galleries from the SAME
+        # product on other stores (official, watermark-free)
+        try:
+            prod = self.scraper.enrich_media(prod)
+        except Exception as exc:  # noqa: BLE001 — enrichment is a bonus
+            self.db.log("WARN", f"Media enrichment skipped: {exc}")
 
         aff_url, network = self.linker.convert(url, prod.source)
         label = price_label(prod.price, prod.currency)

@@ -233,6 +233,15 @@ promotion):
    Pinterest video pin / IG reel (hosted automatically).
 5. **Pin-by-Pin QA gate** blocks anything broken before posting.
 
+### 🔍 Cross-store enrichment — "you never make media"
+
+Thin gallery or no video? The bot searches the **same product on the other
+stores** (Amazon ⇄ Flipkart ⇄ Meesho) and merges that listing's official
+gallery + brand video. Official store images are watermark-free by store
+policy. One polite enrichment pass per product; and if still nothing →
+auto-generated voice reel from the photos you DO have. Every path ends in
+real media. Zero manual media work for you.
+
 > Demo queue in this preview uses AI placeholder images ONLY because the
 > preview sandbox's datacenter IP is blocked by Amazon/Flipkart/Meesho
 > (TLS drop — verified). On **your home network** (via `deploy.sh`) real

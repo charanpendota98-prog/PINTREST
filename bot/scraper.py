@@ -17,7 +17,7 @@ import random
 import re
 import time
 from dataclasses import dataclass, field
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 import requests
 from bs4 import BeautifulSoup
@@ -430,6 +430,54 @@ class Scraper:
         except requests.RequestException as exc:
             log.warning("Image download failed for %s: %s", url, exc)
             return ""
+
+    # -- cross-store enrichment: same product, watermark-free media -------
+    SEARCH_URLS = {
+        "amazon": ("https://www.amazon.in/s?k={q}", r'href="(/[^"]*?/dp/[A-Z0-9]{10}[^"]*)"'),
+        "flipkart": ("https://www.flipkart.com/search?q={q}", r'href="(/[^"]*?/p/[^"?]+)'),
+        "meesho": ("https://www.meesho.com/search?q={q}", r'href="(/[^"?]+-p-[a-z0-9]+)'),
+    }
+    HOSTS = {"amazon": "https://www.amazon.in",
+             "flipkart": "https://www.flipkart.com",
+             "meesho": "https://www.meesho.com"}
+
+    def enrich_media(self, prod: "Product") -> "Product":
+        """You never make media: if the gallery is thin or videoless, hunt
+        the SAME product on the other stores and merge their official,
+        watermark-free gallery (store policy = clean images) + brand video.
+        Polite: one enrichment pass, waits between requests.
+        """
+        if len(prod.images) >= 3 and prod.video_url:
+            return prod
+        q = " ".join(re.sub(r"[^A-Za-z0-9 ]+", " ", prod.title).split()[:6])
+        if not q:
+            return prod
+        for store, (tpl, link_re) in self.SEARCH_URLS.items():
+            if store == prod.source:
+                continue
+            self.polite_wait()
+            html = self._fetch(tpl.format(q=quote(q)))
+            if not html:
+                continue
+            m = re.search(link_re, html)
+            if not m:
+                continue
+            other = self.scrape(self.HOSTS[store] + m.group(1))
+            if not other.ok:
+                continue
+            added = 0
+            for u in other.images:
+                if u not in prod.images:
+                    prod.images.append(u)
+                    added += 1
+            if not prod.video_url and other.video_url:
+                prod.video_url = other.video_url
+            if added or other.video_url:
+                log.info("🔍 Cross-store enriched from %s: +%d images%s",
+                         store, added, " +video" if other.video_url else "")
+                break
+        prod.images = prod.images[: int(self.cfg.get("scraping.max_images", 3)) + 2]
+        return prod
 
     def download_video(self, url: str, dest_dir, max_mb: int = 120) -> str:
         """Stream-download a product video locally; returns saved path or ''."""

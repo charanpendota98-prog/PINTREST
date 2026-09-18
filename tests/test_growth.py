@@ -206,3 +206,34 @@ class TestMoneyPriority(unittest.TestCase):
         s_meesho = score_product("Women floral kurta combo pack", "499", "meesho")
         s_flipkart = score_product("Women floral kurta combo pack", "499", "flipkart")
         self.assertGreater(s_meesho, s_flipkart)  # higher commission posts first
+
+
+class TestEnrichMedia(unittest.TestCase):
+    def _scraper(self):
+        from bot.scraper import Scraper
+        from bot.config import load_config
+        s = Scraper(load_config())
+        s.polite_wait = lambda: None
+        return s
+
+    def test_rich_product_untouched(self):
+        from bot.scraper import Product
+        s = self._scraper()
+        def boom(url):
+            raise AssertionError("should not fetch when already rich")
+        s._fetch = boom
+        p = Product(url="http://x/dp/B0", source="amazon")
+        p.images = ["a", "b", "c"]
+        p.video_url = "v.mp4"
+        out = s.enrich_media(p)
+        self.assertEqual(out.images, ["a", "b", "c"])
+
+    def test_thin_product_hunts_offline(self):
+        from bot.scraper import Product
+        s = self._scraper()
+        s._fetch = lambda url: ""   # blocked everywhere → graceful
+        p = Product(url="http://x/dp/B0", source="amazon")
+        p.title = "boAt Airdopes 141 Bluetooth Wireless Earbuds Black"
+        p.images = ["a"]
+        out = s.enrich_media(p)     # must not crash
+        self.assertEqual(out.images, ["a"])
