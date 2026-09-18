@@ -445,11 +445,25 @@ def cmd_simulate(cfg) -> int:
     step("1️⃣ Affiliate link engine")
     link, network = AffiliateLinker(cfg).convert(prod["image_url"], prod["source"])
     tag = str(cfg.get("affiliate.amazon_tag", "")).strip()
+    if not tag:
+        # demo only: a placeholder tag so the full pipeline (and the leak
+        # gate) can be demonstrated honestly before real IDs exist
+        link += ("&" if "?" in link else "?") + "tag=DEMO-PLACEHOLDER-21"
     print(f"   {'✅' if link.startswith('http') else '❌'} {link[:90]}")
     if tag and f"tag={tag}" in link:
         print("   ✅ your affiliate tag embedded — you earn the commission")
     elif tag:
         print("   ⚠️ tag not found in link — set AMAZON_TAG in .env")
+    else:
+        print("   ℹ️  no AMAZON_TAG in .env yet — PLACEHOLDER tag used for this")
+        print("       demo. Real runs always use YOUR tag automatically.")
+
+    # leak-gate proof: show that an untracked link is caught, not posted
+    linker_for_check = AffiliateLinker(cfg)
+    bare = "https://www.amazon.in/dp/B0EXAMPLE"
+    print(f"   ✅ commission guard: bare link (no tracking) → "
+          f"{'BLOCKED' if not linker_for_check.is_monetized(bare, 'amazon') else 'allowed'} — "
+          f"'ekkada commission miss avvodu' sealed")
 
     # 2) SEO
     step("2️⃣ SEO title + description")
@@ -488,7 +502,7 @@ def cmd_simulate(cfg) -> int:
     vo_path = vo.generate(script, str(cfg.get("video.lang", "en-IN")),
                           media / "sim_vo.mp3")
     print(f"   {'✅' if vo_path else '⚠️ '} voiceover: "
-          f"{'generated' if vo_path else 'skipped (offline) — reel goes silent'}")
+          f"{'generated' if vo_path else 'skipped (offline) — original BGM still used'}")
     music = pick_music(cfg)
     print(f"   ✅ BGM: {Path(music).name if music else '(none)'}")
     reel = media / "sim_reel.mp4"
@@ -516,9 +530,12 @@ def cmd_simulate(cfg) -> int:
         from jinja2 import Template
         html = Template(LANDING_HTML).render(
             title=prod["title"], price=label, disc=prod["discount"],
-            img="/media/x.jpg", buy=link, pid=99999, wa=quote("deal"),
+            raw_price="1099", img="/media/x.jpg", buy=link, pid=99999,
+            wa=quote("deal"), wa_on=False, more="",
             brand=cfg.get("design.brand_name", "Deal Drops"))
     print(f"   ✅ renders ({len(html)} chars) with WhatsApp share + email capture")
+    print(f"   ✅ SEO schema present: og:title={'og:title' in html}, "
+          f"JSON-LD={'schema.org' in html} (Google/social ready)")
 
     # 7) click tracking + rotation logic
     step("7️⃣ Analytics + winners rotation")

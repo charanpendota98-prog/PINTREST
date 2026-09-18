@@ -57,7 +57,7 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
      padding:10px;text-align:center;font-weight:600;font-size:14px}
 </style></head><body><div class="wrap">
 <div class="top">🔥 {{ brand }} — VERIFIED DEAL</div>
-<img class="hero" src="{{ img }}" alt="{{ title }}">
+<img class="hero" src="{{ img }}" alt="{{ title }}" onerror="this.style.display='none'">
 <div class="body">
   <h1>{{ title }}</h1>
   <div><span class="price">{{ price }}</span>
@@ -103,7 +103,7 @@ DEALS_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <div class="sub">{{ brand }} — hand-picked, price-checked, updated daily</div>
 {% for p in deals %}
 <div class="card">
-  <img src="/media/{{ p.img }}" alt="{{ p.title }}">
+  <img src="/media/{{ p.img }}" alt="{{ p.title }}" loading="lazy" onerror="this.parentNode.style.display='none'">
   <div style="flex:1"><div class="t">{{ p.title }}</div>
     <div class="p">{{ p.price }}{% if p.disc >= 15 %} · {{ p.disc }}% OFF{% endif %}</div></div>
   <a class="btn" rel="nofollow sponsored" href="{{ p.buy }}">GRAB →</a>
@@ -204,10 +204,12 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         wa = quote(f"🔥 Deal alert! {p['title']} — only {price}"
                    f"{' (' + str(disc) + '% OFF)' if disc >= 15 else ''} 👉 "
                    f"{public}/go/{pid}")
+        img_name = (p.get("pin_image") or "").split("/")[-1]
+        hero = f"/media/{img_name}" if img_name else (p.get("image_url") or "")
         return render_template_string(LANDING_HTML,
                                       title=p["title"], price=price,
                                       raw_price=re.sub(r"[^0-9.]", "", p["price"]) or "0",
-                                      disc=disc, img=f"/media/{p['pin_image'].split('/')[-1]}",
+                                      disc=disc, img=hero,
                                       buy=p["affiliate_url"], pid=pid, wa=wa,
                                       wa_on=bool(cfg.get("link.whatsapp_share", False)),
                                       more=str(cfg.get("affiliate.meesho_collection_link",

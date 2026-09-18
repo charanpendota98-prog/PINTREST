@@ -74,6 +74,68 @@ def pick_video(cfg) -> str:
     return ""
 
 
+_MUSIC_CACHE: dict[tuple, bool] = {}
+
+
+def music_usable(path: str | None) -> bool:
+    """True only if ffmpeg can actually DECODE this audio file.
+
+    Guards the 'reel went silent' failure mode: a corrupt/partial upload
+    (or a text file renamed .wav) used to fail the mix silently.
+    Results are cached per (path, mtime, size) so per-reel probes stay fast.
+    """
+    if not path:
+        return False
+    from pathlib import Path as _P
+    p = _P(path)
+    try:
+        st = p.stat()
+    except OSError:
+        return False
+    key = (str(p), st.st_mtime_ns, st.st_size)
+    if key in _MUSIC_CACHE:
+        return _MUSIC_CACHE[key]
+    if not p.is_file() or st.st_size < 1024:
+        _MUSIC_CACHE[key] = False
+        return False
+    try:
+        import subprocess
+        import imageio_ffmpeg
+        r = subprocess.run(
+            [imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-i", str(path),
+             "-f", "null", "-"], capture_output=True, timeout=60)
+        _MUSIC_CACHE[key] = r.returncode == 0
+        return _MUSIC_CACHE[key]
+    except Exception:  # noqa: BLE001 — never break a render over a probe
+        return True  # can't probe → let the mix try (it has its own fallback)
+
+
+def usable_or_auto_bgm(cfg, music: str | None) -> str:
+    """Return `music` if it decodes; else fall back to original composed BGM.
+
+    This keeps every reel sounding premium even when the owner's uploaded
+    audio is corrupt — no silent reels, ever.
+    """
+    if music_usable(music):
+        return music or ""
+    if music:
+        log.warning("BGM unusable (corrupt/partial file): %s — "
+                    "falling back to original composed BGM", music)
+    try:
+        from pathlib import Path as _P
+        from . import music_maker
+        mdir = _P(__file__).resolve().parent.parent / str(
+            cfg.get("video.music_dir", "data/music"))
+        mdir.mkdir(parents=True, exist_ok=True)
+        auto = mdir / "auto_bgm.wav"
+        if not auto.exists() or auto.stat().st_size < 1024:
+            music_maker.compose(auto, seconds=14)
+        return str(auto) if auto.exists() else ""
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Auto-BGM fallback failed: %s", exc)
+        return music or ""
+
+
 def pick_music(cfg) -> str:
     """Pick a BGM track the USER added manually.
 
@@ -93,8 +155,12 @@ def pick_music(cfg) -> str:
     if single and _P(single).exists():
         cands.append(single)
     if cands:
-        return _r.choice(cands)
-    # nothing uploaded? compose ORIGINAL royalty-free BGM on the fly
+        good = [c for c in cands if music_usable(c)]
+        if good:
+            return _r.choice(good)
+        log.warning("All uploaded audio is corrupt/partial — composing "
+                    "original BGM instead (reels never go silent)")
+    # nothing usable? compose ORIGINAL royalty-free BGM on the fly
     if cfg.get("video.auto_music", True):
         try:
             from . import music_maker
@@ -165,12 +231,14 @@ class ReelMaker:
         return str(final)
 
     # ------------------------------------------------------------ audio
-    @staticmethod
-    def _mix_audio(silent: Path, out: Path, voiceover: str | None,
+    def _mix_audio(self, silent: Path, out: Path, voiceover: str | None,
                    music: str | None) -> Path:
         import subprocess
         import imageio_ffmpeg
         exe = imageio_ffmpeg.get_ffmpeg_exe()
+        # never let a corrupt upload kill the soundtrack: swap in original BGM
+        if music:
+            music = usable_or_auto_bgm(self.cfg, music) or None
         if not (voiceover or music):
             silent.rename(out)
             return out
@@ -191,7 +259,21 @@ class ReelMaker:
             subprocess.run(cmd, check=True, capture_output=True, timeout=300)
             return out
         except (subprocess.CalledProcessError, OSError) as exc:
+            # second chance: keep the VOICEOVER if music was the problem
+            if voiceover and music:
+                log.warning("Audio mix failed with BGM — retrying voice-only")
+                retry = [exe, "-y", "-i", str(silent), "-i", voiceover,
+                         "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+                         "-c:a", "aac", "-shortest", str(out)]
+                try:
+                    subprocess.run(retry, check=True, capture_output=True,
+                                   timeout=300)
+                    return out
+                except (subprocess.CalledProcessError, OSError) as exc2:
+                    exc = exc2
             log.warning("Audio mix failed (%s) — keeping silent reel", exc)
+            if out.exists():
+                out.unlink(missing_ok=True)
             silent.rename(out)
             return out
 

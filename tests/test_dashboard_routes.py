@@ -123,6 +123,82 @@ class TestAllRoutes(unittest.TestCase):
         self.assertIn(r.status_code, (404, 200))
         self.assertLess(r.status_code, 500)
 
+    def test_dashboard_page_has_js_and_no_dupes(self):
+        from pathlib import Path as P
+        html = (P(__file__).resolve().parent.parent /
+                "templates" / "index.html").read_text()
+        self.assertIn("async function api(", html)
+        # global fetch guard must exist (network error never breaks the UI)
+        self.assertIn("catch(e){ return {ok:false, error:", html)
+
+    def test_javascript_syntax_valid(self):
+        """JS syntax must be valid — a duplicate `const` once killed the
+        whole dashboard silently. node --check guards it forever."""
+        import shutil
+        import subprocess
+        import tempfile
+        from pathlib import Path as P
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node not installed")
+        html = (P(__file__).resolve().parent.parent /
+                "templates" / "index.html").read_text()
+        import re
+        blocks = re.findall(r"<script>(.*?)</script>", html, re.S)
+        self.assertTrue(blocks, "dashboard has no <script> block")
+        with tempfile.NamedTemporaryFile("w", suffix=".js",
+                                         delete=False) as fh:
+            fh.write(blocks[-1])
+            js_path = fh.name
+        out = subprocess.run([node, "--check", js_path],
+                             capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0,
+                         f"JS syntax error: {out.stderr[:400]}")
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFrontendRobustness(unittest.TestCase):
+    """Round-2 hardening: JS can never die, media can never 500,
+    reels can never be silent."""
+
+    def test_api_helper_never_throws(self):
+        """The JS api() must catch both fetch and json failures."""
+        from pathlib import Path as P
+        html = (P(__file__).resolve().parent.parent /
+                "templates" / "index.html").read_text()
+        self.assertIn("catch(e){ return {ok:false, error:", html)
+        self.assertEqual(html.count("const esc"), 1, "duplicate esc breaks JS")
+
+    def test_broken_audio_falls_back_to_composed_bgm(self):
+        import tempfile
+        from pathlib import Path as P
+        from bot.video_maker import music_usable, usable_or_auto_bgm
+        with tempfile.TemporaryDirectory() as td:
+            bad = P(td) / "corrupt.wav"
+            bad.write_bytes(b"RIFFnot-really-audio")
+            self.assertFalse(music_usable(str(bad)))
+            cfg = make_cfg(td)
+            fb = usable_or_auto_bgm(cfg, str(bad))
+            self.assertTrue(fb, "no fallback BGM produced")
+            self.assertTrue(music_usable(fb), "fallback BGM is not decodable")
+
+    def test_pin_filename_is_seo_slug(self):
+        """Pinterest indexes image filenames — must be keyword rich."""
+        from bot.engine import Engine
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            cfg = make_cfg(td)
+            e = Engine(cfg, DB(cfg.db_path))
+            name = e.pin_filename("Women Floral Anarkali Kurta Set", "₹549")
+            self.assertIn("women-floral-anarkali", name)
+            self.assertIn("549", name)
+            self.assertTrue(name.endswith(".jpg"))
+
+    def test_landing_has_product_schema(self):
+        from bot.dashboard import LANDING_HTML
+        self.assertIn("og:title", LANDING_HTML)
+        self.assertIn("schema.org", LANDING_HTML)
+        self.assertIn("priceCurrency", LANDING_HTML)

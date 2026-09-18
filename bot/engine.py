@@ -81,6 +81,20 @@ class Engine:
         self._roundup_day = ""    # daily list-pin guard
 
     # ------------------------------------------------------------- links
+    def pin_filename(self, title: str, price_label: str,
+                     variant: int = 0) -> str:
+        """Pinterest image SEO: Pinterest indexes the IMAGE FILENAME.
+
+        `women-floral-anarkali-kurta-549-<ts>_v0.jpg` ranks for far more
+        searches than `pin_1726634.jpg`. Keyword + price + variant, always
+        unique, always filesystem-safe.
+        """
+        slug = re.sub(r"[^a-z0-9]+", "-", (title or "deal").lower()).strip("-")
+        slug = (slug or "deal")[:40].strip("-")
+        price_slug = re.sub(r"[^0-9]", "", price_label or "") or "0"
+        return (f"{slug}-{price_slug}-{int(time.time() * 1000)}"
+                f"_v{variant}.jpg")
+
     def pick_template(self) -> str:
         """CTR-learning loop: 70% exploit the best-clicked template, 30% explore."""
         counts = self.db.template_clicks()
@@ -185,11 +199,8 @@ class Engine:
         first_id = -1
         for v in range(n_variants):
             tpl = self.pick_template()
-            # Pinterest image SEO: keyword-rich filenames rank in search
-            slug = re.sub(r"[^a-z0-9]+", "-", prod.title.lower()).strip("-")[:40]
-            price_slug = re.sub(r"[^0-9]", "", label) or "0"
-            pin_path = self.cfg.media_dir / (
-                f"{slug}-{price_slug}-{int(time.time()*1000)}_v{v}.jpg")
+            pin_path = self.cfg.media_dir / self.pin_filename(
+                prod.title, label, variant=v)
             self.designer.create(
                 local_imgs[v], prod.title, label, pin_path, network,
                 template=tpl,

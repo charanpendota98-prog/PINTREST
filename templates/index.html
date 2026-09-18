@@ -153,6 +153,8 @@
 
 <script>
 const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let toastTimer;
 function toast(msg, isErr){
   const t = $('#toast'); t.textContent = msg;
@@ -167,8 +169,12 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
 });
 
 async function api(path, opts){
-  const r = await fetch(path, opts);
-  return r.json();
+  // NEVER throws: server restart / network blip / bad JSON all become {ok:false}
+  let r;
+  try { r = await fetch(path, opts); }
+  catch(e){ return {ok:false, error:'network error — server reachable ga ledu'}; }
+  try { return await r.json(); }
+  catch(e){ return {ok:false, error:'bad response (HTTP '+r.status+')'}; }
 }
 async function refresh(){
   try{
@@ -193,7 +199,7 @@ async function refresh(){
     if(active==='queue'){
       const prods = await api('/api/products');
       const rows = prods.map(p => `<tr>
-        <td>${p.pin_image ? `<img class="thumb" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
+        <td>${p.pin_image ? `<img class="thumb" loading="lazy" onerror="this.style.display='none'" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
         <td><a href="${p.url}" target="_blank">${esc(p.title.slice(0,70))}</a><br><span style="color:var(--muted);font-size:11.5px">${esc(p.affiliate_url.slice(0,80))}</span></td>
         <td><span class="badge b-${p.source}">${p.source}</span></td>
         <td>${esc(p.price)}<br><span class="badge" style="background:#3a2f13;color:#ffd166" title="winner score — higher posts first">🏆 ${p.score||0}</span></td>
@@ -206,7 +212,7 @@ async function refresh(){
     if(active==='posted'){
       const posts = await api('/api/posts');
       $('#postedBody').innerHTML = posts.map(p => `<tr>
-        <td>${p.pin_image ? `<img class="thumb" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
+        <td>${p.pin_image ? `<img class="thumb" loading="lazy" onerror="this.style.display='none'" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
         <td><a href="https://www.pinterest.com/pin/${p.pin_id}/" target="_blank">${esc(p.title.slice(0,70))}</a><br>
             <span class="badge b-${p.status}">${p.status}</span> ${p.error?`<span style="color:var(--red2);font-size:11.5px">${esc(p.error.slice(0,90))}</span>`:''}</td>
         <td>${p.pin_id||'—'}</td>
@@ -236,7 +242,6 @@ async function refresh(){
     }
   }catch(e){ console.error(e); }
 }
-const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function addProducts(){
   const urls = $('#urls').value.trim();
@@ -258,7 +263,7 @@ async function postNow(count){
     toast(`Posting ${count} pin(s)… this can take a while`);
     const r = await api('/api/post', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});
     if(r.ok) toast(`🎉 ${r.posted} pin(s) posted to Pinterest!`);
-    else toast(r.error, true);
+    else toast(r.error || 'Something went wrong', true);
     refresh();
   }catch(e){ toast('Failed: '+e.message, true); }
 }
@@ -270,9 +275,9 @@ async function uploadVideo(){
   if(!inp.files.length) return toast('Choose a video first', true);
   const fd = new FormData(); fd.append('file', inp.files[0]);
   try{
-    const r = await fetch('/api/upload-video', {method:'POST', body: fd}).then(r=>r.json());
+    const r = await api('/api/upload-video', {method:'POST', body: fd});
     if(r.ok){ toast('🎬 Video saved — bot will post it automatically!'); inp.value=''; refresh(); }
-    else toast(r.error, true);
+    else toast(r.error || 'Something went wrong', true);
   }catch(e){ toast('Upload failed: '+e, true); }
 }
 async function uploadAudio(){
@@ -280,9 +285,9 @@ async function uploadAudio(){
   if(!inp.files.length) return toast('Choose an audio file first', true);
   const fd = new FormData(); fd.append('file', inp.files[0]);
   try{
-    const r = await fetch('/api/upload-audio', {method:'POST', body: fd}).then(r=>r.json());
+    const r = await api('/api/upload-audio', {method:'POST', body: fd});
     if(r.ok){ toast('🎵 Audio saved — reels will use it automatically!'); inp.value=''; refresh(); }
-    else toast(r.error, true);
+    else toast(r.error || 'Something went wrong', true);
   }catch(e){ toast('Upload failed: '+e, true); }
 }
 async function addManual(){
@@ -294,7 +299,7 @@ async function addManual(){
   try{
     const r = await api('/api/add-manual', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     if(r.ok){ toast('✅ Added to queue (id '+r.id+')'); ['mTitle','mPrice','mMrp','mUrl','mImg','mVideo'].forEach(i=>$('#'+i).value=''); refresh(); }
-    else toast(r.error, true);
+    else toast(r.error || 'Something went wrong', true);
   }catch(e){ toast('Failed: '+e, true); }
 }
 refresh(); setInterval(refresh, 10000);
