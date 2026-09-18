@@ -71,13 +71,21 @@ class TestAffiliate(unittest.TestCase):
     def test_meesho_affid(self):
         out, net = self.l.convert("https://www.meesho.com/cool-kurta/p/xyz1")
         self.assertEqual(net, "meesho")
-        # aggregator (official Meesho partner) takes priority when set
-        self.assertTrue(out.startswith("https://ekaro.in/"))
-        # affid-only fallback when no aggregator configured
-        self.l.cfg.raw["affiliate"]["earnkaro_prefix"] = ""
-        out2, _ = self.l.convert("https://www.meesho.com/cool-kurta/p/xyz1")
-        self.assertIn("affid=MEESH123", out2)
-        self.assertIn("utm_source=affiliate", out2)
+        # no template link → affid fallback (aggregator only as last resort)
+        self.assertIn("affid=MEESH123", out)
+        self.assertIn("utm_source=affiliate", out)
+
+    def test_meesho_direct_af_invite(self):
+        # owner pastes ONE generated link → bot builds af_invite for all
+        self.l.cfg.raw["affiliate"]["meesho_template_link"] = (
+            "https://www.meesho.com/af_invite/24197020:instagram_stories:"
+            "11040673?p_id=394590772&ext_id=6ixg6s")
+        out, net = self.l.convert(
+            "https://www.meesho.com/embellished-kurta-p/489088490")
+        self.assertEqual(net, "meesho")
+        self.assertIn("/af_invite/24197020:pinterest_pins:11040673", out)
+        self.assertIn("p_id=489088490", out)   # product id from the new URL
+        self.assertIn("utm_source=pinterest_pins", out)
 
     def test_other_wrapped_earnkaro(self):
         out, net = self.l.convert("https://shop.example.com/product/42")

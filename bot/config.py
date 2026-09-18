@@ -60,6 +60,10 @@ DEFAULTS: dict[str, Any] = {
         # Meesho collection link generated from affiliate.meesho.com
         # (used as "all deals" CTA on landing pages / IG bio)
         "meesho_collection_link": "",
+        # Paste ONE af_invite link you generated on affiliate.meesho.com —
+        # the bot learns your publisher+campaign IDs and generates af_invite
+        # links for EVERY Meesho product automatically (direct commission).
+        "meesho_template_link": "",
         # Flipkart affiliate id (FAS). If empty, flipkart links go through
         # earnkaro/cuelinks wrapper below instead.
         "flipkart_affid": "",

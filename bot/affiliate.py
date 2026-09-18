@@ -12,7 +12,9 @@ Priority: amazon > meesho > flipkart > configured default_wrapper.
 from __future__ import annotations
 
 import os
+import random
 import re
+import string
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 from .scraper import detect_source
@@ -77,15 +79,32 @@ class AffiliateLinker:
     MEESHO_MONETIZED = re.compile(
         r"af_invite|affiliate\.meesho\.com|affid=|ext_id=|/collection/")
 
+    @property
+    def meesho_ids(self) -> tuple[str, str]:
+        """Your Meesho publisher + campaign IDs, learned from ONE sample
+        af_invite link you paste (MEESHO_TEMPLATE_LINK) — then the bot
+        generates af_invite links for EVERY product with YOUR IDs."""
+        sample = (os.getenv("MEESHO_TEMPLATE_LINK", "") or
+                  self.cfg.get("affiliate.meesho_template_link", "") or "").strip()
+        m = re.search(r"af_invite/(\d+):[^:/]+:(\d+)", sample)
+        return (m.group(1), m.group(2)) if m else ("", "")
+
     def meeshoize(self, url: str) -> str:
         if self.MEESHO_MONETIZED.search(url):
             return url  # your generated link, passed through untouched
-        # Official-grade first: EarnKaro/Cuelinks are licensed Meesho
-        # partners — their converted links carry real commission tracking.
-        wrapped = self._wrap(url)
-        if wrapped != url:
-            return wrapped
-        # fallback: raw reseller-style affid param (works where supported)
+        # DIRECT Meesho affiliate: build af_invite with YOUR publisher +
+        # campaign IDs and the product's p_id (from its URL) — commission
+        # lands in YOUR Meesho account, no middleman.
+        pub, camp = self.meesho_ids
+        if pub and camp:
+            pid = re.search(r"-p/(\d+)", urlparse(url).path)
+            if pid:
+                ext = "".join(random.choices(string.ascii_lowercase + string.digits,
+                                             k=6))
+                return (f"https://www.meesho.com/af_invite/{pub}:pinterest_pins:"
+                        f"{camp}?p_id={pid.group(1)}&ext_id={ext}"
+                        f"&utm_source=pinterest_pins")
+        # fallbacks: raw reseller affid param, then aggregator
         if self.meesho_affid:
             parsed = urlparse(url)
             params = [
@@ -97,7 +116,8 @@ class AffiliateLinker:
             return urlunparse(
                 (parsed.scheme, parsed.netloc, parsed.path, "", urlencode(params), "")
             )
-        return url
+        wrapped = self._wrap(url)
+        return wrapped if wrapped != url else url
 
     def flipkartize(self, url: str) -> str:
         """Use Flipkart affiliate id if present, else fall through to wrapper."""
