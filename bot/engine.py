@@ -75,6 +75,7 @@ class Engine:
         self.notify = Notifier()
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
         self._last_reshare = 0.0  # daily winners-rotation timer
+        self._report_day = ""     # daily report guard
 
     # ------------------------------------------------------------- links
     def pick_template(self) -> str:
@@ -434,6 +435,18 @@ class Engine:
                     self.reshare_winners()
                 except Exception as exc:  # noqa: BLE001
                     self.db.log("WARN", f"Reshare cycle error: {exc}")
+            # daily auto-report at 9 PM IST ("roju post chestunnava" — proof!)
+            today = now.date().isoformat()
+            if now.hour >= 21 and self._report_day != today:
+                self._report_day = today
+                try:
+                    stats = self.db.stats()
+                    clicks = sum(self.db.click_counts().values())
+                    self.notify.daily_summary(stats, clicks)
+                    self.db.log("INFO", f"📊 Daily report sent: {stats.get('posted', 0)} "
+                                        f"posted, {clicks} clicks")
+                except Exception as exc:  # noqa: BLE001
+                    self.db.log("WARN", f"Daily report failed: {exc}")
             w_start, w_end = peak_window(now) if peak else (start_h, end_h)
             # festival / payday volume boost (India shopping spikes)
             fest_name, _, mult = festival_boost(now)
