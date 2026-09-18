@@ -111,6 +111,17 @@ WINNER_NICHES: list[dict] = [
 
 HOOKY_WORDS = ("viral", "trending", "new", "best", "combo", "pack of")
 
+# Deep-level money thinking: expected commission % per network (typical).
+# Higher rate = posts earlier = more money per click. (Meesho lifestyle pays
+# the most in India — so Meesho products jump the queue automatically.)
+COMMISSION_EST = {
+    "meesho": 10,   # 3–15%, lifestyle/fashion sweet spot
+    "amazon": 7,    # 1–10% by category, strong on gadgets/home
+    "flipkart": 5,
+    "earncaro": 4,  # multi-store aggregator
+    "cuelinks": 4,
+}
+
 
 def niche_for(title: str) -> dict | None:
     low = title.lower()
@@ -143,6 +154,8 @@ def score_product(title: str, price: str, source: str) -> int:
         s += 2
     if source in ("meesho", "amazon"):
         s += 1
+    # 💰 money-first: highest-paying network posts first
+    s += COMMISSION_EST.get(source, 2)
     return s
 
 

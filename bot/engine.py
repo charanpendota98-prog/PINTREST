@@ -137,6 +137,13 @@ class Engine:
             video_path = self.scraper.download_video(prod.video_url, self.cfg.media_dir)
             if video_path:
                 self.db.log("INFO", f"Video downloaded for: {prod.title[:50]}")
+        # user's OWN videos always win (uploaded via dashboard → data/videos/)
+        if not video_path:
+            from .video_maker import pick_video
+            uv = pick_video(self.cfg)
+            if uv:
+                video_path = uv
+                self.db.log("INFO", f"🎬 Using YOUR uploaded video: {Path(uv).name}")
         # …otherwise AUTO-GENERATE a viral reel from the photos (the 2026 trick)
         if not video_path and self.cfg.get("video.auto_reel", True):
             try:

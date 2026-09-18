@@ -222,6 +222,22 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                           "source": r.get("source", "")} for r in top],
         })
 
+    @app.post("/api/upload-video")
+    def upload_video():
+        """YOUR videos in, automation out: upload product videos/reels once,
+        the bot posts them as video pins + IG reels automatically."""
+        f = request.files.get("file")
+        if not f or not f.filename:
+            return jsonify({"ok": False, "error": "no file"}), 400
+        if not f.filename.lower().endswith((".mp4", ".mov", ".webm", ".mkv")):
+            return jsonify({"ok": False, "error": "only mp4/mov/webm/mkv"}), 400
+        vdir = ROOT / "data" / "videos"
+        vdir.mkdir(parents=True, exist_ok=True)
+        safe = "".join(c for c in f.filename if c.isalnum() or c in "._-")[:80]
+        f.save(vdir / safe)
+        db.log("INFO", f"🎬 Video added by user: {safe} — will be posted automatically")
+        return jsonify({"ok": True, "file": safe})
+
     @app.post("/api/upload-audio")
     def upload_audio():
         """Manual step for YOU: upload trending audio once.

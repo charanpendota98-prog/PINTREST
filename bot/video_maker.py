@@ -56,6 +56,24 @@ def _accent() -> tuple[int, int, int]:
     return (230, 0, 35)
 
 
+def pick_video(cfg) -> str:
+    """Pick a video the USER uploaded (data/videos/).
+
+    You have your own product videos? Drop them in — they're used INSTEAD
+    of auto-generated reels (your footage = your brand, better trust).
+    Rotates across products automatically.
+    """
+    import random as _r
+    from pathlib import Path as _P
+    vdir = _P(__file__).resolve().parent.parent / "data" / "videos"
+    if vdir.exists():
+        cands = [str(p) for p in vdir.iterdir()
+                 if p.suffix.lower() in (".mp4", ".mov", ".webm", ".mkv")]
+        if cands:
+            return _r.choice(cands)
+    return ""
+
+
 def pick_music(cfg) -> str:
     """Pick a BGM track the USER added manually.
 

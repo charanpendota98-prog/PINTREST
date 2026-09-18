@@ -102,6 +102,14 @@
     </div>
     <button class="btn" onclick="addManual()">➕ Add to Queue (Manual)</button>
 
+    <h3 style="margin:26px 0 12px">🎬 Your videos (post as video pins + reels — 100% auto)</h3>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+      <input type="file" id="videoFile" accept=".mp4,.mov,.webm,.mkv" class="inp" style="max-width:320px">
+      <button class="btn" onclick="uploadVideo()">🎬 Upload Video</button>
+    </div>
+    <div class="hint">Mee own videos unte ikkada pettandi — bot avi Pinterest video pins +
+      IG reels ga automatic ga post chestundi (audio kuda mix avtundi). Files: <code>data/videos/</code></div>
+
     <h3 style="margin:26px 0 12px">🎵 Add trending audio (your manual step — rest is auto)</h3>
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
       <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.aac" class="inp" style="max-width:320px">
@@ -256,6 +264,16 @@ async function postNow(count){
 }
 async function skipP(id){
   await api(`/api/products/${id}/skip`, {method:'POST'}); refresh();
+}
+async function uploadVideo(){
+  const inp = $('#videoFile');
+  if(!inp.files.length) return toast('Choose a video first', true);
+  const fd = new FormData(); fd.append('file', inp.files[0]);
+  try{
+    const r = await fetch('/api/upload-video', {method:'POST', body: fd}).then(r=>r.json());
+    if(r.ok){ toast('🎬 Video saved — bot will post it automatically!'); inp.value=''; refresh(); }
+    else toast(r.error, true);
+  }catch(e){ toast('Upload failed: '+e, true); }
 }
 async function uploadAudio(){
   const inp = $('#audioFile');

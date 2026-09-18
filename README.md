@@ -200,6 +200,20 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 💰 Money Layer — deep-level revenue thinking
+
+1. **Commission-priority posting** (`COMMISSION_EST` in trends.py): products
+   are scored by expected commission — Meesho (3–15%) jumps the queue, so the
+   highest-paying clicks happen FIRST. Money-per-post goes up automatically.
+2. **Your own videos** — dashboard 🎬 upload → `data/videos/`. Your footage
+   beats auto-reels (your brand, more trust) and posts as Pinterest video
+   pins + IG reels, with your trending audio mixed in.
+3. **Multi-network affiliate engine** — Amazon, Meesho, Flipkart, EarnKaro,
+   Cuelinks + custom. New program arrives → add creds in `.env` → done.
+4. Every pin's money path: pin → YOUR bridge link (tracked) → landing →
+   affiliate URL. Clicks are attributed per pin per hour → the machine
+   learns what earns and does more of it.
+
 ## 📸 How REAL photos/videos are captured (no dummies, no AI fakes)
 
 The bot posts ONLY the store's own product media — exactly what top

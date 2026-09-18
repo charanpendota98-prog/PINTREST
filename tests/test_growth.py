@@ -198,3 +198,11 @@ class TestProScraper(unittest.TestCase):
         s._collect_images(BeautifulSoup("<html></html>", "lxml"), p)
         self.assertTrue(p.images[0].endswith("_SL1500_.jpg"))  # hi-res forced
         self.assertTrue(p.video_url.endswith("vid.mp4"))       # brand video found
+
+
+class TestMoneyPriority(unittest.TestCase):
+    def test_commission_priority(self):
+        from bot.trends import score_product
+        s_meesho = score_product("Women floral kurta combo pack", "499", "meesho")
+        s_flipkart = score_product("Women floral kurta combo pack", "499", "flipkart")
+        self.assertGreater(s_meesho, s_flipkart)  # higher commission posts first
