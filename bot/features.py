@@ -190,15 +190,20 @@ def print_how_it_works() -> None:
      fresh design tho re-post
 
 7) SAFETY (account safe, money safe)
-   Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad),
-   dummy-product guard (demo data live account ki NEVER post),
-   crash-net (edaina fail aithe loop continue), housekeep daily,
-   doctor command, 61 automated tests.
+   Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
+   mundhe, dummy-product guard (demo data live account ki NEVER post),
+   single-instance lock (rendu autopilot okate product rendu saarlu post
+   cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
+   continue), housekeep daily, panel password lock, doctor command,
+   161 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
    EarnKaro, IG token, FB token. 5-10 nimushalu, oka saari.
    Tarvata: sudo ./deploy.sh → 24x7 automatic.
+   Deploy ready aa? → python -m bot deploy-check   (✅/❌ checklist)
+   Panel password → python -m bot dashboard-pass
+   Guardians (root lekunda) → ./run.sh  |  ./run.sh status  |  ./run.sh stop
 
 NIJJAM (honesty):
    • Ee bot reach + clicks + commission link ni build chestundi —

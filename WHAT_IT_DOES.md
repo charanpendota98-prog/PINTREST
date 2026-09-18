@@ -92,9 +92,14 @@ line chupistundi.
   **NEVER** post (status=demo + URL marker check; 61 tests lo proof)
 - **Warm-up ramp** — kotha account slow start, jitter, human gaps
 - **Crash-net** — edaina fail aithe loop continue (24×7 alive)
+- **Single-instance lock** — rendu autopilot okate machine lo run avvavu
+  (duplicate pins = spam signal). Heartbeat lock: crash/freeze aithe
+  automatic takeover, manual cleanup ledu
+- **Panel lock** — dashboard (stats/controls/logs) password protected;
+  money pages (`/go/…`, `/deals/today`) public ga untayi
 - **Housekeep** — disk cleanup, logs cap
-- **61 automated tests** — prathi route/page/endpoint + QA + leak +
-  dummy + JS syntax (`node --check`)
+- **161 automated tests** — prathi route/page/endpoint + QA + leak +
+  dummy + panel lock + single-instance + JS syntax (`node --check`)
 
 ---
 
@@ -150,9 +155,14 @@ python -m bot setup          # .env wizard: Pinterest app, AMAZON_TAG,
 python -m bot auth           # Pinterest ALLOW (okka click)
 python -m bot doctor         # anni green unnaya chudu
 python -m bot simulate       # 🏆 PASSED ravali
-sudo ./deploy.sh             # systemd 24×7 + dashboard
+sudo ./deploy.sh             # systemd 24×7 + dashboard (rendu services)
+python -m bot deploy-check   # server ready aa? ✅/❌ + exact fixes
+python -m bot dashboard-pass # panel password (auto-created)
 python -m bot how            # ee doc malli chudu (anytime)
 ```
+
+Root lekunda (systemd ledu ante): `./run.sh` (start) · `./run.sh status` ·
+`./run.sh stop` — ee guardian rendu services ni alive ga chustundi.
 
 ---
 

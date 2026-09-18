@@ -126,13 +126,62 @@ Priority: Amazon tag → Meesho affid → Flipkart affid → EarnKaro → Cuelin
 # 🎨 preview all 4 pin design templates
 .venv/bin/python -m bot design-test
 
-# 🖥 web control panel
+# 🖥 web control panel  (owner-locked — password printed at startup)
 .venv/bin/python -m bot dashboard    # http://localhost:5000
+
+# 🔐 forgot the panel password?
+.venv/bin/python -m bot dashboard-pass
+
+# 🚀 "deploy ki ready aa? inka em kavali?" → one command, full checklist
+.venv/bin/python -m bot deploy-check
 ```
 
 Keep `run` alive 24×7 on any cheap VPS/PC, or with `nohup`:
 ```bash
 nohup .venv/bin/python -m bot run > pindrop.log 2>&1 &
+```
+
+### 🔐 The panel is LOCKED, the money pages are OPEN
+The dashboard is an **admin area** (post now, delete products, read logs), so it
+is password-protected the moment you deploy:
+
+| Route | Access |
+|-------|--------|
+| `/`, `/api/*` (panel + controls) | 🔒 password (auto-created on first run) |
+| `/go/<id>`, `/deals/today`, `/subscribe/<id>`, `/media/*` | 🌍 public — this is the money path (pin → landing → affiliate link) |
+| `/healthz` | 🌍 public uptime probe |
+
+- Password: `DASHBOARD_PASSWORD` in `.env`, else auto-generated once and saved
+  in `data/dashboard_password.txt` (see it: `python -m bot dashboard-pass`).
+- Log in on your phone once — the session lasts 30 days.
+- Scripts/curl: `curl -H "X-Dashboard-Token: <password>" http://ip:5000/api/status`
+- 5 wrong passwords from one IP = 429 block for 5 minutes.
+- Locked API calls return `401 {"ok":false,"login":"/login"}` — never a 500.
+
+**Firewall note (VPS):** the panel listens on `dashboard.host:port`
+(default `0.0.0.0:5000`). If you only need it from your own network, either set
+`DASHBOARD_PASSWORD` (recommended) or restrict the port
+(`sudo ufw allow 5000/tcp` / SSH tunnel `ssh -L 5000:127.0.0.1:5000 user@vps`).
+
+### 🛡 One bot, never two (single-instance lock)
+`python -m bot run` and `python -m bot dashboard` take a **heartbeat lock**
+(`data/locks/*.lock`). A second copy refuses to start and tells you who holds
+it, so the same product can never be posted twice (duplicate pins are spam
+signals — exactly how accounts get limited) and two panels can't fight over
+port 5000:
+
+```bash
+$ python -m bot run
+⏸  Autopilot already running — another instance is already running: pid 3147
+   Two schedulers = duplicate pins + ban risk, so this copy exits.
+```
+A crashed or frozen instance (no heartbeat for 120s) is taken over
+automatically — you never have to delete lock files by hand.
+
+```bash
+./run.sh            # start both guardians (refuses to double-start)
+./run.sh status      # guardian? poster? panel? — one line each
+./run.sh stop        # stop guardians + children
 ```
 
 ### 🔥 Fully-advanced mode (photos + videos, maximum reach)
@@ -449,8 +498,12 @@ audio in-app if you want it, and replying to DMs.
   clicks actually happen (learns from `/go/` click timestamps).
 - **🩺 `python -m bot doctor`** — one command answers "anthi set avuthunda?":
   full ✅/❌ checklist with exact fixes.
-- **🚀 `sudo ./deploy.sh`** — VPS pe one command: venv + deps + systemd
-  service (auto-start on boot, auto-restart on crash). True 24×7 set.
+- **🚀 `sudo ./deploy.sh`** — VPS pe one command: venv + deps + **two** systemd
+  services (poster + panel, auto-start on boot, auto-restart on crash).
+  Non-root? `./run.sh` starts the same pair as guardians. True 24×7 set.
+- **🚦 `python -m bot deploy-check`** — VPS preflight: python/ffmpeg/disk/
+  systemd/port/panel-lock/money-link/Pinterest-creds, each with the exact fix
+  command. Exit 0 = ready to deploy.
 - **`scripts/seed_demo.py`** — preview the pipeline with demo data, no creds.
 
 ## 💰 Conversion Engine — products EKUVA KONIPINCHADAM (sales focus)

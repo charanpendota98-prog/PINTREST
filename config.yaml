@@ -120,5 +120,11 @@ storage:
 dashboard:
   host: 0.0.0.0
   port: 5000
+  # Owner lock. Leave password empty = auto-generated on first run and saved in
+  # data/dashboard_password.txt (see it with: python -m bot dashboard-pass).
+  # The public money pages (/go/…, /deals/today, /subscribe/…) never need login.
+  password: ""
+  require_password: true
+  secret_key: ""
 
 timezone: Asia/Kolkata

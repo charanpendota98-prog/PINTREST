@@ -6,11 +6,16 @@ all URLs are relative).
 """
 from __future__ import annotations
 
+import hmac
 import logging
+import os
 import re
+import secrets
+import time
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import (Flask, jsonify, redirect, render_template_string, request,
+                   send_file, send_from_directory, session)
 
 from .db import DB
 from .engine import Engine
@@ -19,6 +24,107 @@ from .pinterest_api import PinterestAPI, PinterestError
 
 log = logging.getLogger("pindrop.dashboard")
 ROOT = Path(__file__).resolve().parent.parent
+
+# ── Pages that MUST stay public: they are the money path (pins → landing →
+#    affiliate link). Everything else is the admin panel and is password-locked.
+PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/deals/today"}
+PUBLIC_PREFIX = ("/go/", "/subscribe/", "/media/")
+
+LOGIN_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PinDrop Pro — login</title></head>
+<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+ background:#0f1117;color:#e8eaed;display:flex;align-items:center;
+ justify-content:center;min-height:100vh;margin:0">
+<form method="post" action="/login" style="background:#171a21;padding:34px 30px;
+ border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5);width:320px">
+  <div style="font-size:34px;text-align:center">📌</div>
+  <h2 style="margin:6px 0 4px;text-align:center;font-size:19px">PinDrop Pro panel</h2>
+  <p style="margin:0 0 18px;text-align:center;color:#9aa0a6;font-size:12px">
+     Owner-only area. Your bot keeps posting 24×7 regardless.</p>
+  {% if err %}<p style="color:#ff6b6b;font-size:13px;margin:0 0 12px">{{ err }}</p>{% endif %}
+  <input name="password" type="password" placeholder="Panel password" autofocus
+   style="width:100%;box-sizing:border-box;padding:12px;border-radius:9px;
+   border:1px solid #2a2f3a;background:#0f1117;color:#e8eaed;font-size:14px">
+  <button style="width:100%;margin-top:12px;padding:12px;border:0;border-radius:9px;
+   background:#e60023;color:#fff;font-size:14px;font-weight:600;cursor:pointer">
+   Unlock</button>
+  <p style="margin:14px 0 0;color:#5f6368;font-size:11px;text-align:center">
+   Forgot it? On your server run <code>python -m bot dashboard-pass</code></p>
+</form></body></html>"""
+
+
+def resolve_dashboard_secret(cfg) -> str:
+    """Stable session key so the owner isn't logged out on every restart."""
+    env = (os.environ.get("DASHBOARD_SECRET") or "").strip()
+    if env:
+        return env
+    cur = str(cfg.get("dashboard.secret_key", "") or "").strip()
+    if cur:
+        return cur
+    path = Path(cfg.db_path).parent / "dashboard_secret.txt"
+    try:
+        if path.exists():
+            saved = path.read_text().strip()
+            if saved:
+                cfg.raw.setdefault("dashboard", {})["secret_key"] = saved
+                return saved
+        fresh = secrets.token_hex(24)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(fresh + "\n")
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+        cfg.raw.setdefault("dashboard", {})["secret_key"] = fresh
+        return fresh
+    except OSError:
+        return secrets.token_hex(24)
+
+
+def resolve_dashboard_password(cfg, auto: bool = True,
+                               source: dict | None = None) -> str:
+    """Password for the admin panel — env > config > auto-generated file.
+
+    Deployments must NEVER leave the panel open on a public IP: when nothing
+    is configured we mint a strong password once, store it (chmod 600) and
+    keep reusing it so the owner can always find it with `bot dashboard-pass`.
+
+    `source` (optional dict) comes back with {"from": env|config|file|generated|""}
+    so callers can report exactly where the password lives — never guess.
+    """
+    def _done(value: str, whence: str) -> str:
+        if source is not None:
+            source["from"] = whence
+        return value
+
+    env = (os.environ.get("DASHBOARD_PASSWORD") or "").strip()
+    if env:
+        return _done(env, "env")
+    pw = str(cfg.get("dashboard.password", "") or "").strip()
+    if pw:
+        return _done(pw, "config")
+    path = Path(cfg.db_path).parent / "dashboard_password.txt"
+    try:
+        if path.exists():
+            saved = path.read_text().strip()
+            if saved:
+                if auto:
+                    cfg.raw.setdefault("dashboard", {})["password"] = saved
+                return _done(saved, "file")
+        if not auto:
+            return _done("", "")
+        fresh = secrets.token_urlsafe(12)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(fresh + "\n")
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+        cfg.raw.setdefault("dashboard", {})["password"] = fresh
+        return _done(fresh, "generated")
+    except OSError:
+        return _done("", "")
 
 # High-converting mini landing page (warm-up between pin and affiliate link)
 LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -143,6 +249,89 @@ def create_app(cfg, db: DB | None = None) -> Flask:
     @app.errorhandler(500)
     def _se(e):
         return jsonify({"ok": False, "error": "internal error"}), 500
+
+    # ── owner lock: the panel is admin-only, the money pages stay public ──
+    pw = str(cfg.get("dashboard.password", "") or "").strip()
+    if not pw:
+        pw = (os.environ.get("DASHBOARD_PASSWORD") or "").strip()
+    secret = str(cfg.get("dashboard.secret_key", "") or "").strip()
+    if not secret:
+        secret = secrets.token_hex(24)          # per-run when not persisted
+    app.secret_key = secret
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["PERMANENT_SESSION_LIFETIME"] = 30 * 86400   # phone stays logged in
+    _fails: dict = {}
+
+    def _client_ip() -> str:
+        fwd = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        return fwd or request.remote_addr or "?"
+
+    def _authed() -> bool:
+        if not pw:
+            return True                          # local/dev mode (no lock)
+        if hmac.compare_digest(str(session.get("pin_auth", "")), pw):
+            return True
+        if hmac.compare_digest(request.headers.get("X-Dashboard-Token", ""), pw):
+            return True
+        tok = request.args.get("token", "")
+        if tok and hmac.compare_digest(tok, pw):
+            session["pin_auth"] = pw             # ?token=… then clean URL
+            return True
+        return False
+
+    @app.get("/healthz")
+    def _healthz():
+        """Public uptime probe — no data leak beyond 'alive'."""
+        return jsonify({"ok": True, "service": "pindrop-dashboard",
+                        "locked": bool(pw)})
+
+    @app.route("/login", methods=["GET", "POST"])
+    def _login():
+        err = ""
+        if request.method == "POST":
+            ip = _client_ip()
+            now = time.time()
+            hits = [t for t in _fails.get(ip, []) if now - t < 300]
+            if len(hits) >= 5:
+                return render_template_string(
+                    LOGIN_HTML, err="Too many attempts — wait 5 minutes."), 429
+            given = (request.form.get("password") or "").strip()
+            if pw and hmac.compare_digest(given, pw):
+                _fails.pop(ip, None)
+                session.permanent = True
+                session["pin_auth"] = pw
+                return redirect("/")
+            if len(_fails) > 200:                # keep the brute-force map small
+                _fails.clear()
+                _fails[ip] = hits
+            hits.append(now)
+            _fails[ip] = hits
+            err = "Wrong password."
+        if not pw:
+            return redirect("/")
+        return render_template_string(LOGIN_HTML, err=err)
+
+    @app.get("/logout")
+    def _logout():
+        session.pop("pin_auth", None)
+        return redirect("/login")
+
+    @app.before_request
+    def _gate():
+        if not pw:
+            return None
+        path = request.path
+        if path in PUBLIC_EXACT or path.startswith(PUBLIC_PREFIX):
+            return None
+        if _authed():
+            return None
+        if path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "locked — login required",
+                            "login": "/login"}), 401
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            return jsonify({"ok": False, "error": "locked"}), 401
+        return redirect("/login")
 
     def _api_check(fn):
         """Wrapper: run heavy work in a thread-safe way and report errors.
@@ -444,8 +633,42 @@ def create_app(cfg, db: DB | None = None) -> Flask:
 
 
 def serve(cfg) -> None:  # pragma: no cover - long running
-    app = create_app(cfg)
-    host = cfg.get("dashboard.host", "0.0.0.0")
+    host = str(cfg.get("dashboard.host", "0.0.0.0"))
     port = cfg.get_int("dashboard.port", 5000)
-    print(f"\n🖥  Dashboard: http://{host}:{port}\n")
-    app.run(host=host, port=port, debug=False, threaded=True)
+    require = cfg.get_bool("dashboard.require_password", True)
+    src: dict = {}
+    pw = ""
+    if require:
+        pw = resolve_dashboard_password(cfg, source=src)
+    resolve_dashboard_secret(cfg)
+    from .lock import AlreadyRunning, acquire, release
+    try:
+        lk = acquire(cfg, "dashboard")
+    except AlreadyRunning as exc:
+        print(f"\n⏸  Dashboard already running — {exc}")
+        print("   Open the one already serving "
+              f"http://127.0.0.1:{port} (or stop it: pkill -f 'bot dashboard').\n")
+        return
+    app = create_app(cfg)
+    print(f"\n🖥  Dashboard: http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}"
+          f"   (VPS unte: http://<server-ip>:{port})")
+    if pw:
+        whence = {"env": "from .env", "config": "from config.yaml",
+                  "file": "saved earlier", "generated": "just auto-created"}.get(
+                      src.get("from", ""), "set")
+        print(f"🔐 Panel password ({whence}): {pw}")
+        if src.get("from") in ("file", "generated"):
+            print(f"   Saved in {Path(cfg.db_path).parent / 'dashboard_password.txt'} "
+                  "— change anytime with DASHBOARD_PASSWORD in .env")
+        else:
+            print("   Change it anytime via DASHBOARD_PASSWORD in .env "
+                  "(or `python -m bot dashboard-pass`)")
+        print("   Public money pages (/go/…, /deals/today, /subscribe/…) stay open.\n")
+    else:
+        print("⚠️  NO password — panel is OPEN to anyone who finds this port.")
+        print("   Fix: put DASHBOARD_PASSWORD=… in .env or set "
+              "dashboard.require_password: true\n")
+    try:
+        app.run(host=host, port=port, debug=False, threaded=True)
+    finally:
+        release(lk)

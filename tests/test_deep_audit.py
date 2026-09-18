@@ -189,6 +189,8 @@ class TestDashboardResilience(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        import os
+        os.environ.pop("DASHBOARD_PASSWORD", None)   # unlocked-route behaviour
         cls.tmp = tempfile.TemporaryDirectory()
         cfg = _cfg(cls.tmp.name)
         cls.db = DB(cfg.db_path)

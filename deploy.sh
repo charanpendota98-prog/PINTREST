@@ -21,6 +21,8 @@ install_services() {
   cat > /etc/systemd/system/pindrop.service <<EOF
 [Unit]
 Description=PinDrop Pro — Pinterest affiliate autopilot (24×7 scheduler)
+StartLimitIntervalSec=300
+StartLimitBurst=10
 After=network-online.target
 Wants=network-online.target
 
@@ -28,8 +30,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$HERE
 ExecStart=$HERE/.venv/bin/python -m bot run
-Restart=always
-RestartSec=10
+Restart=on-failure
+RestartSec=15
 Environment=PYTHONUNBUFFERED=1
 StandardOutput=journal
 StandardError=journal
@@ -41,6 +43,8 @@ EOF
   cat > /etc/systemd/system/pindrop-dashboard.service <<EOF
 [Unit]
 Description=PinDrop Pro — web dashboard (control panel + landing pages)
+StartLimitIntervalSec=300
+StartLimitBurst=10
 After=network-online.target
 Wants=network-online.target
 
@@ -48,8 +52,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$HERE
 ExecStart=$HERE/.venv/bin/python -m bot dashboard
-Restart=always
-RestartSec=10
+Restart=on-failure
+RestartSec=15
 Environment=PYTHONUNBUFFERED=1
 StandardOutput=journal
 StandardError=journal
@@ -91,3 +95,10 @@ echo "   Deals list: http://${IP:-localhost}:5000/deals/today"
 echo
 echo "   Next: python -m bot simulate    → must print 🏆 SIMULATION PASSED"
 echo "   Then: python -m bot how         → what the machine does, every day"
+echo
+echo "🔐 Panel login (admin area is password-locked; /go/… pages stay public):"
+echo "   .venv/bin/python -m bot dashboard-pass"
+echo "   → prints URL + password (auto-created on first run)"
+echo
+echo "🚦 Anything missing? one command says it all:"
+echo "   .venv/bin/python -m bot deploy-check"

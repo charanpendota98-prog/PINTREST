@@ -416,6 +416,126 @@ def cmd_doctor(cfg) -> int:
     return 0 if bad == 0 else 1
 
 
+def cmd_dashboard_pass(cfg) -> int:
+    """Show (or rotate) the admin-panel password — never locked out."""
+    from pathlib import Path as _P
+    from .dashboard import resolve_dashboard_password
+
+    path = _P(cfg.db_path).parent / "dashboard_password.txt"
+    pw = resolve_dashboard_password(cfg, auto=False)
+    if not pw:
+        pw = resolve_dashboard_password(cfg)
+    if not pw:
+        print("❌ Password create cheyyalekapoyindi (data dir writable aa?).")
+        print("   Fix: DASHBOARD_PASSWORD=<something> pettu .env lo.")
+        return 1
+    host = cfg.get("dashboard.host", "0.0.0.0")
+    port = cfg.get_int("dashboard.port", 5000)
+    print("\n🔐 Dashboard login")
+    print(f"   URL      : http://<server-ip>:{port}"
+          f"{'   (local: http://127.0.0.1:' + str(port) + ')' if host in ('0.0.0.0', '::') else ''}")
+    print(f"   Password : {pw}")
+    print(f"   Saved in : {path}")
+    print("\n   Marchipoyava? Rotate:  .venv/bin/python -c \"import secrets;"
+          "print(secrets.token_urlsafe(12))\"  → .env DASHBOARD_PASSWORD=…\n")
+    return 0
+
+
+def cmd_deploy_check(cfg) -> int:
+    """VPS preflight: 'deploy ki ready na, inka em kavali?' ki oke answer."""
+    import shutil
+    import socket
+    import sys
+    from pathlib import Path as _P
+    from .dashboard import resolve_dashboard_password
+
+    print("\n🚀 DEPLOY PREFLIGHT — server ki ready aa?\n" + "-" * 58)
+    bad = 0
+
+    def ck(name: str, ok: bool, fix: str = "") -> None:
+        nonlocal bad
+        if not ok:
+            bad += 1
+        print(f" {'✅' if ok else '❌'} {name}" + ("" if ok or not fix else f"  → {fix}"))
+
+    py = sys.version_info
+    ck(f"Python ≥3.9 (found {py.major}.{py.minor})", py >= (3, 9),
+       "sudo apt install python3 python3-venv")
+    ff = shutil.which("ffmpeg")
+    if not ff:
+        try:                                     # bundled binary (no apt needed)
+            import imageio_ffmpeg
+            ff = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:                        # noqa: BLE001
+            ff = ""
+    ck(f"ffmpeg (reels/videos){'' if not ff else ' — ' + ('system' if shutil.which('ffmpeg') else 'bundled')}",
+       bool(ff), ".venv/bin/pip install imageio-ffmpeg  (or sudo apt install ffmpeg)")
+    try:
+        import PIL, flask, requests, bs4, yaml, imageio_ffmpeg  # noqa: F401
+        ck("Python packages", True)
+    except ImportError as exc:
+        ck(f"Python packages ({exc})", False, ".venv/bin/pip install -r requirements.txt")
+    ck("git repo intact", (_P(__file__).resolve().parent.parent / "config.yaml").exists())
+
+    # writable storage
+    for label, p in (("data/", _P(cfg.db_path).parent), ("media/", _P(cfg.media_dir))):
+        ok = True
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            t = p / ".preflight"
+            t.write_text("x")
+            t.unlink()
+        except OSError:
+            ok = False
+        ck(f"{label} writable", ok, f"chown/chmod {p}")
+
+    # disk space (media + reels pile up)
+    try:
+        free_gb = shutil.disk_usage(str(_P(cfg.db_path).parent)).free / 1024 ** 3
+    except OSError:
+        free_gb = 0.0
+    ck(f"Disk free ≥1GB (have {free_gb:.1f}GB)", free_gb >= 1, "VPS disk full — cleanup")
+
+    # systemd units
+    if shutil.which("systemctl") and _P("/etc/systemd/system").is_dir():
+        sched = _P("/etc/systemd/system/pindrop.service").exists()
+        dash = _P("/etc/systemd/system/pindrop-dashboard.service").exists()
+        ck("systemd: pindrop.service (poster)", sched, "sudo ./deploy.sh")
+        ck("systemd: pindrop-dashboard.service (panel)", dash, "sudo ./deploy.sh")
+    else:
+        ck("systemd available (docker? use ./run.sh instead)", True)
+
+    # panel lock — the big one
+    pw = resolve_dashboard_password(cfg, auto=False)
+    ck("Dashboard password set", bool(pw),
+       "python -m bot dashboard-pass  (auto-creates one)")
+
+    # port reachable/free (informational — our own service may hold it)
+    port = cfg.get_int("dashboard.port", 5000)
+    s = socket.socket()
+    s.settimeout(0.4)
+    busy = s.connect_ex(("127.0.0.1", port)) == 0
+    s.close()
+    print(f"   ℹ️  Port {port}: {'already listening (our dashboard, most likely)' if busy else 'free for the dashboard'}")
+
+    # money spine — a link MUST come out monetized or we're posting for free
+    from .affiliate import AffiliateLinker
+    link, network = AffiliateLinker(cfg).convert(
+        "https://www.meesho.com/x/p/1k1b6", "meesho", platform="pinterest")
+    monetized = bool(link) and AffiliateLinker(cfg).is_monetized(link)
+    ck(f"Money path: Meesho link monetized ({network})", monetized,
+       "paste MEESHO_TEMPLATE_LINK + AMAZON_TAG in .env → python -m bot meesho")
+    papi = PinterestAPI(cfg)
+    ck("Pinterest credentials", papi.configured, "python -m bot setup && python -m bot auth")
+
+    print("-" * 58)
+    if bad:
+        print(f" ⛔ {bad} item(s) to fix — fix చేసి malli `python -m bot deploy-check`.\n")
+    else:
+        print(" 🎉 DEPLOY-READY! `sudo ./deploy.sh` → bot 24×7 pani chestundi.\n")
+    return 0 if bad == 0 else 1
+
+
 def cmd_ig_check(cfg) -> int:
     ig = InstagramAPI(cfg)
     if not ig.configured:
@@ -684,11 +804,27 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_doctor(cfg)
     if cmd == "ig-check":
         return cmd_ig_check(cfg)
-    if cmd == "add" and rest:
+    if cmd == "add":
+        if not rest:
+            print("\n➕ Products add cheyyandi — oka or ekkuva URLs:\n")
+            print("   python -m bot add 'https://www.meesho.com/xxx/p/1k1b6'")
+            print("   python -m bot add <url1> <url2> <url3>")
+            print("   (autopilot eh products ni own ga vethukuntundi — idi manual)\n")
+            return 0
         return cmd_add(cfg, rest)
-    if cmd == "add-csv" and rest:
+    if cmd == "add-csv":
+        if not rest:
+            print("\n📄 CSV nunchi products add — file path ivvandi:\n")
+            print("   python -m bot add-csv products.csv")
+            print("   (columns: url  or  url,title,price — Meesho/Amazon/Flipkart)\n")
+            return 0
         return cmd_add_csv(cfg, rest[0])
-    if cmd == "keywords" and rest:
+    if cmd == "keywords":
+        if not rest:
+            print("\n🔎 Live Pinterest keyword mining — oka seed ivvandi:\n")
+            print("   python -m bot keywords 'women kurta set' 'home decor'")
+            print("   → Pinterest autocomplete nunchi LIVE search phrases\n")
+            return 0
         return cmd_keywords(cfg, rest)
     if cmd == "trends":
         return cmd_trends(cfg)
@@ -719,8 +855,20 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "post":
         return cmd_post(cfg, int(rest[0]) if rest else 1)
     if cmd in ("run", "autopilot"):
-        Engine(cfg).run_forever()
-        return 0
+        from .lock import AlreadyRunning, acquire, release
+        try:
+            lk = acquire(cfg, "scheduler")
+        except AlreadyRunning as exc:      # never double-post the same product
+            print(f"\n⏸  Autopilot already running — {exc}")
+            print("   Two schedulers = duplicate pins + ban risk, so this copy exits.")
+            print("   Stop the other one:  pkill -f 'bot run'   (or ./run.sh stop)\n")
+            return 0
+        try:
+            Engine(cfg).run_forever()
+        finally:
+            release(lk)
+        print("\n⚠️  Scheduler exited unexpectedly — restart it (./run.sh / systemctl).")
+        return 1
     if cmd == "setup":
         return cmd_setup(cfg)
     if cmd == "design-test":
@@ -729,6 +877,10 @@ def main(argv: list[str] | None = None) -> int:
         from .dashboard import serve
         serve(cfg)
         return 0
+    if cmd in ("dashboard-pass", "panel-pass"):
+        return cmd_dashboard_pass(cfg)
+    if cmd in ("deploy-check", "preflight"):
+        return cmd_deploy_check(cfg)
 
     print(f"Unknown command: {cmd}\n")
     print(__doc__)

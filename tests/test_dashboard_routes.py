@@ -2,6 +2,7 @@
 without a 5xx crash — the owner demanded 'frontend & backend em fail avvodu'."""
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -35,6 +36,7 @@ def make_cfg(tmp: str) -> Config:
 class TestAllRoutes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        os.environ.pop("DASHBOARD_PASSWORD", None)   # these test unlocked routes
         cls.tmp = tempfile.TemporaryDirectory()
         cls.cfg = make_cfg(cls.tmp.name)
         cls.db = DB(cls.cfg.db_path)

@@ -173,6 +173,7 @@ async function api(path, opts){
   let r;
   try { r = await fetch(path, opts); }
   catch(e){ return {ok:false, error:'network error — server reachable ga ledu'}; }
+  if (r.status === 401) { location.href = '/login'; return {ok:false, error:'locked — login cheyandi'}; }
   try { return await r.json(); }
   catch(e){ return {ok:false, error:'bad response (HTTP '+r.status+')'}; }
 }
