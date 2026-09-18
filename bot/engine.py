@@ -95,6 +95,15 @@ class Engine:
         self.kw = KeywordCache(self.db)
         self.notify = Notifier()
         self.tz = ZoneInfo(cfg.get("timezone", "Asia/Kolkata"))
+        # Rescue anything a crashed worker left in 'posting' (older than 20
+        # min only — a post genuinely in flight right now is never stolen).
+        try:
+            rescued = self.db.release_stale_claims()
+            if rescued:
+                self.db.log("WARN", f"♻️  Recovered {rescued} product(s) stuck "
+                                    "in 'posting' — back in the queue")
+        except Exception as exc:  # noqa: BLE001 — startup must never crash
+            log.warning("stale-claim recovery skipped: %s", exc)
         self._last_reshare = 0.0  # daily winners-rotation timer
         self._report_day = ""     # daily report guard
         self._roundup_day = ""    # daily list-pin guard
@@ -328,7 +337,19 @@ class Engine:
 
     # ------------------------------------------------------------- posting
     def post_product(self, product: dict) -> dict:
-        """Publish one queued product to Pinterest. Updates DB rows."""
+        """Publish one queued product to Pinterest. Updates DB rows.
+
+        FIRST thing it does is claim the row atomically: the scheduler and a
+        dashboard "Post now" click can fire at the same instant, and posting
+        the same product twice is a duplicate-pin spam signal. The loser of
+        the claim exits without touching the API.
+        """
+        pid = int(product["id"])
+        if str(product.get("status", "queued")) == "queued" \
+                and not self.db.claim_product(pid):
+            self.db.log("INFO", f"#{pid} already being posted by another worker "
+                                "— skipping (no duplicate pin)")
+            return None
         default_board = self.cfg.get("pinterest.board_name", "Best Deals")
         if self.cfg.get("posting.board_strategy", "niche") == "niche":
             board_name = pick_board(product["title"], product["source"], default_board)
@@ -358,21 +379,24 @@ class Engine:
             if not qa_ok:
                 reason = "QA failed: " + "; ".join(qa_issues)[:400]
                 self.db.update_product(product["id"], status="skipped",
-                                       error=reason)
+                                       claim_ts="", error=reason)
                 self.db.log("WARN", f"🔬 Pin #{product['id']} quarantined — {reason}")
                 return None
 
-        # only now touch the API: board (auto-created, SEO description)
-        board_id = self.api.ensure_board(board_name,
-            f"{board_name} — best offers, price drops & top-rated finds. "
-            "Daily deals India: online shopping discounts & combo offers.")
-        post_id = self.db.add_post(
-            product_id=product["id"],
-            board_id=board_id,
-            status="pending",
-            scheduled_for=scheduled_for.isoformat() if scheduled_for else "",
-        )
+        # From here on the row is CLAIMED: every single exit path must either
+        # post it or hand it back to the queue — a claim must never leak.
+        post_id = None
         try:
+            # board (auto-created, SEO description)
+            board_id = self.api.ensure_board(board_name,
+                f"{board_name} — best offers, price drops & top-rated finds. "
+                "Daily deals India: online shopping discounts & combo offers.")
+            post_id = self.db.add_post(
+                product_id=product["id"],
+                board_id=board_id,
+                status="pending",
+                scheduled_for=scheduled_for.isoformat() if scheduled_for else "",
+            )
             # PLATFORM ORDER (owner strategy): IG + Facebook FIRST,
             # Pinterest after — "anni chesaka chuddam"
             order = [p for p in self.cfg.get("posting.platform_order",
@@ -441,7 +465,7 @@ class Engine:
                 status="posted",
                 posted_at=datetime.now(self.tz).isoformat(timespec="seconds"),
             )
-            self.db.update_product(product["id"], status="posted")
+            self.db.update_product(product["id"], status="posted", claim_ts="")
             self.db.log("INFO", f"Posted pin {pin.get('id')} — {product['title'][:50]}")
             self.notify.posted(product["title"], str(pin.get("id")), product["source"])
             # broadcast to public Telegram deals channel (top-India trick)
@@ -463,11 +487,20 @@ class Engine:
             attempts = int(product.get("attempts", 0) or 0) + 1
             # transient errors retry next cycle; 3 strikes = skip forever
             status = "queued" if attempts < 3 else "skipped"
-            self.db.update_post(post_id, status="failed", error=str(exc)[:500])
-            self.db.update_product(product["id"], status=status,
+            if post_id:
+                self.db.update_post(post_id, status="failed", error=str(exc)[:500])
+            self.db.update_product(product["id"], status=status, claim_ts="",
                                    error=str(exc)[:500], attempts=attempts)
             self.db.log("ERROR", f"Post failed for #{product['id']} "
                                  f"(attempt {attempts}): {exc}")
+            raise
+        except Exception as exc:  # noqa: BLE001 — never strand a claimed row
+            if post_id:
+                self.db.update_post(post_id, status="failed", error=str(exc)[:500])
+            self.db.update_product(product["id"], status="queued", claim_ts="",
+                                   error=str(exc)[:500])
+            self.db.log("WARN", f"#{product['id']} unexpected error, claim "
+                                f"released for retry: {exc}")
             raise
 
     # ---------------------------------------------------------- instagram
@@ -613,16 +646,32 @@ class Engine:
         except FacebookError as exc:
             self.db.log("WARN", f"Facebook cross-post failed: {exc}")
 
-    def post_next(self) -> dict | None:
-        """Post the single oldest queued product. Returns pin dict or None."""
-        pending = self.db.pending_products(limit=1)
+    def post_next(self, tries: int = 3) -> dict | None:
+        """Post the next queued product. Returns the pin dict or None.
+
+        `tries > 1` matters when several workers share the queue: if another
+        process claims the head product first, we simply take the next one
+        instead of idling. QA-quarantined products are skipped the same way.
+        """
+        pending = self.db.pending_products(limit=max(1, tries))
         if not pending:
             self.db.log("INFO", "Queue is empty — nothing to post.")
             return None
-        return self.post_product(pending[0])
+        for product in pending:
+            pin = self.post_product(product)
+            if pin is not None:
+                return pin
+        return None
 
-    def post_batch(self, count: int) -> list[dict]:
-        """Post up to `count` queued products with human-like gaps."""
+    def post_batch(self, count: int, human_gaps: bool = True,
+                   quick_gap: float = 6.0) -> list[dict]:
+        """Post up to `count` queued products.
+
+        `human_gaps=True` (autopilot) waits the configured 40m±25 gap between
+        pins so the account looks human. Manual "post now" from the panel uses
+        `human_gaps=False`: nobody should wait hours in a browser tab — it only
+        keeps a short anti-hammer pause between API calls.
+        """
         posted: list[dict] = []
         for i in range(count):
             try:
@@ -633,8 +682,11 @@ class Engine:
                 break
             posted.append(pin)
             if i < count - 1:
-                gap = self._human_gap()
-                self.db.log("INFO", f"Waiting {gap:.0f}s before next pin (human-like)")
+                if human_gaps:
+                    gap = self._human_gap()
+                    self.db.log("INFO", f"Waiting {gap:.0f}s before next pin (human-like)")
+                else:
+                    gap = quick_gap
                 time.sleep(gap)
         return posted
 
@@ -672,7 +724,24 @@ class Engine:
 
         Pinterest's algorithm boosts new pins; products that already earned
         clicks get a new design + new keywords and go around again.
+
+        Guarded by a named lock: winners are already 'posted' (so the queue
+        claim cannot protect them), and two processes re-sharing the same
+        winner at once = duplicate pin.
         """
+        from .lock import AlreadyRunning, acquire, release
+        try:
+            _lk = acquire(self.cfg, "reshare", stale_after=1800)
+        except AlreadyRunning:
+            self.db.log("INFO", "reshare skipped — another worker is rotating "
+                                "winners right now")
+            return 0
+        try:
+            return self._reshare_winners_locked()
+        finally:
+            release(_lk)
+
+    def _reshare_winners_locked(self) -> int:
         cands = self.db.reshare_candidates(
             min_clicks=self.cfg.get_int("reshare.min_clicks", 3),
             rest_days=self.cfg.get_int("reshare.rest_days", 7),

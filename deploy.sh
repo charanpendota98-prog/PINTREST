@@ -18,6 +18,15 @@ echo "→ sanity checks"
 
 install_services() {
   echo "→ installing systemd services (auto-start on boot, auto-restart)"
+  # Never run the bot as root: use the human who called sudo (fallback: root).
+  RUN_USER="${SUDO_USER:-root}"
+  if [ "$RUN_USER" != "root" ] && id "$RUN_USER" >/dev/null 2>&1; then
+    RUN_GROUP="$(id -gn "$RUN_USER")"
+  else
+    RUN_USER="root"; RUN_GROUP="root"
+  fi
+  mkdir -p data logs
+  chown -R "$RUN_USER:$RUN_GROUP" data logs 2>/dev/null || true
   cat > /etc/systemd/system/pindrop.service <<EOF
 [Unit]
 Description=PinDrop Pro — Pinterest affiliate autopilot (24×7 scheduler)
@@ -28,6 +37,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=$RUN_USER
+Group=$RUN_GROUP
 WorkingDirectory=$HERE
 ExecStart=$HERE/.venv/bin/python -m bot run
 Restart=on-failure
@@ -50,6 +61,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=$RUN_USER
+Group=$RUN_GROUP
 WorkingDirectory=$HERE
 ExecStart=$HERE/.venv/bin/python -m bot dashboard
 Restart=on-failure
@@ -66,7 +79,7 @@ EOF
   systemctl enable --now pindrop.service
   systemctl enable --now pindrop-dashboard.service
   echo
-  echo "✅ BOTH services live:"
+  echo "✅ BOTH services live (running as user: $RUN_USER):"
   echo "   systemctl status pindrop             # scheduler"
   echo "   systemctl status pindrop-dashboard   # dashboard"
   echo "   journalctl -fu pindrop               # live logs (posting)"

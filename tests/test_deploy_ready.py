@@ -308,3 +308,127 @@ class TestSingleInstanceLock(unittest.TestCase):
         lk = acquire(self.cfg, "scheduler", wait=2.0, heartbeat=False)
         self.assertTrue(lk.exists())          # dead twin -> we take over
         release(lk)
+
+
+class TestMediaSafety(unittest.TestCase):
+    """Hostile filenames must be a clean 404 — never a traceback or a leak."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.cfg = _cfg(self.tmp, "")          # unlocked: focus on the route
+        (self.tmp / "secret.txt").write_text("TOP-SECRET")
+        media = Path(self.cfg.media_dir)
+        media.mkdir(parents=True, exist_ok=True)
+        (media / "real.jpg").write_bytes(b"\xff\xd8\xff\xe0real")
+        self.c = create_app(self.cfg, DB(self.cfg.db_path)).test_client()
+
+    def test_hostile_paths_are_404_not_500(self):
+        for path in ("/media/x%00.jpg", "/media/../../secret.txt",
+                     "/media/..%2f..%2fsecret.txt", "/media//etc/passwd",
+                     "/media/.env", "/media/nope.jpg", "/media/"):
+            r = self.c.get(path)
+            self.assertLess(r.status_code, 500, path)
+            self.assertNotIn(b"TOP-SECRET", r.data, path)
+            self.assertNotIn(b"root:", r.data, path)
+
+    def test_real_media_served(self):
+        r = self.c.get("/media/real.jpg")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.data.startswith(b"\xff\xd8"))
+
+
+class TestReshareGuard(unittest.TestCase):
+    """Winner rotation is locked: two workers must not re-share the same pin."""
+
+    def test_second_reshare_worker_skips(self):
+        import unittest.mock as mock
+        from bot.engine import Engine
+        from bot.lock import AlreadyRunning
+        from bot.config import Config
+        tmp = Path(tempfile.mkdtemp())
+        cfg = Config(raw={
+            "design": {"brand_name": "T"},
+            "storage": {"db_path": f"{tmp}/t.db", "media_dir": f"{tmp}/media"},
+            "posting": {"platform_order": ["pinterest"]},
+        })
+        (tmp / "media").mkdir(parents=True, exist_ok=True)
+        db = DB(cfg.db_path)
+        engine = Engine(cfg, db)
+        with mock.patch("bot.lock.acquire",
+                        side_effect=AlreadyRunning(4242, "bot run")):
+            self.assertEqual(engine.reshare_winners(), 0)
+        logs = [str(r["message"]) for r in db.recent_logs(limit=10)]
+        self.assertTrue(any("reshare skipped" in m for m in logs),
+                        f"no skip log: {logs[:3]}")
+
+    def test_reshare_lock_is_released_after_run(self):
+        """The lock must not leak — a later cycle has to be able to run."""
+        from bot.engine import Engine
+        from bot.config import Config
+        from bot.lock import lock_path
+        tmp = Path(tempfile.mkdtemp())
+        cfg = Config(raw={
+            "design": {"brand_name": "T"},
+            "storage": {"db_path": f"{tmp}/t.db", "media_dir": f"{tmp}/media"},
+            "posting": {"platform_order": ["pinterest"]},
+        })
+        (tmp / "media").mkdir(parents=True, exist_ok=True)
+        db = DB(cfg.db_path)
+        Engine(cfg, db).reshare_winners()          # no candidates: quick run
+        self.assertFalse(lock_path(cfg, "reshare").exists(),
+                         "reshare lock leaked")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TestMoneyPathCompliance(unittest.TestCase):
+    """Every clickable money surface must carry the tracked link + disclosure."""
+
+    def setUp(self):
+        from PIL import Image
+        self.tmp = Path(tempfile.mkdtemp())
+        self.cfg = _cfg(self.tmp, "")
+        self.cfg.raw.setdefault("link", {}).update(
+            {"bridge": True, "landing": True, "public_base": "https://deals.example"})
+        media = Path(self.cfg.media_dir)
+        media.mkdir(parents=True, exist_ok=True)
+        img = media / "pin_1.jpg"
+        Image.new("RGB", (1000, 1500), "white").save(img)
+        self.aff = ("https://www.meesho.com/af_invite/24197020:instagram_stories"
+                    ":11075346?p_id=1k1b6")
+        self.db = DB(self.cfg.db_path)
+        self.pid = self.db.add_product(
+            source="meesho", url="https://www.meesho.com/x/p/1k1b6",
+            affiliate_url=self.aff, title="Women Kurta Set Designer",
+            price="499", currency="INR", image_path=str(img),
+            pin_image=str(img), status="posted", discount=45)
+        self.c = create_app(self.cfg, self.db).test_client()
+
+    def test_landing_has_tracked_link_and_disclosure(self):
+        html = self.c.get(f"/go/{self.pid}").data.decode()
+        self.assertIn("af_invite", html, "affiliate link missing on landing!")
+        self.assertIn("#ad", html.lower(), "FTC disclosure missing")
+        self.assertIn("nofollow", html, "sponsored/nofollow attribute missing")
+
+    def test_deals_page_links_are_tracked_or_bridged(self):
+        html = self.c.get("/deals/today").data.decode()
+        self.assertTrue("/go/" in html or "af_invite" in html,
+                        "deals page has no clickable money link")
+
+    def test_clicks_are_counted(self):
+        for _ in range(3):
+            self.c.get(f"/go/{self.pid}")
+        self.assertEqual(self.db.click_counts().get(self.pid), 3)
+
+    def test_landing_off_redirects_directly(self):
+        cfg = _cfg(Path(tempfile.mkdtemp()), "")
+        cfg.raw.setdefault("link", {}).update({"landing": False})
+        db = DB(cfg.db_path)
+        pid = db.add_product(source="meesho", url="https://m/p/1k1b9",
+                             affiliate_url=self.aff, title="Kurta", price="599")
+        c = create_app(cfg, db).test_client()
+        r = c.get(f"/go/{pid}")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("af_invite", r.headers.get("Location", ""))

@@ -21,6 +21,7 @@ posting:
   end_hour: 22             # posting window end (IST)
   min_gap_minutes: 40      # minimum gap between pins (human-like)
   jitter_minutes: 25       # extra random delay added on top
+  manual_gap_seconds: 6    # gap between pins for panel "Post now" (background job)
   schedule_days_ahead: 0   # 0 = post instantly, 1..14 = schedule ahead
   pins_per_product: 3      # pin variations per product (different photo + design)
   peak_mode: true          # post only in peak IST traffic windows (viral trick)

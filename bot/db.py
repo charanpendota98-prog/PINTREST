@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +81,10 @@ MIGRATIONS = [
     "ALTER TABLE products ADD COLUMN discount INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE products ADD COLUMN template TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE products ADD COLUMN images TEXT NOT NULL DEFAULT ''",
+    # claim_ts = when a worker took the product for posting. Guards against
+    # TWO processes (scheduler + dashboard "post now") posting the same
+    # product twice — duplicate pins are spam signals.
+    "ALTER TABLE products ADD COLUMN claim_ts TEXT NOT NULL DEFAULT ''",
 ]
 
 
@@ -101,9 +105,13 @@ class DB:
                     pass
 
     def _conn(self) -> sqlite3.Connection:
+        # timeout = busy timeout: a second process (scheduler + dashboard) may
+        # be writing; 15s waits instead of raising "database is locked".
         conn = sqlite3.connect(self.path, timeout=15)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA journal_mode=WAL")      # readers never block
+        conn.execute("PRAGMA synchronous=NORMAL")    # WAL-safe, far less fsync
+        conn.execute("PRAGMA busy_timeout=15000")
         return conn
 
     # ------------------------------------------------------------------ logs
@@ -148,6 +156,38 @@ class DB:
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def claim_product(self, pid: int) -> bool:
+        """Atomically take a queued product for posting.
+
+        Returns True only for the ONE caller that won the row. This is what
+        makes scheduler + dashboard "Post now" safe to run at the same time:
+        the loser sees `status='posting'` and does not post a duplicate.
+        """
+        with self._conn() as c:
+            cur = c.execute(
+                "UPDATE products SET status='posting', claim_ts=? "
+                "WHERE id=? AND status='queued'",
+                (utcnow(), int(pid)),
+            )
+            return cur.rowcount == 1
+
+    def release_stale_claims(self, older_than_minutes: int = 20) -> int:
+        """Rescue products stuck in 'posting' (a worker crashed mid-post).
+
+        Only rows whose claim is OLDER than the cutoff are touched, so a
+        post that is genuinely in flight right now is never stolen back.
+        """
+        cutoff = (datetime.now(timezone.utc)
+                  - timedelta(minutes=max(1, older_than_minutes))
+                  ).isoformat(timespec="seconds")
+        with self._conn() as c:
+            cur = c.execute(
+                "UPDATE products SET status='queued', claim_ts='' "
+                "WHERE status='posting' AND (claim_ts='' OR claim_ts < ?)",
+                (cutoff,),
+            )
+            return cur.rowcount
 
     def all_products(self, limit: int = 500) -> list[dict[str, Any]]:
         with self._conn() as c:

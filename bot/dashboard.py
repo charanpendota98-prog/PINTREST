@@ -184,6 +184,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
     <li>🚚 Fast delivery & easy returns</li>
     <li>💯 Secure checkout on the official store</li>
   </ul>
+  <div style="color:#777;font-size:11.5px;margin:14px 0 -8px">
+    #ad · affiliate link — we may earn a small commission, you pay nothing extra.</div>
   <a class="buy" rel="nofollow sponsored" href="{{ buy }}">🛒 GRAB THE DEAL →</a>
   {% if more %}<a class="more" rel="nofollow sponsored" href="{{ more }}">
      🛍️ Browse More Deals — full collection</a>{% endif %}
@@ -435,8 +437,18 @@ def create_app(cfg, db: DB | None = None) -> Flask:
 
     @app.get("/media/<path:name>")
     def media(name: str):
-        p = (media_dir / name).resolve()
-        if not str(p).startswith(str(media_dir.resolve())) or not p.is_file():
+        """Serve a generated pin/reel — strictly inside the media dir.
+
+        Hostile filenames (null bytes, traversal, symlink tricks) must be a
+        clean 404, never a traceback/500.
+        """
+        try:
+            root = media_dir.resolve()
+            p = (media_dir / name).resolve()
+            inside = p == root or root in p.parents
+        except (OSError, ValueError):        # null byte, bad encoding, …
+            return jsonify({"ok": False, "error": "not found"}), 404
+        if not inside or not p.is_file():
             return jsonify({"ok": False, "error": "not found"}), 404
         return send_file(p)
 
@@ -603,19 +615,69 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         db.log("INFO", f"Manually queued product #{pid}: {title[:60]}")
         return jsonify({"ok": True, "id": pid})
 
+    # Manual posting runs in the background: a browser tab must never hang for
+    # hours, and a double-click must not spawn a second posting thread.
+    _post_job: dict = {"running": False, "done": 0, "total": 0,
+                       "started": "", "last": "", "error": ""}
+
     @app.post("/api/post")
     @_api_check
     def post_now():
+        import threading
         data = request.get_json(force=True, silent=True) or {}
-        count = max(1, min(int(data.get("count", 1)), 25))
+        try:
+            count = max(1, min(int(data.get("count", 1)), 10))
+        except (TypeError, ValueError):
+            raise ValueError("count must be a number")
         api = PinterestAPI(cfg)
         if not api.configured:
             raise ValueError(
                 "Pinterest credentials missing. Fill .env (PINTEREST_APP_ID, "
                 "PINTEREST_APP_SECRET) and run: python -m bot auth"
             )
-        posted = engine.post_batch(count)
-        return jsonify({"ok": True, "posted": len(posted)})
+        if _post_job["running"]:
+            return jsonify({"ok": True, "running": True, "queued": count,
+                            "posted": _post_job["done"],
+                            "message": "Posting is already running — this click "
+                                       "was not started (no duplicate burst)."})
+
+        def _work(n: int) -> None:
+            _post_job.update({"running": True, "done": 0, "total": n,
+                              "started": time.strftime("%H:%M:%S"),
+                              "last": "", "error": ""})
+            try:
+                pins = engine.post_batch(
+                    n, human_gaps=False,
+                    quick_gap=max(0.0, cfg.get_float(
+                        "posting.manual_gap_seconds", 6)))
+                _post_job["done"] = len(pins)
+                if not pins:
+                    # never leave the owner with a silent "0 posted": say why
+                    why = ""
+                    for row in (db.recent_logs(limit=12) or []):
+                        if str(row.get("level", "")).upper() in ("ERROR", "WARN"):
+                            why = str(row.get("message", ""))[:220]
+                            break
+                    _post_job["error"] = why or ("nothing posted — check the "
+                                                 "logs tab (queue empty or QA "
+                                                 "quarantine)")
+            except Exception as exc:  # noqa: BLE001 — job must always end
+                _post_job["error"] = str(exc)[:200]
+                db.log("ERROR", f"manual post job failed: {exc}")
+            finally:
+                _post_job["running"] = False
+                _post_job["last"] = time.strftime("%H:%M:%S")
+
+        threading.Thread(target=_work, args=(count,), daemon=True,
+                         name="pin-post-now").start()
+        return jsonify({"ok": True, "running": True, "queued": count,
+                        "message": f"Posting {count} pin(s) in the background — "
+                                   "this page can be closed."})
+
+    @app.get("/api/post/status")
+    @_api_check
+    def post_status():
+        return jsonify({"ok": True, **_post_job})
 
     @app.post("/api/products/<int:pid>/skip")
     @_api_check

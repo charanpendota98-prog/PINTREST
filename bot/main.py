@@ -744,6 +744,9 @@ def cmd_queue(cfg) -> int:
 
 
 def cmd_post(cfg, count: int) -> int:
+    if count < 1:
+        print("❌ count must be 1 or more (usage: python -m bot post 3)")
+        return 2
     eng = Engine(cfg)
     if not eng.api.configured:
         print("❌ Pinterest not connected. Run: python -m bot auth")
@@ -853,7 +856,12 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "queue":
         return cmd_queue(cfg)
     if cmd == "post":
-        return cmd_post(cfg, int(rest[0]) if rest else 1)
+        try:
+            n = int(rest[0]) if rest else 1
+        except ValueError:
+            print(f"❌ '{rest[0]}' is not a number. Usage: python -m bot post [count]")
+            return 2
+        return cmd_post(cfg, n)
     if cmd in ("run", "autopilot"):
         from .lock import AlreadyRunning, acquire, release
         try:

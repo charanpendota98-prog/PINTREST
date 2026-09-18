@@ -261,11 +261,25 @@ async function addProducts(){
 }
 async function postNow(count){
   try{
-    toast(`Posting ${count} pin(s)… this can take a while`);
     const r = await api('/api/post', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});
-    if(r.ok) toast(`🎉 ${r.posted} pin(s) posted to Pinterest!`);
-    else toast(r.error || 'Something went wrong', true);
+    if(!r.ok){ toast(r.error || 'Something went wrong', true); return; }
+    toast(r.message || `Posting ${count} pin(s) in the background…`);
     refresh();
+    // poll the job: the panel never hangs waiting for Pinterest
+    let ticks = 0;
+    const t = setInterval(async () => {
+      ticks++;
+      const s = await api('/api/post/status');
+      if(!s.running){
+        clearInterval(t);
+        if(s.error) toast('Posting failed: ' + s.error, true);
+        else toast(`🎉 ${s.done} pin(s) posted to Pinterest!`);
+        refresh();
+      } else if(ticks === 20){
+        clearInterval(t);
+        toast(`Still posting… ${s.done}/${s.total} done (watch the logs tab)`);
+      }
+    }, 3000);
   }catch(e){ toast('Failed: '+e.message, true); }
 }
 async function skipP(id){

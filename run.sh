@@ -24,8 +24,21 @@ guardian_pid() {                       # prints the live guardian pid, if any
   echo "$p"
 }
 
+systemd_active() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet pindrop 2>/dev/null && return 0
+  systemctl is-active --quiet pindrop-dashboard 2>/dev/null && return 0
+  return 1
+}
+
 case "${1:-start}" in
   stop)
+    if systemd_active; then
+      echo "⚠️  systemd services are ACTIVE (pindrop / pindrop-dashboard)."
+      echo "   This script must not kill them — use:"
+      echo "     sudo systemctl stop pindrop pindrop-dashboard"
+      exit 1
+    fi
     G="$(guardian_pid || true)"
     echo "→ stopping guardians + children…"
     [ -n "${G:-}" ] && kill -TERM "$G" 2>/dev/null
