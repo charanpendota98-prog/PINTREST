@@ -1,7 +1,6 @@
 """SQLite storage: products queue, posted pins, logs."""
 from __future__ import annotations
 
-import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -299,13 +298,41 @@ class DB:
                       "(SELECT id FROM logs ORDER BY id DESC LIMIT ?)", (keep,))
 
     def oldest_activity(self) -> datetime | None:
-        """First-ever activity timestamp (for warm-up ramp calculations)."""
+        """First-ever activity timestamp (for warm-up ramp calculations).
+
+        MUST be a never-pruned source: `housekeep()` trims the logs table, so
+        using MIN(logs.ts) would silently reset the warm-up ramp and drop
+        posting volume to day-1 levels. Products + posts + clicks are the
+        durable record of "when did this account start working".
+        """
         with self._conn() as c:
-            row = c.execute("SELECT MIN(ts) AS t FROM logs").fetchone()
+            row = c.execute(
+                """SELECT MIN(t) AS t FROM (
+                       SELECT MIN(created_at) AS t FROM products
+                       UNION ALL SELECT MIN(posted_at) FROM posts
+                       UNION ALL SELECT MIN(ts) FROM clicks
+                   ) WHERE t IS NOT NULL AND t != ''""").fetchone()
+            t = row["t"] if row and row["t"] else None
+            if not t:   # brand-new install: fall back to logs, then "now"
+                row2 = c.execute("SELECT MIN(ts) AS t FROM logs").fetchone()
+                t = row2["t"] if row2 and row2["t"] else None
+        if not t:
+            return None
         try:
-            return datetime.fromisoformat(row["t"]) if row and row["t"] else None
+            dt = datetime.fromisoformat(str(t))
         except (ValueError, TypeError):
             return None
+        if dt.tzinfo is None:               # old rows may be naive
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def account_age_days(self) -> float:
+        """Days since first activity (0.0 when unknown) — warm-up safe."""
+        started = self.oldest_activity()
+        if not started:
+            return 0.0
+        return max(0.0, (datetime.now(timezone.utc) - started).total_seconds()
+                   / 86400.0)
 
     # ------------------------------------------------------------- reshare
     def reshare_candidates(self, min_clicks: int = 3, rest_days: int = 7,

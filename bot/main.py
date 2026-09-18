@@ -513,7 +513,7 @@ def cmd_simulate(cfg) -> int:
         from PIL import Image
         Image.new("RGB", (1000, 1000), (240, 240, 245)).save(media / "demo_ph.jpg")
         img = str(media / "demo_ph.jpg")
-    from .pin_designer import PinDesigner, TEMPLATES
+    from .pin_designer import TEMPLATES
     from .engine import Engine
     e = Engine(cfg)
     out = media / "sim_pin.jpg"
@@ -591,7 +591,7 @@ def cmd_music(cfg) -> int:
 
 def cmd_trends(cfg) -> int:
     """Show the winner-niche priority list (what top channels push)."""
-    from .trends import describe, WINNER_NICHES
+    from .trends import describe
     print()
     print(describe())
     print("\n   Autopilot hunts these niches FIRST, and the queue posts")
@@ -637,7 +637,6 @@ def cmd_design_test(cfg) -> int:
     """Generate a sample pin so you can preview the design quality."""
     from PIL import Image
     from .pin_designer import PinDesigner
-    import random
 
     # build a fake product photo
     img = Image.new("RGB", (800, 800), (250, 244, 235))

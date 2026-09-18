@@ -112,7 +112,7 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
 
     # ---- duplicate guard
     try:
-        rest = int(cfg.get("reshare.rest_days", 7))
+        rest = cfg.get_int("reshare.rest_days", 7)
         recent = [r for r in (db.recent_posts(limit=300) or [])
                   if r.get("product_id") == product.get("id")
                   and r.get("status") == "posted" and r.get("posted_at")]

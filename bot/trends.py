@@ -196,7 +196,7 @@ def live_keywords(cfg, limit: int = 12, region: str = "", force: bool = False
     import time as _time
     from pathlib import Path as _P
     region = region or str(cfg.get("trends.region", "IN"))
-    cache_hours = float(cfg.get("trends.cache_hours", 24))
+    cache_hours = cfg.get_float("trends.cache_hours", 24)
     root = _P(__file__).resolve().parent.parent
     cache = root / _CACHE_FILE
     if not force and cache.exists():

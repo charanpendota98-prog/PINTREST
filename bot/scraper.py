@@ -118,8 +118,8 @@ class Scraper:
         return None
 
     def _fetch(self, url: str) -> str | None:
-        retries = int(self.cfg.get("scraping.max_retries", 2))
-        timeout = int(self.cfg.get("scraping.timeout_seconds", 25))
+        retries = self.cfg.get_int("scraping.max_retries", 2)
+        timeout = self.cfg.get_int("scraping.timeout_seconds", 25)
         for attempt in range(retries + 1):
             try:
                 resp = self.session.get(url, timeout=timeout)
@@ -132,7 +132,7 @@ class Scraper:
         return None
 
     def polite_wait(self) -> None:
-        delay = float(self.cfg.get("scraping.delay_seconds", 4.0))
+        delay = self.cfg.get_float("scraping.delay_seconds", 4.0)
         time.sleep(delay + random.random() * 2)
 
     # ------------------------------------------------------------ scrapers
@@ -231,7 +231,7 @@ class Scraper:
             if w >= 400:
                 push(tag.get("src") or tag.get("data-src", ""))
 
-        prod.images = imgs[: int(self.cfg.get("scraping.max_images", 3))]
+        prod.images = imgs[: self.cfg.get_int("scraping.max_images", 3)]
         if not prod.image_url and prod.images:
             prod.image_url = prod.images[0]
 
@@ -411,8 +411,6 @@ class Scraper:
         if found:
             log.info("Discovered %d %s products", len(found), source)
         return found
-        """Download product image locally; returns saved path or ''."""
-        return self.download_image_url(prod.image_url, dest_dir, prod.title)
 
     def download_image_url(self, url: str, dest_dir, name_hint: str = "") -> str:
         """Download any image url locally; returns saved path or ''."""
@@ -476,7 +474,7 @@ class Scraper:
                 log.info("🔍 Cross-store enriched from %s: +%d images%s",
                          store, added, " +video" if other.video_url else "")
                 break
-        prod.images = prod.images[: int(self.cfg.get("scraping.max_images", 3)) + 2]
+        prod.images = prod.images[: self.cfg.get_int("scraping.max_images", 3) + 2]
         return prod
 
     def download_video(self, url: str, dest_dir, max_mb: int = 120) -> str:

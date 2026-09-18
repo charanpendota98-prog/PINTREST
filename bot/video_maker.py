@@ -16,7 +16,7 @@ import logging
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 log = logging.getLogger("pindrop.video")
 

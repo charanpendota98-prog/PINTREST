@@ -160,12 +160,47 @@ class Config:
 
     # convenience accessors -------------------------------------------------
     def get(self, path: str, default: Any = None) -> Any:
+        """Dotted lookup with a safety net for EMPTY YAML values.
+
+        YAML turns `width:` (no value) into None, and `int(None)` used to
+        crash Engine() — i.e. the whole bot refused to start because one
+        line in config.yaml was left blank. An empty key is now treated as
+        "not set" so the built-in default applies.
+        """
         node: Any = self.raw
         for part in path.split("."):
             if not isinstance(node, dict) or part not in node:
                 return default
             node = node[part]
+        if node is None:
+            return default
+        if isinstance(node, str) and not node.strip() and default not in (None, ""):
+            return default      # blank line in config.yaml → use the default
         return node
+
+
+    def get_int(self, path: str, default: int = 0) -> int:
+        """Never trust config.yaml for numbers: a typo like `pins_per_day: 8x`
+        or `abc` must fall back to the default instead of killing the bot."""
+        try:
+            return int(float(str(self.get(path, default)).strip()))
+        except (TypeError, ValueError):
+            return int(default)
+
+    def get_float(self, path: str, default: float = 0.0) -> float:
+        try:
+            return float(str(self.get(path, default)).strip())
+        except (TypeError, ValueError):
+            return float(default)
+
+    def get_bool(self, path: str, default: bool = False) -> bool:
+        """`yes/no/on/off/1/0/true/false` all work the way a human expects."""
+        val = self.get(path, default)
+        if isinstance(val, bool):
+            return val
+        if val is None:
+            return bool(default)
+        return str(val).strip().lower() in ("1", "true", "yes", "y", "on")
 
     # --- secrets come ONLY from environment (.env) --------------------------
     @property

@@ -13,7 +13,6 @@ Pure Pillow — no external services.
 from __future__ import annotations
 
 import logging
-import math
 import random
 import re
 from pathlib import Path
@@ -93,8 +92,8 @@ def _rounded(draw, box, radius, fill, outline=None, width=0):
 class PinDesigner:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.W = int(cfg.get("design.width", 1000))
-        self.H = int(cfg.get("design.height", 1500))
+        self.W = cfg.get_int("design.width", 1000)
+        self.H = cfg.get_int("design.height", 1500)
         self.accent = _hex(cfg.get("design.accent_color", "#E60023"))
         self.brand = str(cfg.get("design.brand_name", "")).strip()
         self.cta = str(cfg.get("design.cta_text", "Shop Now ➜") or "Shop Now ➜")

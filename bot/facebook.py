@@ -43,12 +43,33 @@ class FacebookAPI:
         return bool(self.token and self.page_id)
 
     # ------------------------------------------------------------ helpers
-    def _post(self, path: str, **data) -> dict:
-        r = requests.post(f"{GRAPH}/{path}",
-                          data={"access_token": self.token, **data}, timeout=60)
+    def _request(self, method: str, path: str, *, data: dict | None = None,
+                 params: dict | None = None, timeout: int = 60) -> dict:
+        """One funnel for every Graph call: network failures and non-JSON
+        bodies become FacebookError so callers (dashboard, doctor, 24×7 loop)
+        never see a raw SSL/DNS exception."""
+        if not self.configured:
+            raise FacebookError("Facebook not configured (FACEBOOK_ACCESS_TOKEN + FACEBOOK_PAGE_ID)")
+        try:
+            r = requests.request(
+                method, f"{GRAPH}/{path}",
+                data=({"access_token": self.token, **(data or {})} if data is not None
+                      else None),
+                params=({"access_token": self.token, **(params or {})} if params is not None
+                        else None),
+                timeout=timeout)
+        except requests.RequestException as exc:
+            raise FacebookError(f"FB network error: {exc}") from exc
         if r.status_code >= 400:
             raise FacebookError(f"FB {r.status_code}: {r.text[:200]}")
-        return r.json()
+        try:
+            out = r.json()
+        except ValueError:
+            raise FacebookError(f"FB non-JSON response: {(r.text or '')[:200]}")
+        return out if isinstance(out, dict) else {"data": out}
+
+    def _post(self, path: str, **data) -> dict:
+        return self._request("POST", path, data=data)
 
     # ------------------------------------------------------------- posts
     def post_photo(self, image_url: str, caption: str) -> str:
@@ -63,9 +84,6 @@ class FacebookAPI:
         return str(out.get("id", ""))
 
     def check(self) -> dict:
-        r = requests.get(f"{GRAPH}/{self.page_id}",
-                         params={"access_token": self.token,
-                                 "fields": "id,name,followers_count"}, timeout=30)
-        if r.status_code >= 400:
-            raise FacebookError(f"FB check {r.status_code}: {r.text[:200]}")
-        return r.json()
+        return self._request("GET", self.page_id,
+                             params={"fields": "id,name,followers_count"},
+                             timeout=30)

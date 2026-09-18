@@ -111,13 +111,16 @@ class YouTubeAPI:
         """Swap the pasted code for a long-lived refresh token (saved)."""
         if not (self.client_id and self.client_secret):
             raise YouTubeError("YT_CLIENT_ID / YT_CLIENT_SECRET missing in .env")
-        resp = requests.post(TOKEN_URL, data={
-            "code": code.strip(),
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "redirect_uri": self.redirect_uri,
-            "grant_type": "authorization_code",
-        }, timeout=30)
+        try:
+            resp = requests.post(TOKEN_URL, data={
+                "code": code.strip(),
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "redirect_uri": self.redirect_uri,
+                "grant_type": "authorization_code",
+            }, timeout=30)
+        except requests.RequestException as exc:
+            raise YouTubeError(f"token exchange network error: {exc}") from exc
         if resp.status_code != 200:
             raise YouTubeError(f"token exchange failed: "
                                f"{resp.status_code} {resp.text[:300]}")
@@ -140,12 +143,15 @@ class YouTubeAPI:
             return self._cached_token
         if not self.configured:
             raise YouTubeError("YouTube not configured (see bot yt-auth-url)")
-        resp = requests.post(TOKEN_URL, data={
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "refresh_token": self.refresh_token,
-            "grant_type": "refresh_token",
-        }, timeout=30)
+        try:
+            resp = requests.post(TOKEN_URL, data={
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "refresh_token": self.refresh_token,
+                "grant_type": "refresh_token",
+            }, timeout=30)
+        except requests.RequestException as exc:
+            raise YouTubeError(f"token refresh network error: {exc}") from exc
         if resp.status_code != 200:
             raise YouTubeError(f"token refresh failed: {resp.status_code} "
                                f"{resp.text[:200]}")
@@ -179,9 +185,12 @@ class YouTubeAPI:
                          "application/json; charset=UTF-8"),
             "video": (p.name, p.read_bytes(), "video/mp4"),
         }
-        resp = requests.post(
-            UPLOAD_URL, files=files,
-            headers={"Authorization": f"Bearer {token}"}, timeout=300)
+        try:
+            resp = requests.post(
+                UPLOAD_URL, files=files,
+                headers={"Authorization": f"Bearer {token}"}, timeout=300)
+        except requests.RequestException as exc:
+            raise YouTubeError(f"upload network error: {exc}") from exc
         if resp.status_code not in (200, 201):
             raise YouTubeError(f"upload failed: {resp.status_code} "
                                f"{resp.text[:300]}")

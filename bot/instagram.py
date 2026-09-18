@@ -59,44 +59,48 @@ class InstagramAPI:
         return bool(self.token and self.ig_user_id)
 
     # ----------------------------------------------------------------- api
-    def _post(self, path: str, **params) -> dict:
-        resp = requests.post(
-            f"{GRAPH}/{path}",
-            params={"access_token": self.token},
-            data=params,
-            timeout=90,
-        )
-        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-        if resp.status_code >= 400 or "error" in data:
+    @staticmethod
+    def _payload(resp) -> dict:
+        """Parse a Graph response; never raise a raw JSON/HTTP error."""
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {"raw": (resp.text or "")[:300]}
+        return data if isinstance(data, dict) else {"data": data}
+
+    def _call(self, method: str, path: str, *, params: dict | None = None,
+              data: dict | None = None, json_body: dict | None = None,
+              timeout: int = 90) -> dict:
+        """Single funnel for every Graph call.
+
+        Network failures (SSL/DNS/timeout) and non-JSON bodies become
+        InstagramError, so the dashboard, doctor and the 24×7 loop can never
+        crash on a flaky connection.
+        """
+        if not self.configured:
+            raise InstagramError("Instagram not configured (INSTAGRAM_ACCESS_TOKEN + IG_USER_ID)")
+        try:
+            resp = requests.request(
+                method, f"{GRAPH}/{path}",
+                params={"access_token": self.token, **(params or {})},
+                data=data, json=json_body, timeout=timeout)
+        except requests.RequestException as exc:
+            raise InstagramError(f"Instagram network error: {exc}") from exc
+        body = self._payload(resp)
+        if resp.status_code >= 400 or "error" in body:
             raise InstagramError(
-                f"Instagram API {resp.status_code}: {str(data.get('error', data))[:300]}"
+                f"Instagram API {resp.status_code}: {str(body.get('error', body))[:300]}"
             )
-        return data
+        return body
+
+    def _post(self, path: str, **params) -> dict:
+        return self._call("POST", path, data=params)
 
     def _post_json(self, path: str, body: dict) -> dict:
-        resp = requests.post(
-            f"{GRAPH}/{path}",
-            params={"access_token": self.token},
-            json=body,
-            timeout=90,
-        )
-        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-        if resp.status_code >= 400 or "error" in data:
-            raise InstagramError(
-                f"Instagram API {resp.status_code}: {str(data.get('error', data))[:300]}"
-            )
-        return data
+        return self._call("POST", path, json_body=body)
 
     def _get(self, path: str, **params) -> dict:
-        resp = requests.get(
-            f"{GRAPH}/{path}", params={"access_token": self.token, **params}, timeout=60
-        )
-        data = resp.json()
-        if resp.status_code >= 400 or "error" in data:
-            raise InstagramError(
-                f"Instagram API {resp.status_code}: {str(data.get('error', data))[:300]}"
-            )
-        return data
+        return self._call("GET", path, params=params, timeout=60)
 
     # --------------------------------------------------------------- check
     def check(self) -> dict:
@@ -198,7 +202,7 @@ class InstagramAPI:
 
     # ------------------------------------------------------- engagement
     def auto_reply_links(self, reply: str = "🔗 Link in bio! Tap our bio & grab "
-                                             "the deal 😍",
+                         "the deal 😍",
                          max_per_cycle: int = 5,
                          reply_for=None) -> int:
         """Auto-answer 'link?' comments — the engagement trick top pages use
@@ -212,6 +216,9 @@ class InstagramAPI:
         - capped replies per cycle + random human delays between them
         - skips media we already answered (no duplicate replies)
         """
+        if not (self.enabled and self.configured):
+            return 0
+
         import random as _r
         import time as _t
         n = 0
@@ -278,6 +285,8 @@ class InstagramAPI:
         Needs instagram_manage_messages scope on the token. Best-effort:
         any API hiccup is logged and skipped, never fatal.
         """
+        if not (self.enabled and self.configured):
+            return 0
         import random as _r
         import time as _t
         if not self.cfg.get("instagram.auto_dm", True):

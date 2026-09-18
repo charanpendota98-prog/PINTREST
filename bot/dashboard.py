@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_file, send_from_directory
@@ -393,8 +392,6 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         src = detect_source(url)
         linker = AffiliateLinker(cfg)
         aff_url, network = linker.convert(url, src)
-        prod = type("P", (), {"image_url": image_url, "title": title,
-                              "price": price, "currency": "INR"})()
         img_path = engine.scraper.download_image_url(image_url, cfg.media_dir, title)
         if not img_path:
             raise ValueError("Could not download the image — check the image URL")
@@ -449,6 +446,6 @@ def create_app(cfg, db: DB | None = None) -> Flask:
 def serve(cfg) -> None:  # pragma: no cover - long running
     app = create_app(cfg)
     host = cfg.get("dashboard.host", "0.0.0.0")
-    port = int(cfg.get("dashboard.port", 5000))
+    port = cfg.get_int("dashboard.port", 5000)
     print(f"\n🖥  Dashboard: http://{host}:{port}\n")
     app.run(host=host, port=port, debug=False, threaded=True)

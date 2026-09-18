@@ -264,7 +264,7 @@ class PinterestAPI:
             "video/mp4" if media_type == "video" else "image/jpeg")
         try:
             reg = self._request("POST", "/media", json={"media_type": media_type})
-        except PinterestError as exc:
+        except PinterestError:
             if media_type == "video":
                 return self._upload_video_legacy(file_path)
             data = base64.b64encode(p.read_bytes()).decode()

@@ -11,3 +11,4 @@ data/
 
 # OS junk
 .DS_Store
+logs/

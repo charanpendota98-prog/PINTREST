@@ -33,14 +33,29 @@ from .video_maker import ReelMaker, pick_music
 log = logging.getLogger("pindrop.engine")
 
 
+# Built-in fallbacks: a missing/broken template in config.yaml must NEVER
+# stop a pin from going out (the pin is the money).
+DEFAULT_SEO_TEMPLATE = ("{title} | {price} | best deal today\n"
+                        "{hashtags}")
+DEFAULT_IG_CAPTION = ("\U0001F525 {title}\n\U0001F4B0 Price: {price}\n"
+                      "\U0001F6D2 Comment 'LINK' — link in bio!\n{hashtags}")
+
+
 def build_seo_text(cfg, title: str, price: str, currency: str, source: str,
                    discount: int = 0, festival_kw: str = "") -> str:
     """SEO-rich Pinterest description: hook + urgency + tiered hashtag mix."""
     label = price_label(price, currency) or "Best price"
     hashtags = hashtag_mix(title + (" " + festival_kw if festival_kw else ""),
-                           source, int(cfg.get("seo.max_hashtags", 8)))
-    template = cfg.get("seo.description_template")
-    text = template.format(title=title, price=label, hashtags=hashtags).strip()
+                           source, cfg.get_int("seo.max_hashtags", 8))
+    template = (cfg.get("seo.description_template")
+                or DEFAULT_SEO_TEMPLATE)
+    try:
+        text = template.format(title=title, price=label,
+                               hashtags=hashtags).strip()
+    except (KeyError, IndexError, ValueError):
+        # a broken custom template must never stop a pin from going out
+        text = DEFAULT_SEO_TEMPLATE.format(
+            title=title, price=label, hashtags=hashtags).strip()
     urgency = []
     if discount >= 15:
         urgency.append(f"⚡ FLAT {discount}% OFF — today only!")
@@ -57,9 +72,13 @@ def build_seo_text(cfg, title: str, price: str, currency: str, source: str,
 def build_ig_caption(cfg, title: str, price: str, currency: str, source: str = "amazon") -> str:
     """Instagram caption — no clickable links on IG, drive comments + bio."""
     label = price_label(price, currency) or "Best price"
-    return cfg.get("instagram.caption_template").format(
-        title=title, price=label, hashtags=hashtag_mix(title, source)
-    ).strip()
+    tags = hashtag_mix(title, source)
+    tpl = (cfg.get("instagram.caption_template") or DEFAULT_IG_CAPTION)
+    try:
+        return tpl.format(title=title, price=label, hashtags=tags).strip()
+    except (KeyError, IndexError, ValueError):
+        return DEFAULT_IG_CAPTION.format(
+            title=title, price=label, hashtags=tags).strip()
 
 
 class Engine:
@@ -106,11 +125,16 @@ class Engine:
         return random.choice(TEMPLATES)
 
     def _pin_link(self, product: dict) -> str:
-        """Bridge link (your domain, tracked) or raw affiliate link."""
+        """Bridge link (your domain, tracked) or the PIN Pinterest link.
+
+        Uses the pinterest-tuned Meesho link (or your platform override) so
+        the Meesho report labels Pinterest clicks correctly — money is the
+        same publisher either way, the label is what changes.
+        """
         base = str(self.cfg.get("link.public_base", "") or "").strip().rstrip("/")
         if self.cfg.get("link.bridge", False) and base:
             return f"{base}/go/{product['id']}"
-        return product["affiliate_url"]
+        return self._aff_link(product, "pinterest")
 
     def _aff_link(self, product: dict, platform: str = "") -> str:
         """Affiliate link tuned for the platform being posted to.
@@ -162,7 +186,6 @@ class Engine:
         if not self.cfg.get("pinterest.sections", False):
             return ""
         try:
-            from .pin_designer import pick_board
             name = pick_board(product.get("title", ""), product.get("source", ""),
                               str(self.cfg.get("pinterest.board_name", "Best Deals")))
             return self.api.ensure_section(board_id, name)
@@ -203,7 +226,7 @@ class Engine:
         label = price_label(prod.price, prod.currency)
 
         # download full gallery (up to max_images photos)
-        max_imgs = max(1, int(self.cfg.get("scraping.max_images", 3)))
+        max_imgs = max(1, self.cfg.get_int("scraping.max_images", 3))
         local_imgs: list[str] = []
         for img_url in (prod.images or [prod.image_url])[:max_imgs]:
             p = self.scraper.download_image_url(img_url, self.cfg.media_dir, prod.title)
@@ -247,7 +270,7 @@ class Engine:
                 self.db.log("WARN", f"Reel generation failed: {exc}")
 
         # how many pin variations?
-        per_product = max(1, int(self.cfg.get("posting.pins_per_product", 2)))
+        per_product = max(1, self.cfg.get_int("posting.pins_per_product", 2))
         n_variants = min(per_product, len(local_imgs)) or 1
 
         disc = prod.discount_pct
@@ -311,16 +334,38 @@ class Engine:
             board_name = pick_board(product["title"], product["source"], default_board)
         else:
             board_name = default_board
-        board_id = self.api.ensure_board(board_name,
-            f"{board_name} — best offers, price drops & top-rated finds. "
-            "Daily deals India: online shopping discounts & combo offers.")
         link = self._pin_link(product)
 
-        days_ahead = int(self.cfg.get("posting.schedule_days_ahead", 0))
+        days_ahead = self.cfg.get_int("posting.schedule_days_ahead", 0)
         scheduled_for = None
         if days_ahead > 0:
             scheduled_for = datetime.now(self.tz) + timedelta(days=days_ahead)
 
+        # keyword-stuffed SEO title (Pinterest = search engine) + LIVE
+        # autocomplete phrase mined from Pinterest typeahead
+        phrase = self.kw.phrase_for(product["title"])
+        seo_t = seo_title(product["title"],
+                          price_label(product["price"], product["currency"]),
+                          product["source"], phrase=phrase)
+        video_file = product.get("video_path", "") or ""
+        # 🔬 PIN-BY-PIN QA GATE runs BEFORE any API call: junk/untracked
+        # products must never even create a board or a post row.
+        from . import qa as _qa
+        qa_img = product.get("pin_image") or product.get("image_path") or ""
+        if not video_file or not Path(video_file).exists():
+            qa_ok, qa_issues = _qa.qa_pin(self.cfg, self.db, product, seo_t,
+                                          product["seo_text"], qa_img, link)
+            if not qa_ok:
+                reason = "QA failed: " + "; ".join(qa_issues)[:400]
+                self.db.update_product(product["id"], status="skipped",
+                                       error=reason)
+                self.db.log("WARN", f"🔬 Pin #{product['id']} quarantined — {reason}")
+                return None
+
+        # only now touch the API: board (auto-created, SEO description)
+        board_id = self.api.ensure_board(board_name,
+            f"{board_name} — best offers, price drops & top-rated finds. "
+            "Daily deals India: online shopping discounts & combo offers.")
         post_id = self.db.add_post(
             product_id=product["id"],
             board_id=board_id,
@@ -328,25 +373,6 @@ class Engine:
             scheduled_for=scheduled_for.isoformat() if scheduled_for else "",
         )
         try:
-            # keyword-stuffed SEO title (Pinterest = search engine) + LIVE
-            # autocomplete phrase mined from Pinterest typeahead
-            phrase = self.kw.phrase_for(product["title"])
-            seo_t = seo_title(product["title"],
-                              price_label(product["price"], product["currency"]),
-                              product["source"], phrase=phrase)
-            video_file = product.get("video_path", "") or ""
-            # 🔬 PIN-BY-PIN QA GATE — broken pins never reach the API
-            from . import qa as _qa
-            qa_img = product.get("pin_image") or product.get("image_path") or ""
-            if not video_file or not Path(video_file).exists():
-                qa_ok, qa_issues = _qa.qa_pin(self.cfg, self.db, product, seo_t,
-                                              product["seo_text"], qa_img, link)
-                if not qa_ok:
-                    reason = "QA failed: " + "; ".join(qa_issues)[:400]
-                    self.db.update_post(post_id, status="failed", error=reason)
-                    self.db.update_product(product["id"], status="skipped", error=reason)
-                    self.db.log("WARN", f"🔬 Pin #{product['id']} quarantined — {reason}")
-                    return None
             # PLATFORM ORDER (owner strategy): IG + Facebook FIRST,
             # Pinterest after — "anni chesaka chuddam"
             order = [p for p in self.cfg.get("posting.platform_order",
@@ -617,7 +643,7 @@ class Engine:
         """ZERO-TOUCH winner-clone sourcing: hunts products in the exact
         niches top channels push, priority order (fashion → decor → beauty…)."""
         added = 0
-        limit = int(self.cfg.get("autopilot.discover_limit", 4))
+        limit = self.cfg.get_int("autopilot.discover_limit", 4)
         for store, query, niche in sourcing_plan():
             try:
                 urls = self.scraper.discover_products(store, limit=limit, query=query)
@@ -648,9 +674,9 @@ class Engine:
         clicks get a new design + new keywords and go around again.
         """
         cands = self.db.reshare_candidates(
-            min_clicks=int(self.cfg.get("reshare.min_clicks", 3)),
-            rest_days=int(self.cfg.get("reshare.rest_days", 7)),
-            max_shares=int(self.cfg.get("reshare.max_shares", 3)))
+            min_clicks=self.cfg.get_int("reshare.min_clicks", 3),
+            rest_days=self.cfg.get_int("reshare.rest_days", 7),
+            max_shares=self.cfg.get_int("reshare.max_shares", 3))
         # 📈 Pinterest-reported engagement (saves/clicks) also qualifies a
         # winner — even before our own landing counter sees traffic
         try:
@@ -784,7 +810,7 @@ class Engine:
         for p in prods:
             p["score"] = score_product(p["title"], p["price"], p["source"])
         seg = segment or random.choice(list(ru.SEGMENTS))
-        items = ru.pick_roundup(prods, seg, int(self.cfg.get("roundup.count", 5)))
+        items = ru.pick_roundup(prods, seg, self.cfg.get_int("roundup.count", 5))
         if len(items) < 3:
             self.db.log("INFO", "Roundup skipped — not enough products yet")
             return None
@@ -810,16 +836,16 @@ class Engine:
 
     # ----------------------------------------------------------- scheduler
     def _human_gap(self) -> float:
-        mins = float(self.cfg.get("posting.min_gap_minutes", 40))
-        jitter = float(self.cfg.get("posting.jitter_minutes", 25))
+        mins = self.cfg.get_float("posting.min_gap_minutes", 40)
+        jitter = self.cfg.get_float("posting.jitter_minutes", 25)
         return (mins + random.random() * jitter) * 60
 
     def run_forever(self) -> None:  # pragma: no cover - long loop
         """24×7 scheduler: posts inside PEAK traffic windows (or configured hours)."""
-        per_day = int(self.cfg.get("posting.pins_per_day", 8))
+        per_day = self.cfg.get_int("posting.pins_per_day", 8)
         peak = bool(self.cfg.get("posting.peak_mode", True))
-        start_h = int(self.cfg.get("posting.start_hour", 9))
-        end_h = int(self.cfg.get("posting.end_hour", 22))
+        start_h = self.cfg.get_int("posting.start_hour", 9)
+        end_h = self.cfg.get_int("posting.end_hour", 22)
         self.db.log("INFO", f"Scheduler started: {per_day} pins/day, "
                             f"{'PEAK windows' if peak else f'{start_h}:00-{end_h}:00'} IST")
         print(f"\n🤖 Scheduler running 24×7 — {per_day} pins/day in "
@@ -879,8 +905,7 @@ class Engine:
 
             # 🛡️ ANTI-BAN WARM-UP: brand-new accounts blasting 8 pins/day
             # get flagged. Ramp: ~30% on day 1, +10%/day, full by week 1.
-            started = self.db.oldest_activity()
-            age_days = (now - started).days if started else 0
+            age_days = int(self.db.account_age_days())
             ramp = min(1.0, 0.3 + 0.1 * age_days)
             if ramp < 1.0:
                 self.db.log("INFO", f"🛡️ Warm-up day {age_days}: volume at "
@@ -891,7 +916,7 @@ class Engine:
             queue = self.db.pending_products(limit=100)
 
             # ZERO-TOUCH: queue running dry? go hunt trending products itself
-            min_q = int(self.cfg.get("autopilot.min_queue", 5))
+            min_q = self.cfg.get_int("autopilot.min_queue", 5)
             if len(queue) < min_q and self.cfg.get("autopilot.auto_source", True):
                 self.db.log("INFO", f"Queue low ({len(queue)}) — autopilot hunting "
                                     "trending products on Amazon/Meesho/Flipkart…")
