@@ -80,15 +80,22 @@ class AffiliateLinker:
         r"af_invite|affiliate\.meesho\.com|affid=|ext_id=|/collection/")
 
     @property
-    def meesho_ids(self) -> tuple[str, str, str]:
-        """Your Meesho publisher + source-token + campaign IDs, learned from
-        ONE sample af_invite link you paste (MEESHO_TEMPLATE_LINK) — then the
-        bot generates af_invite links for EVERY product with YOUR IDs and
-        the EXACT source token Meesho already accepts for your account."""
+    def meesho_ids(self) -> tuple[str, str, list[str]]:
+        """Your Meesho publisher + source-token + ALL campaign IDs.
+
+        Meesho rotates campaign IDs per product/campaign — so paste links
+        over time (comma/newline separated in MEESHO_TEMPLATE_LINK); the bot
+        learns every campaign and builds new links with the LATEST one.
+        """
         sample = (os.getenv("MEESHO_TEMPLATE_LINK", "") or
                   self.cfg.get("affiliate.meesho_template_link", "") or "").strip()
-        m = re.search(r"af_invite/(\d+):([^:/]+):(\d+)", sample)
-        return (m.group(1), m.group(2), m.group(3)) if m else ("", "", "")
+        pub = src = ""
+        camps: list[str] = []
+        for m in re.finditer(r"af_invite/(\d+):([^:/]+):(\d+)", sample):
+            pub, src = m.group(1), m.group(2)
+            if m.group(3) not in camps:
+                camps.append(m.group(3))
+        return pub, src, camps
 
     def meeshoize(self, url: str) -> str:
         if self.MEESHO_MONETIZED.search(url):
@@ -96,12 +103,13 @@ class AffiliateLinker:
         # DIRECT Meesho affiliate: build af_invite with YOUR publisher +
         # campaign IDs and the product's p_id (from its URL) — commission
         # lands in YOUR Meesho account, no middleman.
-        pub, src, camp = self.meesho_ids
-        if pub and camp:
+        pub, src, camps = self.meesho_ids
+        if pub and camps:
             pid = re.search(r"-p/(\d+)", urlparse(url).path)
             if pid:
                 ext = "".join(random.choices(string.ascii_lowercase + string.digits,
                                              k=6))
+                camp = camps[-1]  # latest campaign the owner generated
                 return (f"https://www.meesho.com/af_invite/{pub}:{src}:"
                         f"{camp}?p_id={pid.group(1)}&ext_id={ext}"
                         f"&utm_source={src}")

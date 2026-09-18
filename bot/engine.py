@@ -264,6 +264,19 @@ class Engine:
                     self.db.update_product(product["id"], status="skipped", error=reason)
                     self.db.log("WARN", f"🔬 Pin #{product['id']} quarantined — {reason}")
                     return None
+            # PLATFORM ORDER (owner strategy): IG + Facebook FIRST,
+            # Pinterest after — "anni chesaka chuddam"
+            order = [p for p in self.cfg.get("posting.platform_order",
+                                             ["instagram", "facebook", "pinterest"])]
+            done: set[str] = set()
+            for plat in order:
+                if plat == "pinterest":
+                    break
+                if plat == "instagram":
+                    self._post_instagram(product, post_id)
+                elif plat == "facebook":
+                    self._post_facebook(product)
+                done.add(plat)
             if video_file and Path(video_file).exists():
                 # video pin path — real / auto-generated reel uploaded to Pinterest
                 media_id = self.api.upload_video(video_file)
@@ -294,8 +307,14 @@ class Engine:
             self.notify.deal(product["title"],
                              price_label(product["price"], product["currency"]),
                              link, product.get("image_url", ""))
-            self._post_instagram(product, post_id)
-            self._post_facebook(product)
+            # platforms that come AFTER pinterest in the configured order
+            for plat in order:
+                if plat in done or plat == "pinterest":
+                    continue
+                if plat == "instagram":
+                    self._post_instagram(product, post_id)
+                elif plat == "facebook":
+                    self._post_facebook(product)
             return pin
         except PinterestError as exc:
             attempts = int(product.get("attempts", 0) or 0) + 1

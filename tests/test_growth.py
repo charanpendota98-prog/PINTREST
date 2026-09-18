@@ -348,3 +348,17 @@ class TestManyChatStyleTriggers(unittest.TestCase):
             self.assertIn("1,099", e._ig_reply_for("M1", "price"))
             self.assertIn("buy", e._ig_reply_for("M1", "buy").lower())
             self.assertIn("Airdopes", e._ig_reply_for("M1", "link"))
+
+
+class TestMultiCampaign(unittest.TestCase):
+    def test_latest_campaign_used(self):
+        from bot.affiliate import AffiliateLinker
+        from bot.config import load_config
+        lk = AffiliateLinker(load_config())
+        lk.cfg.raw["affiliate"]["meesho_template_link"] = (
+            "https://www.meesho.com/af_invite/24197020:instagram_stories:11040673?p_id=1,"
+            "https://www.meesho.com/af_invite/24197020:instagram_stories:11049016?p_id=2")
+        pub, src, camps = lk.meesho_ids
+        self.assertEqual(camps, ["11040673", "11049016"])
+        out, _ = lk.convert("https://www.meesho.com/kurta-p/555", "meesho")
+        self.assertIn(":11049016?", out)   # latest campaign wins

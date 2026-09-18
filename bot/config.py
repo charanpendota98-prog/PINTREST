@@ -27,6 +27,8 @@ DEFAULTS: dict[str, Any] = {
         "pins_per_product": 3,    # pin variations per product (different photos+designs)
         "peak_mode": True,        # post only in peak IST traffic windows
         "board_strategy": "niche",  # niche = keyword boards per category (more reach)
+        # owner strategy: build IG + FB buzz first, Pinterest after
+        "platform_order": ["instagram", "facebook", "pinterest"],
     },
     "link": {
         "bridge": False,          # true = pins link to YOUR domain /go/<id> (tracked)
