@@ -105,6 +105,7 @@ DEFAULTS: dict[str, Any] = {
         "mode": "carousel",        # single | carousel | reel
         "posts_per_day": 3,
         "auto_dm": True,           # ManyChat-grade keyword DM auto-answers
+        "auto_bio_link": True,     # bio website auto-updates to latest deal
         "host_designed_pins": False,  # upload designed pins to ImgBB (needs IMGBB_KEY)
         "caption_template": (
             "🔥 {title}\n💰 Price: {price}\n"

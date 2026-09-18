@@ -236,6 +236,23 @@ class InstagramAPI:
             log.info("Auto-replied to %d 'link' comments", n)
         return n
 
+    # ------------------------------------------------- auto bio link
+    def set_bio_link(self, url: str) -> bool:
+        """'Insta auto direct link': after every post, the bio website is
+        auto-updated to THIS deal (official Graph API profile update).
+        Followers tap bio → straight to the money link. Best-effort."""
+        if not self.cfg.get("instagram.auto_bio_link", True):
+            return False
+        if not (self.enabled and self.configured):
+            return False
+        try:
+            self._post(f"{self.ig_user_id}", website=url)
+            log.info("IG bio link → %s", url[:80])
+            return True
+        except InstagramError as exc:
+            log.warning("Bio link update skipped: %s", str(exc)[:120])
+            return False
+
     # ------------------------------------------------- ManyChat-style DMs
     def auto_dm(self, reply_for=None, max_per_cycle: int = 5) -> int:
         """ManyChat-grade AUTO-DM via the OFFICIAL Instagram Messaging API

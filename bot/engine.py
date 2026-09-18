@@ -366,6 +366,12 @@ class Engine:
                 return
             self.db.update_post(post_id, ig_post_id=media_id)
             self.db.log("INFO", f"Instagram post {media_id} — {product['title'][:40]}")
+            # auto direct link: bio website becomes THIS deal
+            bio_link = (f"{str(self.cfg.get('link.public_base','') or '').rstrip('/')}/go/{product['id']}"
+                        if (self.cfg.get("link.bridge", False)
+                            and self.cfg.get("link.public_base"))
+                        else product["affiliate_url"])
+            self.ig.set_bio_link(bio_link)
         except InstagramError as exc:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
@@ -407,6 +413,12 @@ class Engine:
         try:
             caption = build_ig_caption(self.cfg, product["title"], product["price"],
                                        product["currency"])
+            # Facebook ALLOWS clickable links in post text → auto-link!
+            base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
+            fb_link = (f"{base}/go/{product['id']}"
+                       if (self.cfg.get("link.bridge", False) and base)
+                       else product["affiliate_url"])
+            caption = f"{caption}\n\n🛒 Direct link: {fb_link}"
             mode = str(self.cfg.get("facebook.mode", "photo"))
             if mode == "link":
                 base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
