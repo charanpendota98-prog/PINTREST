@@ -351,15 +351,18 @@ class Engine:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
 
-    def _ig_reply_for(self, media_id: str) -> str:
-        """Per-PRODUCT comment reply: 'link?' on the earbuds reel gets an
-        earbuds answer (name + price + bio CTA) — never a generic one."""
+    def _ig_reply_for(self, media_id: str, trigger: str = "link") -> str:
+        """ManyChat-style, per-PRODUCT comment reply: the trigger keyword
+        picks the template, {title}/{price} fill from the product behind
+        that media. Never a generic answer."""
         p = self.db.product_by_ig_media(media_id)
         if not p:
             return ""
-        label = price_label(p["price"], p["currency"])
-        return (f"🔥 {p['title'][:60]} — only {label or 'best price'}! 😍 "
-                "Link in bio — grab it before price jumps!")
+        label = price_label(p["price"], p["currency"]) or "best price"
+        tpl = (self.cfg.get("instagram.triggers") or {}).get(trigger, "")
+        if not tpl:
+            tpl = "🔥 {title} — only {price}! Link in bio!"
+        return tpl.format(title=p["title"][:60], price=label)
 
     def _post_facebook(self, product: dict) -> None:
         """Cross-post to your Facebook Page (official Graph API, best-effort)."""

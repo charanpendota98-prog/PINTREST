@@ -200,6 +200,22 @@ they're 5–8s edits: hook text → zooming product photo → price pop → CTA 
 That's exactly what `bot/video_maker.py` renders automatically from photos,
 24×7, for every product.
 
+## 💬 ManyChat? — not needed, we ship it free
+
+ManyChat is a paid SaaS for IG comment/DM automation. We cover the same
+ground with official API + zero monthly cost:
+
+| ManyChat feature | PinDrop Pro built-in |
+|---|---|
+| Keyword triggers ("link", "price", "buy"…) | ✅ `instagram.triggers` — configurable templates |
+| Per-product replies | ✅ media→product mapping, {title}/{price} auto-fill |
+| Rate safety | ✅ caps + human delays + duplicate skip |
+| Visual flow builder | ⚪ not needed — templates are config, not drag-drop |
+| Auto-DM | ⛔ Meta blocks 3rd-party DM bots (even ManyChat is limited here) |
+
+If you STILL want ManyChat someday: connect it to the same IG account —
+it complements us (you'd just be paying for a drag-drop UI).
+
 ## 📋 Deals-of-the-Day Roundups — the list-post weapon
 
 Top channels ride LIST pins (viral saves); we generate them daily,

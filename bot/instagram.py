@@ -185,6 +185,7 @@ class InstagramAPI:
         import random as _r
         import time as _t
         n = 0
+        triggers = list((self.cfg.get("instagram.triggers") or {"link": ""}).keys())
         try:
             medias = self._get(f"{self.ig_user_id}/media", fields="id").get("data", [])[:8]
         except InstagramError:
@@ -202,11 +203,13 @@ class InstagramAPI:
             for c in comments:
                 if n >= max_per_cycle:
                     break
-                if "link" in (c.get("text") or "").lower():
+                low = (c.get("text") or "").lower()
+                hit = next((k for k in triggers if k in low), "")
+                if hit:
                     msg = reply
                     if reply_for:
                         try:
-                            msg = reply_for(m["id"]) or reply
+                            msg = reply_for(m["id"], hit) or reply
                         except Exception:  # noqa: BLE001
                             msg = reply
                     try:

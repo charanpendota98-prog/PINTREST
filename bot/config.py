@@ -103,6 +103,15 @@ DEFAULTS: dict[str, Any] = {
             "🔥 {title}\n💰 Price: {price}\n"
             "🛒 Comment 'LINK' — link in bio!\n{hashtags}"
         ),
+        # ManyChat-style keyword triggers → auto-replies (free, built-in).
+        # {title} and {price} get filled per product automatically.
+        "triggers": {
+            "link": "🔥 {title} — only {price}! 😍 Link in bio — grab it now!",
+            "price": "💰 {title} is just {price} right now — link in bio!",
+            "buy": "🛒 To buy {title}: tap the LINK IN BIO — checkout on the official store!",
+            "deal": "⚡ Yes! {title} at {price} is live — link in bio!",
+            "cost": "💸 Cost of {title}: only {price}! Link in bio to order.",
+        },
     },
     "video": {
         "auto_reel": True,   # no product video on the page? auto-generate a viral reel from photos
