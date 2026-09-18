@@ -116,17 +116,26 @@ instagram:
   ig_user_id: ""            # or IG_USER_ID in .env
   mode: carousel            # single | carousel | reel
   posts_per_day: 3
-  list_posts: true         # 📚 daily CAROUSEL list post (highest IG engagement:
-                           # slide-1 hook → one product/slide → save CTA)
-  list_count: 6
-  host_designed_pins: false # true → upload designed pins to ImgBB (IMGBB_KEY in .env)
-  caption_template: |
-    🔥 {title}
-    💰 Price: {price}
-    🛒 Comment 'LINK' — link in bio!
-    {hashtags}
-  stories: true             # also drop a 24h Story per product (extra reach)
-
+  private_dm: true          # 🔥 ManyChat move: comment "link" → DM with the
+                            #    DIRECT product link (official private reply)
+  public_reply: true        #    also leave a public reply (reach + proof)
+  reply_delay_seconds: 3    #    human-ish pause between answers (0 = instant)
+  auto_dm: true             # answer keyword DMs (link/price/buy…)
+  auto_bio_link: true       # bio website auto-updates to the latest deal
+  triggers:                 # keywords people type → what they get
+    link: "🔥 {title} — only {price}! 😍 Link in bio — grab it now!"
+    price: "💰 {title} is just {price} right now — link in bio!"
+    buy: "🛒 To buy {title}: tap the LINK IN BIO — checkout on the official store!"
+    deal: "⚡ Yes! {title} at {price} is live — link in bio!"
+    cost: "💸 Cost of {title}: only {price}! Link in bio to order."
+    rate: "📦 Rate of {title}: {price} — link in bio to order!"
+    order: "🛒 Ordering {title}? Tap the LINK IN BIO — official store checkout!"
+    dm: "📩 Sent you the link for {title} — check your DM!"
+    send: "📩 Link for {title} sent — check your DM!"
+    interested: "😍 Great choice! {title} — link in bio!"
+    chahiye: "😍 Sending {title} ({price}) — link in bio!"
+    kitna: "💰 {title} price: {price} — link in bio!"
+    kitne: "💰 {title} price: {price} — link in bio!"
 youtube:
   enabled: false            # true → publish each reel as a YouTube Short
   privacy: public           # public | unlisted | private

@@ -685,6 +685,33 @@ def cmd_ig_check(cfg) -> int:
               f"| posts: {info.get('media_count', 0)}")
         print(f"   Mode: {cfg.get('instagram.mode')} | designed-pin hosting: "
               f"{'ImgBB' if ig.imgbb_key else 'off (uses product photo URLs)'}")
+        # 🤖 what the bot does with comments + DMs (ManyChat equivalent)
+        triggers = list((cfg.get("instagram.triggers") or {}).keys())
+        dm_on = bool(cfg.get("instagram.private_dm", True))
+        pub_on = bool(cfg.get("instagram.public_reply", True))
+        auto_dm = bool(cfg.get("instagram.auto_dm", True))
+        print(f"\n🤖 AUTO-DM (ManyChat-style, official API — no third party):")
+        print(f"   comment → private DM with the direct link: "
+              f"{'ON' if dm_on else 'OFF'}")
+        print(f"   public comment reply (engagement):         "
+              f"{'ON' if pub_on else 'OFF'}")
+        print(f"   keyword DM answers (link/price/buy…):      "
+              f"{'ON' if auto_dm else 'OFF'}")
+        print(f"   bio link auto-updates to latest deal:      "
+              f"{'ON' if cfg.get('instagram.auto_bio_link', True) else 'OFF'}")
+        print(f"   trigger words ({len(triggers)}): {', '.join(triggers[:10])}")
+        # real capability probe: newer tokens have messaging permission
+        try:
+            ig._get(f"{ig.ig_user_id}/conversations", fields="id")
+            print("   inbox access: ✅ token can read conversations")
+        except InstagramError as exc:
+            low = str(exc).lower()
+            if "permission" in low or "scope" in low or "190" in low:
+                print("   inbox access: ⚠️  token needs instagram_manage_messages")
+                print("        → regenerate the token with that permission; "
+                      "comment replies still work")
+            else:
+                print(f"   inbox access: ⚠️  {str(exc)[:90]}")
         return 0
     except InstagramError as exc:
         print(f"❌ {exc}")

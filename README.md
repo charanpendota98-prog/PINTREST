@@ -628,6 +628,40 @@ affiliate:
 
 ---
 
+## 🤖 Auto-DM / Auto-Reply (free ManyChat equivalent — official API)
+
+**Endi jarugutundi (exact flow), roju automatic:**
+
+1. Nuvvu post chesina reel/carousel ki evaraina comment chestharu: `link`,
+   `price`, `buy`, `rate`, `order`, `chahiye`, `kitna`… (13 trigger words).
+2. Bot aa comment ni chusi **aa commenter ki PRIVATE DM** pampistundi —
+   andulo **aa product peru + price + NE DIRECT affiliate link** untundi
+   (Instagram official *private reply* API; comment chesina 7 rojulu varaku
+   allowed).
+3. Same comment ki **public reply** kuda pedtundi ("link in bio!") — reach
+   peragadaniki (comments lo clickable link undadu, anduke bio/DM route).
+4. Oke comment ki **rendu saarlu DM povadu** — DB ledger lo comment id store
+   avutundi (restart chesina gurtu untundi).
+5. DM lo kuda evaraina `link`/`price` type chesthe → bot product match chesi
+   link tho answer istundi (`instagram.auto_dm`).
+6. Prathi post tarvata **bio website auto-update** avutundi aa deal ki —
+   "link in bio" nijamga pani chestundi (`instagram.auto_bio_link`).
+
+**Edi kaadu (honesty):** evaru interact cheyyani follower ki DM pampinchalemu —
+adi Instagram policy (spam control), ManyChat ki kuda ade limit. Comment ki
+private reply = 7 rojulu; conversation continue = 24 hours. Ee bot third-party
+service vaadadu, password share cheyyadu — direct official API.
+
+**Scopes (token lo undali):** `instagram_basic`, `instagram_content_publish`,
+`instagram_manage_comments` (public replies), **`instagram_manage_messages`**
+(private DM + inbox). Token lo messages permission lekapote bot public reply
+ki fallback avutundi (pani agadu) — `python -m bot ig-check` lo exact ga
+cheptundi enti missing o.
+
+**Controls:** `instagram.private_dm` (DM on/off), `instagram.public_reply`,
+`instagram.auto_dm`, `instagram.auto_bio_link`, `instagram.triggers` (keywords +
+templates), `instagram.reply_delay_seconds` (human-ish pause).
+
 ## 📸 Instagram Automation (fully automatic cross-posting)
 
 Every product Pinterest lo post avvగానే, same product mee **Instagram page** lo kuda

@@ -255,13 +255,24 @@ def print_how_it_works() -> None:
      file perms, setup %, queue, pause/breaker state, best product score.
      Owner chudalsina avasaram ledu — issue unte log + panel lo kanipistundi.
 
-11) SAFETY (account safe, money safe)
+11) AUTO-DM / AUTO-REPLY (ManyChat equivalent, official API)
+   🤖 Comment → DM (R47): evaraina "link/price/buy/chahiye/kitna…" (13
+     trigger words) comment chesthe bot aa commenter ki PRIVATE DM pampistundi
+     — andulo product + price + NE direct affiliate link. Public reply kuda
+     (reach). Oke comment rendu saarlu DM povadu (DB ledger, restart-proof).
+   📩 Keyword DMs: evaraina direct ga DM chesthe product match chesi link.
+   🔗 Bio auto-update: prathi post tarvata bio website aa deal ki update.
+   🔐 Official private-reply API — third-party ledu, password ledu, ban trickery
+     ledu. Scope missing aithe public reply ki fallback (crash ledu).
+   `python -m bot ig-check` → DM/reply ON/OFF + triggers + inbox access probe.
+
+12) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   287 automated tests.
+   300 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

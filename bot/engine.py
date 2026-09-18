@@ -650,6 +650,22 @@ class Engine:
             return f"😍 Today's best deals, all in one place: {base}/deals/today"
         return "🔗 Link in bio! 😍"
 
+    def _ig_comment_dm(self, media_id: str, trigger: str = "link") -> str:
+        """The DM that goes to whoever commented: THAT product + its REAL
+        buy link, one tap away (this is the ManyChat money move)."""
+        p = self.db.product_by_ig_media(media_id)
+        if not p:
+            base = str(self.cfg.get("link.public_base", "") or "").rstrip("/")
+            return (f"😍 Today's best deals: {base}/deals/today" if base else "")
+        label = price_label(p["price"], p["currency"]) or "best price"
+        link = self._aff_link(p, "instagram")
+        # NOTE: comments can't carry clickable links, so the PUBLIC reply
+        # points to bio/DM; the DM itself carries the real link. Keep the DM
+        # text clean and product-specific.
+        return (f"🛒 {p['title'][:70]}\n"
+                f"💰 {label}\n"
+                f"👉 Buy here: {link}")
+
     def _ig_reply_for(self, media_id: str, trigger: str = "link") -> str:
         """ManyChat-style, per-PRODUCT comment reply: the trigger keyword
         picks the template, {title}/{price} fill from the product behind
@@ -1296,8 +1312,14 @@ class Engine:
                 self.post_next()
                 self._api_ok()          # success clears the breaker
                 if self.ig.enabled and self.ig.configured:
+                    # comment → PRIVATE DM with the direct link (ManyChat
+                    # style), then the public reply for engagement; the DB
+                    # ledger guarantees nobody is messaged twice
                     self.ig.auto_reply_links(
-                        reply_for=self._ig_reply_for)  # per-product answers
+                        reply_for=self._ig_reply_for,       # public answer
+                        dm_for=self._ig_comment_dm,          # DM + real link
+                        is_answered=self.db.ig_comment_seen,
+                        mark_answered=self.db.mark_ig_comment)
                     self.ig.auto_dm(reply_for=self._ig_dm_for)  # ManyChat-grade DMs
             except PinterestError as exc:
                 # 401/403 → long pause (retrying cannot fix a token),

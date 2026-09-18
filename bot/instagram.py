@@ -204,17 +204,28 @@ class InstagramAPI:
     def auto_reply_links(self, reply: str = "🔗 Link in bio! Tap our bio & grab "
                          "the deal 😍",
                          max_per_cycle: int = 5,
-                         reply_for=None) -> int:
-        """Auto-answer 'link?' comments — the engagement trick top pages use
-        (boosts reach, drives bio clicks). NEEDS instagram_manage_comments.
+                         reply_for=None,
+                         dm_for=None,
+                         is_answered=None,
+                         mark_answered=None) -> int:
+        """Answer trigger comments the ManyChat way: **DM first, reply second**.
 
-        reply_for(media_id) -> str : optional per-PRODUCT reply composer
-        (engine passes the product behind that media: "boAt Earbuds ₹1,099 —
-        link in bio!") so every answer is about THAT product, not generic.
+        1. Someone comments "link" / "price" / "buy" (any configured keyword).
+        2. The bot sends them a PRIVATE message with the product + buy link
+           (official private-reply API, allowed for 7 days after the comment).
+        3. It also leaves a short public reply so the comment gets visible
+           engagement (boosts reach) — switch off with instagram.public_reply.
 
-        Safety-first (so we never get caught/throttled):
-        - capped replies per cycle + random human delays between them
-        - skips media we already answered (no duplicate replies)
+        Params
+        ------
+        reply_for(media_id, trigger) -> public reply text (per product)
+        dm_for(media_id, trigger)    -> DM text with the DIRECT product link
+        is_answered(comment_id)      -> already handled? (DB ledger, no dupes)
+        mark_answered(comment_id)    -> record that we handled it
+
+        Safety-first: capped per cycle, human-ish random delays, per-comment
+        ledger so nobody is ever messaged twice, and every API error is
+        logged + skipped (never fatal).
         """
         if not (self.enabled and self.configured):
             return 0
@@ -222,6 +233,8 @@ class InstagramAPI:
         import random as _r
         import time as _t
         n = 0
+        dm_on = bool(self.cfg.get("instagram.private_dm", True))
+        public_on = bool(self.cfg.get("instagram.public_reply", True))
         triggers = list((self.cfg.get("instagram.triggers") or {"link": ""}).keys())
         try:
             medias = self._get(f"{self.ig_user_id}/media", fields="id").get("data", [])[:8]
@@ -231,18 +244,39 @@ class InstagramAPI:
             if n >= max_per_cycle:
                 break
             try:
-                comments = self._get(f"{m['id']}/comments", fields="id,text").get("data", [])
+                comments = self._get(
+                    f"{m['id']}/comments",
+                    fields="id,text,username").get("data", [])
             except InstagramError:
-                continue
-            # already answered this media? skip (anti-duplicate)
-            if any("link in bio" in (c.get("text") or "").lower() for c in comments):
                 continue
             for c in comments:
                 if n >= max_per_cycle:
                     break
+                cid = str(c.get("id") or "")
                 low = (c.get("text") or "").lower()
                 hit = next((k for k in triggers if k in low), "")
-                if hit:
+                if not hit or not cid:
+                    continue
+                if is_answered:
+                    try:
+                        if is_answered(cid):
+                            continue          # never DM the same person twice
+                    except Exception:  # noqa: BLE001
+                        pass
+                sent = False
+                if dm_on and dm_for:
+                    try:
+                        body = dm_for(m["id"], hit) or ""
+                    except Exception:  # noqa: BLE001
+                        body = ""
+                    if body:
+                        sent = self.private_reply_to_comment(cid, body)
+                        if not sent:
+                            # token without messages scope: fall back to the
+                            # public "link in bio" reply so the comment is
+                            # still answered
+                            public_on = True
+                if public_on:
                     msg = reply
                     if reply_for:
                         try:
@@ -251,12 +285,24 @@ class InstagramAPI:
                             msg = reply
                     try:
                         self._post(f"{m['id']}/comments", message=msg)
-                        n += 1
-                        _t.sleep(3 + _r.random() * 5)  # human-ish delay
-                    except InstagramError:
-                        continue
+                        sent = True
+                    except InstagramError as exc:
+                        log.warning("Comment reply skipped: %s", str(exc)[:120])
+                if sent:
+                    n += 1
+                    if mark_answered:
+                        try:
+                            mark_answered(cid)
+                        except Exception:  # noqa: BLE001
+                            pass
+                    # human-ish delay (configurable so tests/ops can zero it)
+                    delay = self.cfg.get_float(
+                        "instagram.reply_delay_seconds", 3.0)
+                    if delay > 0:
+                        _t.sleep(delay + _r.random() * 2)
         if n:
-            log.info("Auto-replied to %d 'link' comments", n)
+            log.info("Answered %d trigger comment(s) (%s)", n,
+                     "DM" if dm_on else "public")
         return n
 
     # ------------------------------------------------- auto bio link
@@ -277,6 +323,41 @@ class InstagramAPI:
             return False
 
     # ------------------------------------------------- ManyChat-style DMs
+    def message_user(self, user_id: str, text: str) -> bool:
+        """Send a DM to a user id (inside Instagram's 24h message window)."""
+        try:
+            self._post_json(f"{self.ig_user_id}/messages", {
+                "recipient": {"id": str(user_id)},
+                "message": {"text": str(text)[:1000]},
+            })
+            return True
+        except InstagramError as exc:
+            log.warning("DM send skipped: %s", str(exc)[:120])
+            return False
+
+    def private_reply_to_comment(self, comment_id: str, text: str) -> bool:
+        """ManyChat's signature move, via the OFFICIAL API: reply to a comment
+        with a PRIVATE message (DM) to whoever wrote it.
+
+        Instagram allows this for 7 days after the comment, and it is the exact
+        same endpoint ManyChat uses — no third party, no password sharing, no
+        automation-detection trickery. Falls back to nothing (returns False)
+        when the token lacks instagram_manage_messages.
+        """
+        if not (self.enabled and self.configured):
+            return False
+        if not comment_id:
+            return False
+        try:
+            self._post_json(f"{self.ig_user_id}/messages", {
+                "recipient": {"comment_id": str(comment_id)},
+                "message": {"text": str(text)[:1000]},
+            })
+            return True
+        except InstagramError as exc:
+            log.warning("Private reply skipped: %s", str(exc)[:140])
+            return False
+
     def auto_dm(self, reply_for=None, max_per_cycle: int = 5) -> int:
         """ManyChat-grade AUTO-DM via the OFFICIAL Instagram Messaging API
         (no third-party, no ban risk): polls conversations, answers keyword
@@ -324,12 +405,12 @@ class InstagramAPI:
             if not body:
                 body = "🔗 Link in bio! 😍"
             try:
-                self._post_json(f"{self.ig_user_id}/messages", {
-                    "recipient": {"id": frm.get("id")},
-                    "message": {"text": body[:1000]},
-                })
-                n += 1
-                _t.sleep(2 + _r.random() * 4)  # human-ish
+                if self.message_user(frm.get("id"), body):
+                    n += 1
+                    delay = self.cfg.get_float(
+                        "instagram.reply_delay_seconds", 3.0)
+                    if delay > 0:
+                        _t.sleep(delay + _r.random() * 2)
             except InstagramError as exc:
                 log.warning("DM send skipped: %s", str(exc)[:120])
         if n:

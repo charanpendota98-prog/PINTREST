@@ -9,6 +9,9 @@ from typing import Any
 
 _lock = threading.Lock()
 
+# answered Instagram comment ids live in `state` under this key (bounded list)
+IG_COMMENTS_KEY = "ig.answered_comments"
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS products (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +60,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
     email TEXT NOT NULL UNIQUE,
     ts    TEXT NOT NULL
 );
+-- answered IG comment ids live in `state` under this key (bounded list)
+
 CREATE TABLE IF NOT EXISTS state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -229,6 +234,30 @@ class DB:
     def del_state(self, key: str) -> None:
         with _lock, self._conn() as c:
             c.execute("DELETE FROM state WHERE key=?", (key,))
+
+    # ------------------------------- IG comment ledger (ManyChat dedupe)
+    def ig_comment_seen(self, comment_id: str) -> bool:
+        """True when we already answered this exact comment (no double DMs)."""
+        if not comment_id:
+            return True
+        try:
+            ids = set(str(self.get_state(IG_COMMENTS_KEY)).split(","))
+        except Exception:  # noqa: BLE001
+            return False
+        return str(comment_id) in ids
+
+    def mark_ig_comment(self, comment_id: str, keep: int = 400) -> None:
+        """Remember an answered comment id (bounded, oldest dropped first)."""
+        if not comment_id:
+            return
+        try:
+            ids = [i for i in str(self.get_state(IG_COMMENTS_KEY)).split(",") if i]
+            if str(comment_id) in ids:
+                return
+            ids.append(str(comment_id))
+            self.set_state(IG_COMMENTS_KEY, ",".join(ids[-max(50, keep):]))
+        except Exception:  # noqa: BLE001 — ledger must never break posting
+            pass
 
     def update_product(self, pid: int, **fields: Any) -> None:
         if not fields:
