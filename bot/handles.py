@@ -275,6 +275,26 @@ def check_handle(handle: str, timeout: float = 8.0) -> dict:
     return out
 
 
+def pick_first_free(candidates: list[str], timeout: float = 8.0) -> dict:
+    """Probe candidates in order; return the FIRST free on both platforms.
+
+    "Free on both" only. A handle blocked/unknown is skipped, never assumed —
+    the whole point is that the owner should not have to re-check by hand.
+    """
+    checked: list[dict] = []
+    for cand in candidates:
+        h = clean_handle(cand)
+        if len(h) < HANDLE_MIN:
+            continue
+        res = check_handle(h, timeout)
+        checked.append(res)
+        if res["verdict"] == "free_both":
+            return {"picked": h, "tested": checked,
+                    "skipped": [c["handle"] for c in checked[:-1]]}
+    return {"picked": "", "tested": checked,
+            "skipped": [c["handle"] for c in checked]}
+
+
 def check_lines(candidates: list[str], timeout: float = 8.0,
                 limit: int = 6) -> list[str]:
     """Probe the top of the ladder and say which handle to actually pick."""

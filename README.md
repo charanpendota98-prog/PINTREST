@@ -245,8 +245,34 @@ python -m bot name "SuperDeals"        # ⛔ "already in use — vaddu" ani chep
 
 ```bash
 python -m bot name "Gharvana" --live   # score + live handle/domain check
-python -m bot name                     # current brand decision sheet
+python -m bot name --next              # 🚨 handle taken? → full plan
+python -m bot handle check --pick gharvanahome gharvanadeals thegharvana
+                                       # rendu chotla free unna modati handle auto-save
 ```
+
+#### Handle already taken aa? (ee case lo)
+
+**Brand name marchalsina avasaram ledu.** Pinterest lo NAME unique kaadu —
+handle matrame unique. Order lo try cheyyandi:
+
+| # | Handle | Enduku |
+|---|---|---|
+| 1 | `gharvanahome` | Brand + niche (Home) — SEO-friendly, mundu ide try cheyyi |
+| 2 | `gharvanadeals` | Brand + "deals" — positioning ki match |
+| 3 | `gharvanafinds` | Brand + "finds" — NAME field wording ki match |
+| 4 | `thegharvana` | Official account la kanipistundi |
+| 5 | `gharvanaindia` | India market signal |
+| 6 | `gharvanahq` | Short, brand-studio feel |
+| 7 | `gharvana_home` | Intentional separator (trailing underscore **vaddu**) |
+
+**Fully ownable brand kavali ante** (name + handle rendu nee vi): spelling
+variant teesukondi — `Gharvanaa`, `Gharvanah`, `Gharvaniya`, `Gharvanika`.
+Appudu NAME field kuda maarchali (`Gharvaniya | Home Deals & Finds`).
+
+> ⚙️ **One command (VPS lo):**
+> `python -m bot handle check --pick gharvanahome gharvanadeals gharvanafinds`
+> → Pinterest + Instagram rendu chotla free unna **modati** handle ni
+> automatic ga save chestundi (blocked/unknown ni skip chestundi, guess cheyyadu).
 
 Brand marchali ante (rendu commands, config comments safe):
 `python -m bot brand "Brand | Home & Kitchen"` + `python -m bot handle <name>`

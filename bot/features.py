@@ -340,6 +340,17 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+18) HANDLE TAKEN PLAYBOOK (R58) — "handle already taken ani vachindi"
+   🚨 `python -m bot name --next`: config lo unna brand ki full plan —
+   (1) brand + suffix/prefix (`gharvanahome` · `gharvanadeals` · `thegharvana` ·
+   `gharvanaindia` · `gharvana_home`), (2) **same sound, different spelling**
+   (`gharvanaa` · `gharvanah` · `gharvanika` · `gharvanora` · `gharvaniya`) —
+   brand word kuda fresh + claimable, (3) kotha coined names.
+   🤖 `python -m bot handle check --pick <names...>`: Pinterest + Instagram
+   rendu chotla free unna **MODATI** handle ni automatic ga save chestundi
+   (blocked/unknown ni skip chestundi, guess cheyyadu). Brand word odilesi
+   povadam avasaram ledu — handle variant + NAME field lo keywords = same reach.
+
 17) DEALS POSITIONING (R57) — "SuperDeals ani pedudama?"
    🎯 `python -m bot name "<Brand>"` ippudu **deals formula** kuda chupistundi:
    "SuperDeals" = promo phrase (Super Deals India / Superdeals.in / Online SUPER
@@ -358,7 +369,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   466 automated tests.
+   487 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

@@ -187,6 +187,98 @@ def name_field_options(brand: str) -> list[str]:
     return out
 
 
+def spelling_variants(base: str) -> list[dict]:
+    """Coined respellings of a brand word — same sound, still ownable.
+
+    Used when the exact word is taken: a doubled vowel or a different ending
+    keeps the name recognisable AND gives a fresh, claimable handle.
+    """
+    plain = re.sub(r"[^a-z]", "", str(base or "").lower())
+    if not plain:
+        return []
+    out: list[dict] = []
+    stem = plain[:-1] if plain.endswith(("a", "i", "o", "u")) else plain
+    ideas = [
+        (stem + "aa", "double vowel — same sound, Indian-style spelling"),
+        (stem + "ah", "'ah' ending — same pronunciation, different spelling"),
+        (stem + "ika", "'-ika' suffix — brand-like, easy to say"),
+        (stem + "ora", "'-ora' suffix — modern brand feel"),
+        (stem + "iya", "'-iya' suffix — warm, brandable"),
+        (stem + "aya", "'-aya' ending — keeps the rhythm, easy to type"),
+    ]
+    for word, why in ideas:
+        if word == plain or len(word) > 14 or _clusters(word):
+            continue
+        res = score(word)
+        if res["score"] < 70 or any("already in use" in r.lower()
+                                   for r in res["risks"]):
+            continue
+        out.append({"name": word.capitalize(), "handle": word, "why": why,
+                    "score": res["score"]})
+    return out
+
+
+def taken_plan(brand: str, niche: str = "Home") -> list[str]:
+    """'Handle taken' ki full plan: handle variants + spelling variants + fresh names."""
+    base = re.sub(r"[^a-z0-9]", "", str(brand or "").lower()) or "yourbrand"
+    title = str(brand or "").split("|")[0].strip().title() or base.title()
+    niche_word = re.sub(r"[^a-z]", "", niche.lower()) or "home"
+    handle_opts = [
+        (base + niche_word, f"brand + niche ('{niche_word}') — SEO-friendly, "
+                            "first thing to try"),
+        (base + "deals", "brand + 'deals' — matches the positioning"),
+        (base + "finds", "brand + 'finds' — matches the NAME field wording"),
+        ("the" + base, "'the' prefix — reads like the official account"),
+        (base + "india", "market keyword — India audience signal"),
+        ("get" + base, "'get' prefix — action word, voice-search friendly"),
+        (base + "hq", "'hq' — short, modern, brand-studio feel"),
+        (base + "_" + niche_word, "intentional separator (never a trailing "
+                                  "underscore)"),
+    ]
+    out = [
+        "═" * 66,
+        f"🚨 '{base}' HANDLE TAKEN — plan (brand ni marchalsina avasaram ledu)",
+        "═" * 66,
+        "   Try order (Pinterest lo paste → free aa? → Instagram lo kuda same",
+        "   handle check cheyyi → dorikindi save cheyyi):",
+        "",
+        "1️⃣ Same brand + suffix/prefix (4-6 chars extra, brand gurthu pettukuntaru)",
+    ]
+    for i, (h, why) in enumerate(handle_opts, 1):
+        h = clean_handle(h)[:HANDLE_MAX] if "clean_handle" in globals() else h[:30]
+        out.append(f"   {i}. @{h}  — {why}")
+
+    out += ["", "2️⃣ Same sound, different spelling (brand word kuda fresh + claimable)"]
+    variants = spelling_variants(base)
+    if variants:
+        for v in variants:
+            out.append(f"   • {v['name']}  (@{v['handle']}) — {v['why']} "
+                       f"[{v['score']}/100]")
+        out.append("   ℹ️ Spelling maarithe NAME field kuda maarchali "
+                   f"(ex: '{variants[0]['name']} | Home Deals & Finds') — "
+                   "appudu brand + handle rendu nee vi avutayi.")
+    else:
+        out.append("   (variants generate avvaledu — base already variant-la undi)")
+
+    out += ["", "3️⃣ Kotha coined name (brand word marudam ante)"]
+    fresh = [c for c in blends(8) if c["handle"] != base][:6]
+    for cand in fresh:
+        out.append(f"   • {cand['name']}  (@{cand['handle']}) — "
+                   f"{cand['meaning']} [{cand['score']}/100]")
+
+    out += [
+        "",
+        "⚙️  ANNI okkasari check + save (VPS lo):",
+        f"   python -m bot handle check --pick {' '.join(h for h, _ in handle_opts[:5])}",
+        "   → Pinterest + Instagram rendu chotla free unna MODATI handle ni",
+        "     automatic ga save chestundi (adhigam lo print chestundi).",
+        "",
+        "⚙️  Manual ga okati ishtam ante:",
+        "   python -m bot handle gharvanahome",
+    ]
+    return out
+
+
 def deals_formula(brand: str) -> list[str]:
     """The honest answer to 'shall we just call it SuperDeals?'."""
     plain = re.sub(r"[^A-Za-z0-9]", "", str(brand or "")).lower() or "yourbrand"
@@ -292,7 +384,10 @@ def report(name: str, cfg=None, live: bool = False) -> list[str]:
         if live:
             from . import handles as _h
             out.append("🔎 LIVE CHECK")
-            out += _h.check_lines([handle], limit=1)
+            lines = _h.check_lines([handle], limit=1)
+            out += lines
+            if any("taken" in line for line in lines):
+                out += [""] + taken_plan(res["name"])
             for tld in (".com", ".in"):
                 state, detail = probe_domain(f"{plain}{tld}")
                 icon = {"serving": "❌ in use", "not-serving": "✅ not serving",

@@ -17,6 +17,7 @@ Usage:
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
   python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
+  python -m bot name --next              # 🚨 handle taken? → variants + auto-pick
   python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
   python -m bot handle check [names]     # 🔎 live: which handles are free?
   python -m bot onboard                  # 📋 every Pinterest screen → what to select
@@ -918,8 +919,17 @@ def cmd_name(cfg, rest: list[str]) -> int:
     from . import naming as _naming
     words = [w for w in rest if not w.startswith("-")]
     live = any(w in ("--live", "-l", "live", "check") for w in rest)
+    next_plan = any(w in ("--next", "-n", "next", "taken") for w in rest)
     name = " ".join(words).strip()
     print()
+    if next_plan:
+        brand = name
+        if not brand:
+            brand = str(cfg.get("brand.display_name", "") or "").split("|")[0]
+            brand = brand.strip() or str(cfg.get("design.brand_name", "") or "")
+        print("\n".join(_naming.taken_plan(brand or "Gharvana")))
+        print()
+        return 0
     if name:
         print("\n".join(_naming.report(name, cfg, live=live)))
     else:
@@ -937,10 +947,33 @@ def cmd_handle(cfg, rest: list[str]) -> int:
     words = arg.split()
     if words and words[0].lower() in ("check", "--check", "verify"):
         from . import handles as _h
-        given = [_h.clean_handle(w) for w in words[1:] if w.strip()]
+        pick = any(w in ("--pick", "--save") for w in words[1:])
+        given = [_h.clean_handle(w) for w in words[1:]
+                 if w.strip() and not w.startswith("-")]
         cands = given or ([i["handle"] for i in _h.handle_ideas()] + _h.plan_c())
         print()
         print("\n".join(_h.check_lines(cands, limit=len(cands) if given else 6)))
+        if pick:
+            res = _h.pick_first_free(cands)
+            print()
+            if res["picked"]:
+                saved = _h.save_handle(cfg, res["picked"])
+                print(f"✅ Picked + saved the first handle free on BOTH "
+                      f"platforms: {res['picked']}")
+                if res["skipped"]:
+                    print(f"   (taken/unknown ani skip chesindi: "
+                          f"{', '.join(res['skipped'])})")
+                if res.get("warnings"):
+                    print(f"   ⚠️ {res['warnings'][0]}")
+                if res.get("polish"):
+                    print(f"   🔧 Cleaner alternative: "
+                          f"{' / '.join(res['polish'][:3])}")
+                if not saved.get("saved"):
+                    print("   ⚠️ Save avvaledu — config ni check cheyyandi.")
+            else:
+                print("❌ Ee list lo full-free handle dorakaledu. "
+                      "Kotha names: python -m bot name --next")
+                print("   (leda: python -m bot name \"Gharvana\" --live)")
         print()
         return 0
     saved_line = ""
