@@ -176,7 +176,7 @@ class TestQAGate(unittest.TestCase):
         cfg.raw.setdefault("affiliate", {})["amazon_tag"] = "me-21"
         with tempfile.TemporaryDirectory() as tmp:
             img = Path(tmp) / "p.jpg"
-            Image.new("RGB", (900, 900), "white").save(img)
+            _pin_like(img)
             db = DB(Path(tmp) / "t.db")
             prod = {"id": 1, "title": "Wireless Bluetooth Earbuds Gaming"}
             seo_t = "Wireless Bluetooth Earbuds Gaming | best deal 2026"
@@ -406,7 +406,7 @@ class TestCommissionLeak(unittest.TestCase):
         cfg = load_config()
         with tempfile.TemporaryDirectory() as tmp:
             img = Path(tmp) / "p.jpg"
-            Image.new("RGB", (900, 900), "white").save(img)
+            _pin_like(img, (900, 900))
             db = DB(Path(tmp) / "t.db")
             prod = {"id": 1, "title": "Wireless Bluetooth Earbuds Gaming",
                     "source": source}
@@ -709,3 +709,48 @@ class TestStoreTrueHooks(unittest.TestCase):
 
     def test_source_optional_backwards_compatible(self):
         self.assertTrue(hook_for("₹99", "Kurta", 3))
+
+
+def _pin_like(path, size=(1000, 1500)):
+    """Non-blank stand-in for a DESIGNED pin (QA rejects blank media now)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", size, "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 60, size[0] - 60, size[1] - 420), fill=(38, 38, 58))
+    d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
+                fill=(200, 30, 60))
+    im.save(path)
+
+
+class TestBlankMediaGuard(unittest.TestCase):
+    """R73 — a pin that rendered blank must never go live."""
+
+    def test_blank_detector(self):
+        from PIL import Image, ImageDraw
+        from bot.qa import pin_is_blank
+        flat = Image.new("RGB", (900, 900), "white")
+        self.assertTrue(pin_is_blank(flat))
+        textured = Image.new("RGB", (900, 900), "white")
+        d = ImageDraw.Draw(textured)
+        d.rectangle((50, 50, 850, 500), fill=(30, 30, 60))
+        d.text((60, 620), "JUST ₹299", fill=(0, 0, 0))
+        self.assertFalse(pin_is_blank(textured))
+
+    def test_qa_quarantines_a_blank_pin(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from bot.config import load_config
+        from bot.db import DB
+        from bot import qa
+        with tempfile.TemporaryDirectory() as tmp:
+            img = Path(tmp) / "blank.jpg"
+            Image.new("RGB", (1000, 1500), "white").save(img)
+            prod = {"id": 7, "title": "Cotton Kurta Set For Women",
+                    "source": "meesho"}
+            ok, issues = qa.qa_pin(
+                load_config(), DB(Path(tmp) / "t.db"), prod,
+                "Cotton Kurta Set For Women", "Cotton kurta set women #ad",
+                str(img), "https://www.meesho.com/af_invite/24197020:x:1?p_id=35pwo2&ext_id=35pwo2")
+            self.assertFalse(ok)
+            self.assertTrue(any("blank" in i for i in issues))

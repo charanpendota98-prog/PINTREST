@@ -63,7 +63,7 @@ def _seed(db: DB, tmp: str, n: int = 6, prefix: str = "race") -> str:
     img = Path(tmp) / "media" / "p.jpg"
     img.parent.mkdir(parents=True, exist_ok=True)
     if not img.exists():
-        Image.new("RGB", (1000, 1500), "white").save(img)
+        _pin_like(img)
     for i in range(n):
         db.add_product(
             source="meesho", url=f"https://www.meesho.com/{prefix}{i}/p/1k1b{100 + i}",
@@ -327,3 +327,14 @@ class TestManualPostJob(unittest.TestCase):
         self.c.post("/api/post", json={"count": 999})      # clamped, not a crash
         st = self._wait()
         self.assertLessEqual(st.get("done", 0), 10)
+
+
+def _pin_like(path, size=(1000, 1500)):
+    """Non-blank stand-in for a DESIGNED pin (QA rejects blank media now)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", size, "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 60, size[0] - 60, size[1] - 420), fill=(38, 38, 58))
+    d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
+                fill=(200, 30, 60))
+    im.save(path)

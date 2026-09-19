@@ -12,6 +12,24 @@ import pathlib
 
 FEATURES = [
     # (name, category, what it does, enablement check, how to enable)
+    ("Hi-res photo normalisation", "sourcing",
+     "every CDN asked for the FULL-SIZE shot (Amazon SL1500 / Flipkart 832 / "
+     "Meesho resize-strip) + one entry per real photo — no pixelated or "
+     "duplicate pins; downloads are PIL-verified (an HTML error page or a "
+     "1x1 pixel can never become a product photo)",
+     lambda cfg: True, "always on (scraper.normalize_image_url)"),
+    ("Blank-media guard", "safety",
+     "a pin that rendered blank (design failure) is quarantined, never posted",
+     lambda cfg: True, "always on (qa.pin_is_blank)"),
+    ("Trending collection seeds", "sourcing",
+     "Meesho's own Trending / Shoppers-Favourite / New-Collection pages are "
+     "hunted FIRST, then the niche search queries",
+     lambda cfg: True, "always on (trends.MEESHO_TRENDING)"),
+    ("Product-behind-headline hook", "content",
+     "the opening reel frame shows the product (blurred + darkened) behind "
+     "the headline — viewers see WHAT it is in second one",
+     lambda cfg: bool(cfg.get("video.auto_reel", True)),
+     "video.auto_reel=true (default on)"),
     ("Trending signals (★ + rating count)", "sourcing",
      "page's own ★/ratings scraped into the radar — 'em trending unnayo' "
      "with REAL numbers, never invented",
@@ -512,7 +530,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   680 automated tests.
+   690 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

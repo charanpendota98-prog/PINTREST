@@ -513,7 +513,7 @@ class TestMeeshoLinkCorrectness(unittest.TestCase):
             self.addCleanup(tmp.cleanup)
             db = DB(f"{tmp.name}/t.db")
             img = Path(tmp.name) / "p.jpg"
-            Image.new("RGB", (800, 1200), "white").save(img)
+            _pin_like(img)
             prod = {"id": 1, "source": "meesho",
                     "title": "Floral Printed Kurta Set for Women"}
             seo_t = "Floral Printed Kurta Set for Women | best deal 2026"
@@ -664,3 +664,14 @@ class TestMeeshoLandingProbeDetail(unittest.TestCase):
                 "https://www.meesho.com/af_invite/24197020:facebook:1?p_id=1&ext_id=1")
         self.assertIsNone(pr["ok"])
         self.assertIn("dns", pr["reason"])
+
+
+def _pin_like(path, size=(1000, 1500)):
+    """Non-blank stand-in for a DESIGNED pin (QA rejects blank media now)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", size, "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 60, size[0] - 60, size[1] - 420), fill=(38, 38, 58))
+    d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
+                fill=(200, 30, 60))
+    im.save(path)

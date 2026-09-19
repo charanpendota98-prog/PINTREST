@@ -240,13 +240,29 @@ class Engine:
 
         # download full gallery (up to max_images photos)
         max_imgs = max(1, self.cfg.get_int("scraping.max_images", 3))
+        from .scraper import photo_key
+        photo_urls: list[str] = []
+        seen_keys: set[str] = set()
+        for img_url in (prod.images or [prod.image_url]):
+            if not img_url:
+                continue
+            key = photo_key(img_url)          # one entry per REAL photo
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            photo_urls.append(img_url)
+            if len(photo_urls) >= max_imgs:
+                break
         local_imgs: list[str] = []
-        for img_url in (prod.images or [prod.image_url])[:max_imgs]:
+        for img_url in photo_urls:
             p = self.scraper.download_image_url(img_url, self.cfg.media_dir, prod.title)
             if p and p not in local_imgs:
                 local_imgs.append(p)
         if not local_imgs:
             raise ValueError("Product found but image download failed.")
+        # the model-wearing shot leads EVERYWHERE (pin + reel), not just the reel
+        from .video_maker import pick_hero
+        local_imgs = pick_hero(local_imgs)
 
         # video: prefer the page's real product video…
         video_path = ""

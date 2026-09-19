@@ -417,7 +417,7 @@ class TestRealPostingPath(unittest.TestCase):
         self.calls: list = []
 
         img = Path(self.tmp.name) / "pin.jpg"
-        Image.new("RGB", (1000, 1500), (255, 255, 255)).save(img)
+        _pin_like(img)
         self.img = img
 
     def tearDown(self):
@@ -541,7 +541,7 @@ class TestIngestPipelineMocked(unittest.TestCase):
                 paths = []
                 for i in range(3):
                     p = Path(td) / f"s{i}.jpg"
-                    Image.new("RGB", (1000, 1500), (250, 250, 250)).save(p)
+                    _pin_like(p)
                     paths.append(str(p))
 
                 class FakeScraper:
@@ -752,3 +752,138 @@ class TestHookFrameNeverTruncates(unittest.TestCase):
             img = ReelMaker(_cfg(tmp))._frame_hook(
                 "rating viral meesho finds until i go broke day 41", 1.0)
             self.assertEqual(img.size, (720, 1280))
+
+
+def _pin_like(path, size=(1000, 1500)):
+    """Non-blank stand-in for a DESIGNED pin (QA rejects blank media now)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", size, "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 60, size[0] - 60, size[1] - 420), fill=(38, 38, 58))
+    d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
+                fill=(200, 30, 60))
+    im.save(path)
+
+
+class TestCorrectPhotos(unittest.TestCase):
+    """R73 — "correctgaa photos thiskoni upload cheyali".
+
+    Downloads must be the FULL-SIZE photo, one entry per real shot, and an
+    HTML error page / 1×1 pixel can never be saved as a product photo.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.cfg = _cfg(self.tmp.name)
+        Path(self.cfg.media_dir).mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _scraper(self):
+        from bot.scraper import Scraper
+        return Scraper(self.cfg)
+
+    def test_normalize_image_url_full_size(self):
+        from bot.scraper import normalize_image_url as n
+        self.assertIn("._SL1500_.", n("https://m.media-amazon.com/images/I/71a._SX300_.jpg"))
+        self.assertIn("/image/832/832/",
+                      n("https://rukminim2.flixcart.com/image/128/128/x/jpeg/a.jpg"))
+        self.assertEqual(n("https://images.meesho.com/images/products/1/x.jpg?width=200"),
+                         "https://images.meesho.com/images/products/1/x.jpg")
+        self.assertEqual(n("https://images.meesho.com/images/products/1/x_320x480.jpg"),
+                         "https://images.meesho.com/images/products/1/x.jpg")
+
+    def test_photo_key_collapses_sizes(self):
+        from bot.scraper import photo_key
+        self.assertEqual(photo_key("https://m.media-amazon.com/images/I/71a._SX300_.jpg"),
+                         photo_key("https://m.media-amazon.com/images/I/71a._SL1500_.jpg"))
+        self.assertEqual(photo_key("https://images.meesho.com/images/products/1/x.jpg?width=90"),
+                         photo_key("https://images.meesho.com/images/products/1/x.jpg?width=900"))
+
+    def test_gallery_keeps_one_entry_per_shot_hi_res(self):
+        from bs4 import BeautifulSoup
+        from bot.scraper import Product
+        html = ('<html><head><script type="application/ld+json">'
+                '{"@type":"Product","name":"Kurti","image":['
+                '"https://images.meesho.com/images/products/1/x.jpg?width=200",'
+                '"https://images.meesho.com/images/products/1/x.jpg?width=1000"]}'
+                '</script></head><body></body></html>')
+        s = self._scraper()
+        s._last_html = html
+        prod = Product(url="https://www.meesho.com/kurti/p/35pwo2", source="meesho")
+        s._collect_images(BeautifulSoup(html, "html.parser"), prod)
+        self.assertEqual(len(prod.images), 1)
+        self.assertNotIn("?", prod.images[0])
+
+    class _Resp:
+        def __init__(self, content, ctype):
+            self.content, self.headers = content, {"content-type": ctype}
+
+        def raise_for_status(self):
+            pass
+
+    class _Sess:
+        def __init__(self, resp):
+            self.resp = resp
+
+        def get(self, url, timeout=30):
+            return resp_(self.resp)
+
+    def test_download_rejects_html_error_page(self):
+        s = self._scraper()
+        s.session = self._Sess(self._Resp(b"<html>403 Forbidden</html>", "text/html"))
+        self.assertEqual(s.download_image_url("https://x/a.jpg", self.dir), "")
+
+    def test_download_rejects_tiny_and_accepts_real_photo(self):
+        import io as _io
+        from PIL import Image
+        s = self._scraper()
+        small = _io.BytesIO()
+        Image.new("RGB", (64, 64), (10, 200, 10)).save(small, "PNG")
+        s.session = self._Sess(self._Resp(small.getvalue(), "image/png"))
+        self.assertEqual(s.download_image_url("https://x/tiny.png", self.dir), "")
+        big = _io.BytesIO()
+        Image.new("RGB", (900, 1200), (120, 30, 200)).save(big, "JPEG")
+        data = big.getvalue()
+        s.session = self._Sess(self._Resp(data, "image/jpeg"))
+        p1 = s.download_image_url("https://x/big.jpg", self.dir, "test")
+        p2 = s.download_image_url("https://x/big.jpg", self.dir, "test")
+        self.assertTrue(p1 and Path(p1).exists())
+        self.assertEqual(p1, p2)          # same bytes → same file (no dupes)
+
+    def test_hook_frame_shows_the_product(self):
+        from PIL import Image, ImageStat
+        from bot.video_maker import ReelMaker
+        bg = Image.new("RGB", (900, 1400), (200, 30, 40))
+        img = ReelMaker(self.cfg)._frame_hook("wait for the price", 1.0, bg=bg)
+        self.assertEqual(img.size, (720, 1280))
+        self.assertGreater(
+            ImageStat.Stat(img.convert("L").resize((64, 64))).stddev[0], 3.0)
+
+    def test_sourcing_plan_starts_with_trending_pages(self):
+        from bot.trends import MEESHO_TRENDING, sourcing_plan
+        plan = sourcing_plan(per_niche=1)
+        self.assertTrue(MEESHO_TRENDING)
+        self.assertEqual(plan[0][0], "meesho")
+        self.assertTrue(plan[0][1].startswith("https://www.meesho.com/"))
+
+    def test_discover_products_accepts_a_trending_url(self):
+        from bot.scraper import Scraper
+        s = Scraper(self.cfg)
+        seen = {}
+
+        def fake_fetch(url, retries=None):
+            seen["url"] = url
+            return '<a href="/kurti/p/35pwo2">x</a>'
+
+        s._fetch = fake_fetch
+        urls = s.discover_products("meesho", limit=2,
+                                   query="https://www.meesho.com/home-decor/pl/3tl")
+        self.assertEqual(seen["url"], "https://www.meesho.com/home-decor/pl/3tl")
+        self.assertTrue(any("/p/35pwo2" in u for u in urls))
+
+
+def resp_(r):
+    return r

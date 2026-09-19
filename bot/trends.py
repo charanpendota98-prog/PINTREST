@@ -159,9 +159,26 @@ def score_product(title: str, price: str, source: str) -> int:
     return s
 
 
+# Meesho's OWN trending / best-seller / new-collection pages. Verified live
+# (R73): they answer with real pages, and they are the closest public thing to
+# "em trending unnayo" — hunted FIRST, before the niche search queries.
+MEESHO_TRENDING = [
+    ("https://www.meesho.com/sarees-new-collection/pl/2kn", "Women's Fashion"),
+    ("https://www.meesho.com/women-topwear-trends/pl/40w0", "Women's Fashion"),
+    ("https://www.meesho.com/lehengas-favourite/pl/6lqa", "Women's Fashion"),
+    ("https://www.meesho.com/women-kurtis/pl/3j0", "Women's Fashion"),
+    ("https://www.meesho.com/home-decor/pl/3tl", "Home Decor & Organization"),
+    ("https://www.meesho.com/storage-organizers/pl/672t", "Home Decor"),
+    ("https://www.meesho.com/beauty-products/pl/9on", "Beauty & Skincare"),
+    ("https://www.meesho.com/jewellery/pl/9tx", "Jewellery & Accessories"),
+]
+
+
 def sourcing_plan(per_niche: int = 2) -> list[tuple[str, str, str]]:
     """Hunt order for autopilot: (store, query, niche_name) best niches first."""
-    plan: list[tuple[str, str, str]] = []
+    plan: list[tuple[str, str, str]] = [
+        ("meesho", url, niche) for url, niche in MEESHO_TRENDING
+    ]
     for n in sorted(WINNER_NICHES, key=lambda x: x["priority"]):
         for store, q in n["queries"].items():
             plan.append((store, q, n["name"]))

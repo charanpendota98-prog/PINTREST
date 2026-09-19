@@ -42,7 +42,7 @@ class TestAllRoutes(unittest.TestCase):
         cls.db = DB(cls.cfg.db_path)
         img = Path(cls.tmp.name) / "media" / "pin_demo.jpg"
         img.parent.mkdir(parents=True, exist_ok=True)
-        Image.new("RGB", (700, 900), "white").save(img)
+        _pin_like(img)
         pid = cls.db.add_product(
             source="amazon", url="https://www.amazon.in/dp/B0T1",
             affiliate_url="https://www.amazon.in/dp/B0T1?tag=t-21",
@@ -257,3 +257,14 @@ class TestNoDummyPosting(unittest.TestCase):
                            title="real one")
             pend = db.pending_products()
             self.assertEqual([p["url"] for p in pend], ["u2"])
+
+
+def _pin_like(path, size=(1000, 1500)):
+    """Non-blank stand-in for a DESIGNED pin (QA rejects blank media now)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", size, "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 60, size[0] - 60, size[1] - 420), fill=(38, 38, 58))
+    d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
+                fill=(200, 30, 60))
+    im.save(path)

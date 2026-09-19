@@ -21,6 +21,20 @@ from urllib.parse import urlparse
 log = logging.getLogger("pindrop.qa")
 
 MIN_SIDE = 600          # px — Pinterest shrinks tiny images to nothing
+
+
+def pin_is_blank(im) -> bool:
+    """True when the pin is (nearly) one flat colour = the design failed.
+
+    A blank/black pin still passes "file exists + big enough" and would go
+    live looking broken. stddev < 3 on a 64x64 grey copy catches it.
+    """
+    try:
+        from PIL import ImageStat
+        stat = ImageStat.Stat(im.convert("L").resize((64, 64)))
+        return float(stat.stddev[0]) < 3.0
+    except Exception:  # noqa: BLE001 — never block posting on a stats error
+        return False
 MAX_BYTES = 32_000_000  # API upload limit is ~32MB
 
 # 🔒 DUMMY-POSTING GUARD — owner's rule: "no dummy posting, ever".
@@ -87,6 +101,9 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
                 w, h = im.size
                 if min(w, h) < MIN_SIDE:
                     issues.append(f"media too small ({w}x{h} < {MIN_SIDE}px)")
+                elif pin_is_blank(im):
+                    issues.append("pin image is blank (design never rendered) "
+                                  "— pin quarantined")
         except Exception as exc:  # noqa: BLE001
             issues.append(f"media unreadable: {exc}")
 

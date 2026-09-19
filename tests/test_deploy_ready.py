@@ -395,7 +395,7 @@ class TestMoneyPathCompliance(unittest.TestCase):
         media = Path(self.cfg.media_dir)
         media.mkdir(parents=True, exist_ok=True)
         img = media / "pin_1.jpg"
-        Image.new("RGB", (1000, 1500), "white").save(img)
+        _pin_like(img)
         self.aff = ("https://www.meesho.com/af_invite/24197020:instagram_stories"
                     ":11075346?p_id=1k1b6")
         self.db = DB(self.cfg.db_path)
@@ -432,3 +432,14 @@ class TestMoneyPathCompliance(unittest.TestCase):
         r = c.get(f"/go/{pid}")
         self.assertEqual(r.status_code, 302)
         self.assertIn("af_invite", r.headers.get("Location", ""))
+
+
+def _pin_like(path, size=(1000, 1500)):
+    """Non-blank stand-in for a DESIGNED pin (QA rejects blank media now)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", size, "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 60, size[0] - 60, size[1] - 420), fill=(38, 38, 58))
+    d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
+                fill=(200, 30, 60))
+    im.save(path)

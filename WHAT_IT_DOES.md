@@ -65,7 +65,8 @@ line chupistundi.
 - 1 product → **3 pin variations** (different photo + design template)
 - **Auto-reel**: **whole product gallery → one video** (model-wearing shot
   first, a different ken-burns move per photo; slanted **"JUST ₹299"**
-  sticker + real ★/rating chip when the page shows them) + **original
+  sticker + real ★/rating chip when the page shows them; the opening
+  frame shows the product behind the headline) + **original
   composed BGM** (copyright-free;
   ni uploaded audio unte adi win) + TTS voiceover (en/hi/te)
 - **Pinterest image SEO**: filename `women-floral-kurta-549-<ts>_v0.jpg` —

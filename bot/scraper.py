@@ -11,6 +11,8 @@ product via CSV/dashboard instead — the bot never crashes on it.
 """
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import logging
 import random
@@ -39,6 +41,41 @@ DOMAIN_SOURCES = {
     "meesho": ("meesho.com", "affiliate.meesho.com"),
     "flipkart": ("flipkart.com", "fkrt.it"),
 }
+
+
+def normalize_image_url(url: str) -> str:
+    """Ask the CDN for the FULL-SIZE version of the SAME photo.
+
+    Thumbnails make pixelated pins, so: Amazon → ._SL1500_., Flipkart →
+    image/832/832/, Meesho → drop the resize query string. Only well-known
+    patterns are touched; callers keep the original URL as a fallback.
+    """
+    u = (url or "").strip()
+    if not u:
+        return ""
+    if u.startswith("//"):
+        u = "https:" + u
+    if "media-amazon.com" in u or "images-amazon.com" in u:
+        u = re.sub(r"\._[^_.]+_\.", "._SL1500_.", u)
+    if "flixcart.com" in u:
+        u = re.sub(r"/image/\d+/\d+/", "/image/832/832/", u)
+    if "images.meesho.com" in u:
+        base, _, q = u.partition("?")
+        if q and re.search(r"(width|height|resize|quality)=", q, re.I):
+            u = base
+        u = re.sub(r"_(\d{2,4})x(\d{2,4})(?=\.(?:jpe?g|png|webp))", "", u)
+    return u
+
+
+def photo_key(url: str) -> str:
+    """Identity of a photo ignoring CDN size variants (dedupe key)."""
+    u = (url or "").strip().lower().split("?")[0]
+    if u.startswith("//"):
+        u = "https:" + u
+    u = re.sub(r"\._[^_.]+_\.", ".", u)
+    u = re.sub(r"/image/\d+/\d+/", "/image/", u)
+    u = re.sub(r"_(\d{2,4})x(\d{2,4})(?=\.(?:jpe?g|png|webp))", "", u)
+    return re.sub(r"^https?://", "", u)
 
 
 def human_int(text) -> int:
@@ -188,15 +225,26 @@ class Scraper:
     def _collect_images(self, soup: BeautifulSoup, prod: Product) -> None:
         imgs: list[str] = []
 
+        seen_keys: set[str] = set()
+
         def push(u: str) -> None:
+            """HI-RES first, original as fallback, exactly one entry per shot.
+
+            Without the key check a gallery yields 4 thumbnails + 4 originals
+            of the same dress → duplicate pins (spam signal) and pixelated
+            designs. With it: one entry per photo, the big one.
+            """
             u = (u or "").strip()
-            if u.startswith("//"):
-                u = "https:" + u
-            # top-tier trick: force Amazon CDN to serve HI-RES (1500px)
-            if "m.media-amazon.com" in u:
-                u = re.sub(r"\._[^_]+_\.", "._SL1500_.", u)
-            if u.startswith("http") and u not in imgs and ".svg" not in u:
-                imgs.append(u)
+            if not u:
+                return
+            for cand in (normalize_image_url(u), u):
+                if not cand.startswith("http") or ".svg" in cand:
+                    continue
+                key = photo_key(cand)
+                if key in seen_keys or cand in imgs:
+                    continue
+                seen_keys.add(key)
+                imgs.append(cand)
 
         # PRO SOURCE #1: Amazon 'colorImages' JS blob — the REAL hiRes gallery
         # (same data Amazon's own viewer uses; survives lazy-loading)
@@ -448,7 +496,10 @@ class Scraper:
         Returns [] politely when the network blocks us.
         """
         from urllib.parse import quote_plus
-        if query:
+        if query and query.startswith("http"):
+            # trending/collection SEED URLs (bot/trends.MEESHO_TRENDING)
+            urls = {source or "meesho": query}
+        elif query:
             urls = {
                 "amazon": f"https://www.amazon.in/s?k={quote_plus(query)}",
                 "flipkart": f"https://www.flipkart.com/search?q={quote_plus(query)}",
@@ -487,28 +538,56 @@ class Scraper:
             log.info("Discovered %d %s products", len(found), source)
         return found
 
-    def download_image_url(self, url: str, dest_dir, name_hint: str = "") -> str:
-        """Download any image url locally; returns saved path or ''."""
+    def download_image_url(self, url: str, dest_dir, name_hint: str = "",
+                           min_side: int = 300) -> str:
+        """Download a PRODUCT PHOTO — and prove it really is one.
+
+        A blocked/404 CDN answers with an HTML error page (or a 1×1 pixel);
+        saving that as a product photo puts a broken image on a pin. So the
+        bytes must decode with PIL, be big enough, and be unique (sha1) —
+        otherwise we return '' and the caller tries the next photo.
+        """
         if not url:
             return ""
         try:
             resp = self.session.get(url, timeout=30)
             resp.raise_for_status()
-            ctype = resp.headers.get("content-type", "")
-            ext = ".png" if "png" in ctype else (".webp" if "webp" in ctype else ".jpg")
-            safe = re.sub(r"[^A-Za-z0-9_-]+", "_", name_hint)[:50].strip("_") or "img"
-            path = dest_dir / f"{safe}_{int(time.time()*1000)}{ext}"
-            path.write_bytes(resp.content)
-            return str(path)
         except requests.RequestException as exc:
             log.warning("Image download failed for %s: %s", url, exc)
             return ""
+        ctype = (resp.headers.get("content-type") or "").lower()
+        data = resp.content or b""
+        if ctype and not ctype.startswith("image/"):
+            log.warning("Image download rejected (content-type %s): %s", ctype, url)
+            return ""
+        try:
+            from PIL import Image          # lazy: the scraper must import w/o PIL
+            with Image.open(io.BytesIO(data)) as im:
+                im.load()
+                w, h = im.size
+                fmt = (im.format or "JPEG").upper()
+        except Exception as exc:  # noqa: BLE001 — not an image / half-downloaded
+            log.warning("Image download rejected (undecodable, %d bytes): %s",
+                        len(data), url)
+            return ""
+        if min(w, h) < min_side:
+            log.warning("Image download rejected (too small %dx%d): %s", w, h, url)
+            return ""
+        digest = hashlib.sha1(data).hexdigest()[:12]
+        ext = {"PNG": ".png", "WEBP": ".webp", "GIF": ".gif"}.get(fmt, ".jpg")
+        safe = re.sub(r"[^A-Za-z0-9_-]+", "_", name_hint)[:50].strip("_") or "img"
+        path = dest_dir / f"{safe}_{digest}{ext}"
+        if not path.exists():                     # same photo twice → same file
+            path.write_bytes(data)
+        log.debug("Image ok %dx%d %s", w, h, path.name)
+        return str(path)
 
     # -- cross-store enrichment: same product, watermark-free media -------
     SEARCH_URLS = {
         "amazon": ("https://www.amazon.in/s?k={q}", r'href="(/[^"]*?/dp/[A-Z0-9]{10}[^"]*)"'),
         "flipkart": ("https://www.flipkart.com/search?q={q}", r'href="(/[^"]*?/p/[^"?]+)'),
-        "meesho": ("https://www.meesho.com/search?q={q}", r'href="(/[^"?]+-p-[a-z0-9]+)'),
+        "meesho": ("https://www.meesho.com/search?q={q}",
+                   r'href="(/[^"?]*?/p/[a-z0-9]+)'),
     }
     HOSTS = {"amazon": "https://www.amazon.in",
              "flipkart": "https://www.flipkart.com",

@@ -16,7 +16,7 @@ import logging
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 log = logging.getLogger("pindrop.video")
 
@@ -327,7 +327,8 @@ class ReelMaker:
         writer.send(None)  # init
         frames = 0
         for i in range(n_hook):
-            writer.send(self._frame_hook(hook, i / n_hook).tobytes())
+            writer.send(self._frame_hook(hook, i / n_hook,
+                                         bg=photos[0]).tobytes())
             frames += 1
         proof = _proof_label(rating, reviews)
         for idx, photo in enumerate(photos):
@@ -458,8 +459,18 @@ class ReelMaker:
             return out
 
     # ------------------------------------------------------------ frames
-    def _frame_hook(self, hook: str, t: float) -> Image.Image:
-        img = Image.new("RGB", (W, H), (16, 16, 20))
+    def _frame_hook(self, hook: str, t: float,
+                    bg: Image.Image | None = None) -> Image.Image:
+        """Opening frame. With `bg` the product itself sits behind the
+        headline (blurred + darkened) — the viewer sees WHAT it is in second
+        one, which is exactly how the top reels open."""
+        if bg is not None:
+            base = ImageOps.fit(bg, (W, H), method=Image.LANCZOS,
+                                centering=(0.5, 0.35))
+            img = Image.blend(base.filter(ImageFilter.GaussianBlur(9)),
+                              Image.new("RGB", (W, H), (12, 12, 16)), 0.58)
+        else:
+            img = Image.new("RGB", (W, H), (16, 16, 20))
         d = ImageDraw.Draw(img)
         # subtle vignette bars
         d.rectangle((0, 0, W, 90), fill=(230, 0, 35))
