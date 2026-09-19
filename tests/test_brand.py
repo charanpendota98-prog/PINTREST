@@ -212,3 +212,27 @@ class TestCliAndLines(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOnboardingGuidance(unittest.TestCase):
+    """The Pinterest onboarding answers must stay documented (R51).
+
+    The owner hit these screens live; the answers belong in the repo so nobody
+    has to research them again.
+    """
+
+    def test_readme_documents_goals_and_focus(self):
+        readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+        self.assertIn("A few more details", readme)
+        self.assertIn("Increase online sales", readme)
+        self.assertIn("Drive traffic to your site", readme)   # outbound clicks
+        self.assertIn("Brand focus", readme)
+        self.assertIn("Content creator", readme)
+
+    def test_wizard_and_ready_mention_them(self):
+        src = (Path(__file__).resolve().parents[1] / "bot" / "main.py").read_text()
+        ready = (Path(__file__).resolve().parents[1] / "bot" / "ready.py").read_text()
+        for needle in ("A few more details", "Drive traffic to your site",
+                       "Brand focus"):
+            self.assertIn(needle, src)
+        self.assertIn("Brand focus: Home", ready)

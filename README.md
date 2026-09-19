@@ -85,6 +85,27 @@ mana landing page URL (`link.public_base`, e.g. `https://yourdomain.com`) →
 Pinterest lo **Claim** cheyandi (Settings → Claimed accounts). Claim cheste
 **Rich Pins** + pins ki mana site attribution vasthundi (extra reach).
 
+**2a-2. "A few more details" screen — emi pick cheyali?**
+
+**Business goals** (multi-select — ee moodu pick cheyandi):
+- ✅ `Increase online sales` — ide mana core (commission)
+- ✅ `Drive traffic to your site` — **chala important**: Pinterest analytics lo
+  *outbound clicks* (mana money metric) ee goal tho highlight avutundi, and
+  Pinterest ranking ki outbound clicks positive signal
+- ✅ `Create content on Pinterest to grow an audience` — reach/creator tools
+- ⬜ `Grow brand awareness` — optional (harm ledu)
+- ⬜ `Generate more leads` — mana daggara email capture undi, kani primary kaadu
+- ⬜ `Not sure yet` — vaddu
+
+**Brand focus** (single select — okate pick cheyali):
+👉 **`Home`** — enduku:
+- 2026 lo Pinterest lo **#1 niche** = home decor & organization (billions of pins)
+- Mana radar kuda **problem-solver home/kitchen** products ki highest score
+  isthundi (organizers, storage, kitchen gadgets) — bot content ee focus lo untundi
+- Fashion (#2), Beauty (#3) taruvata vastayi — kani focus okate undali,
+  Pinterest single-focus accounts ni better ga rank chestundi
+- Later change cheyyali anipisthe: Settings → Business → edit (lock kaadu)
+
 **2b. Developer app (API access):**
 1. Go to **https://developers.pinterest.com/apps/** → *Create app*.
 2. In the app: add the redirect URI exactly as: `http://localhost:8888/callback`

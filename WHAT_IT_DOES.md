@@ -89,7 +89,7 @@ line chupistundi.
 
 - Pin-by-Pin **QA gate** — broken/untracked content never posts
 - **Dummy guard** — demo/sample data (`seed_demo.py`) live account ki
-  **NEVER** post (status=demo + URL marker check; 338 tests lo proof)
+  **NEVER** post (status=demo + URL marker check; 340 tests lo proof)
 - **Warm-up ramp** — kotha account slow start, jitter, human gaps
 - **Crash-net** — edaina fail aithe loop continue (24×7 alive)
 - **Single-instance lock** — rendu autopilot okate machine lo run avvavu
@@ -98,7 +98,7 @@ line chupistundi.
 - **Panel lock** — dashboard (stats/controls/logs) password protected;
   money pages (`/go/…`, `/deals/today`) public ga untayi
 - **Housekeep** — disk cleanup, logs cap
-- **338 automated tests** — prathi route/page/endpoint + QA + leak +
+- **340 automated tests** — prathi route/page/endpoint + QA + leak +
   dummy + panel lock + single-instance + JS syntax (`node --check`)
 
 ---
