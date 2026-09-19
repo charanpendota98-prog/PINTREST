@@ -268,12 +268,21 @@ def profile_form(cfg, name: str = "") -> list[str]:
         pass
     verdict, reason = website_advice(site)
     mark = {"empty": "⏸ ", "warn": "⛔", "ok": "✅"}.get(verdict, "•")
+    handle = pin_strip(display).lower().replace(" ", "")
+    saved_handle = ""
+    try:
+        saved_handle = str(cfg.get("brand.handle", "") or "")
+    except Exception:  # noqa: BLE001
+        pass
+    if saved_handle:
+        handle = saved_handle
     return [
         "📝 PINTEREST 'EDIT PROFILE' FORM — field by field:",
         f"   Name       → {display}",
         "                (idi KEYWORD field — search lo ide kanipistundi)",
-        f"   Username   → {pin_strip(display).lower().replace(' ', '')}"
-        "                  (@handle; Name lo handle pettakandi)",
+        f"   Username   → {handle}"
+        "                  (@handle; Name lo handle pettakandi"
+        + ("" if saved_handle else " — taken aa? python -m bot handle") + ")",
         f"   About      → {bio}",
         "   Pronouns   → (blank — brand account ki avasaram ledu)",
         f"   Website    → {site or '(blank until deploy)'}",

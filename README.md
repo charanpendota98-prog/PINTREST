@@ -161,6 +161,36 @@ use the same handle on Instagram so the two accounts reinforce each other.
 >
 > ⚠️ **Common trap:** `pindropdeals` ni **Name** field lo pettakandi (appudu
 > keyword poyindi) — adi **Username** field lo pettali.
+**Handle (username) rules + "already taken" ladder**
+
+Pinterest username: **3-30 chars**, letters + numbers + underscore matrame
+(hyphen ❌ dot ❌ space ❌, anni numbers ❌). Instagram kuda ide set allow
+chestundi → **oke handle rendu chotla** vaadandi (brand consistency).
+
+```bash
+python -m bot handle                 # rules + ranked fallbacks + save hint
+python -m bot handle pindrop_deals   # save the one you picked
+```
+
+`pindropdeals` taken aithe ee order lo try cheyyandi (top = best):
+
+| # | Handle | Enduku |
+|---|---|---|
+| 1 | `pindrop_deals` | Brand ki closest (space → underscore), cleanest |
+| 2 | `pindropdealshome` | Niche keyword (Home) — search/suggest lo brand+niche |
+| 3 | `pindropdealsindia` | Market keyword — India account la kanipistundi |
+| 4 | `thepindropdeals` | Prefix — real brand la, fan account la kaadu |
+| 5 | `getpindropdeals` | Prefix — action word, voice search ki best |
+| 6-9 | `...hq` · `...co` · `...daily` · `...shop` | Chinnadi + brand-ish |
+| 10 | `pindropdeals01` | ⚠️ **Last option** — numbers = duplicate/fan la kanipistundi |
+
+Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
+`smartfindsindia`, `gharfinds`, `dealfindsindia`.
+
+> 💡 **Name field unique kaadu** — `PinDrop Deals | Home & Kitchen` pettachu
+> (adi keyword/ranking field). Handle lo keywords stuff cheyyakandi (adi URL
+> matrame, ranking ki peddaga use ledu).
+
 > ⚠️ **Website field lo `t.me` / `wa.me` / shortener links pettakandi** —
 > Pinterest vaatini claim cheyyanivvadu (Rich Pins + attribution pothayi) and
 > loot-deal links ni spam pattern ga chustundi. Deploy ayyaka mana landing

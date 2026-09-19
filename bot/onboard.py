@@ -77,6 +77,17 @@ SCREENS: list[tuple[str, str, str, str]] = [
         "do it (2 min)",
     ),
     (
+        "Username already taken? (e.g. pindropdeals)",
+        "python -m bot handle   → ranked fallbacks; pick the FIRST one that is "
+        "free on BOTH Pinterest and Instagram",
+        "Try order: pindrop_deals → pindropdealshome → pindropdealsindia → "
+        "thepindropdeals → getpindropdeals → ...hq/co/daily/shop → numbers "
+        "LAST (looks like a fan/duplicate account). Rules: 3-30 chars, "
+        "letters/numbers/underscore only (hyphen, dot, space ledu). The NAME "
+        "field is not unique — 'PinDrop Deals | Home & Kitchen' keep cheyyandi.",
+        "2 min",
+    ),
+    (
         "Connected accounts (Instagram / YouTube / Etsy)",
         "Instagram claim cheyyandi (bot already IG API tho post chestundi)",
         "Claimed account = ne pins meeda ne peru + analytics. "

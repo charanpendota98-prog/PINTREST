@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
   python -m bot onboard                  # 📋 every Pinterest screen → what to select
   python -m bot claim [token]            # 🔖 claim your website (Rich Pins)
   python -m bot brand ["Name | Niche"]   # 🏷️ profile name/bio/boards for reach
@@ -910,6 +911,34 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+def cmd_handle(cfg, rest: list[str]) -> int:
+    """🔗 Pinterest/IG handle: rules, ranked fallbacks, save the choice."""
+    from . import handles as _handles
+    arg = " ".join(rest).strip().lstrip("@")
+    saved_line = ""
+    if arg:
+        res = _handles.save_handle(cfg, arg)
+        if not res["saved"] and res.get("errors"):
+            print()
+            print("\n".join(_handles.advice(cfg, arg)))
+            print()
+            return 2
+        saved_line = (f"✅ Saved handle: {res['handle']} "
+                      f"(Pinterest + Instagram rendu chotla ide vaadandi)")
+        if res.get("warnings"):
+            saved_line += "   ⚠️ " + res["warnings"][0]
+    print()
+    if saved_line:
+        print(saved_line)
+    print("\n".join(_handles.advice(cfg, arg)))
+    print()
+    return 0
+    print()
+    print("\n".join(_handles.advice(cfg, arg)))
+    print()
+    return 0
+
+
 def cmd_onboard(cfg) -> int:
     """📋 Every Pinterest onboarding screen → what to select (skip rules too)."""
     from . import onboard as _onboard
@@ -1177,6 +1206,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd in ("handle", "handles"):
+        return cmd_handle(cfg, rest)
     if cmd in ("onboard", "onboarding"):
         return cmd_onboard(cfg)
     if cmd == "claim":

@@ -310,6 +310,9 @@ def print_how_it_works() -> None:
    Claim website (`bot claim`) → developer app.
    Nijam: REQUIRED 2 matrame (business account + developer app); migilinavi
    optional shortcuts — skip chesina account ki emi avvadu.
+   🔗 `python -m bot handle`: handle taken aithe ranked fallbacks (closest to
+   brand first, numbers LAST) + Pinterest/IG rules (3-30, letters/numbers/
+   underscore; hyphen/dot/space ledu) + comment-preserving save (`brand.handle`).
    📝 Profile form guard: Name (keyword) vs Username (@handle) trap detect +
    **Website field warning** — t.me / wa.me / shortener link unte refuse
    chestundi (claim cheyyaleru → Rich Pins + attribution povu, spam signal).
@@ -320,7 +323,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   374 automated tests.
+   400 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
