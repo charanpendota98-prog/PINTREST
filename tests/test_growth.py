@@ -789,3 +789,41 @@ class TestHookFontNotShrunkByEmoji(unittest.TestCase):
         lines, size = _fit_text(d, "Wait for the price 👀", 633, 5, start=64)
         self.assertGreaterEqual(size, 56)
         self.assertEqual(" ".join(lines), "Wait for the price")
+
+
+class TestFfmpegFallback(unittest.TestCase):
+    """R75 — ARM VMs (Oracle Ampere) may lack the bundled ffmpeg binary."""
+
+    def test_uses_env_override_when_it_exists(self):
+        import os
+        import sys
+        from unittest import mock
+        from bot.video_maker import ffmpeg_exe
+        with mock.patch.dict(os.environ, {"IMAGEIO_FFMPEG_EXE": sys.executable}):
+            self.assertEqual(ffmpeg_exe(), sys.executable)
+
+    def test_falls_back_to_system_ffmpeg(self):
+        import os
+        from unittest import mock
+        import bot.video_maker as vm
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("IMAGEIO_FFMPEG_EXE", None)
+            with mock.patch("imageio_ffmpeg.get_ffmpeg_exe",
+                            side_effect=RuntimeError("no binary for arm64")), \
+                 mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"):
+                self.assertEqual(vm.ffmpeg_exe(), "/usr/bin/ffmpeg")
+                self.assertEqual(os.environ.get("IMAGEIO_FFMPEG_EXE"),
+                                 "/usr/bin/ffmpeg")
+
+    def test_clear_error_when_nothing_available(self):
+        import os
+        from unittest import mock
+        import bot.video_maker as vm
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("IMAGEIO_FFMPEG_EXE", None)
+            with mock.patch("imageio_ffmpeg.get_ffmpeg_exe",
+                            side_effect=RuntimeError("nope")), \
+                 mock.patch("shutil.which", return_value=None):
+                with self.assertRaises(RuntimeError) as ctx:
+                    vm.ffmpeg_exe()
+        self.assertIn("apt install ffmpeg", str(ctx.exception))

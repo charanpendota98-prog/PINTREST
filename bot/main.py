@@ -415,7 +415,8 @@ def cmd_doctor(cfg) -> int:
     try:
         import PIL, flask, bs4, yaml, imageio_ffmpeg  # noqa: F401
         ck("Dependencies installed", True)
-        ck("ffmpeg (reels)", bool(imageio_ffmpeg.get_ffmpeg_exe()))
+        from .video_maker import ffmpeg_exe as _ff
+        ck("ffmpeg (reels)", bool(_ff()))
     except ImportError as e:
         ck("Dependencies installed", False, f"pip install -r requirements.txt ({e})")
     ck("Fonts (pin text)", Path("/usr/share/fonts/truetype/dejavu").exists()
@@ -617,8 +618,8 @@ def cmd_deploy_check(cfg) -> int:
     ff = shutil.which("ffmpeg")
     if not ff:
         try:                                     # bundled binary (no apt needed)
-            import imageio_ffmpeg
-            ff = imageio_ffmpeg.get_ffmpeg_exe()
+            from .video_maker import ffmpeg_exe as _ff
+            ff = _ff()
         except Exception:                        # noqa: BLE001
             ff = ""
     ck(f"ffmpeg (reels/videos){'' if not ff else ' — ' + ('system' if shutil.which('ffmpeg') else 'bundled')}",

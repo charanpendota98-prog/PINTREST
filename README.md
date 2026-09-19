@@ -845,6 +845,41 @@ audio in-app if you want it, and replying to DMs.
   command. Exit 0 = ready to deploy.
 - **`scripts/seed_demo.py`** — preview the pipeline with demo data, no creds.
 
+### ☁️ Cloud VM deploy (Oracle Cloud "Always Free" — recommended)
+
+The bot must run where the internet is OPEN and the machine never sleeps.
+A free Oracle Cloud VM is exactly that, and `scripts/vm_bootstrap.sh` sets it
+up end-to-end:
+
+```bash
+# 1) Oracle Cloud → Create Instance:
+#    - Image:   Ubuntu 22.04/24.04 LTS (ARM ok)
+#    - Shape:   VM.Standard.A1.Flex (Ampere ARM) 2 OCPU / 12 GB  → Always Free
+#               (or the 2 × VM.Standard.E2.1.Micro AMD micro instances)
+#    - Region:  Mumbai / Hyderabad (lowest latency to Meesho/Amazon)
+#    - SSH key: paste your public key (Oracle asks for it at creation)
+
+# 2) SSH into the VM, then:
+gh auth login                      # repo private → GitHub lo okasari login
+git clone https://github.com/charanpendota98-prog/PINTREST.git pintrest
+cd pintrest
+nano .env                          # paste your tokens (the script prints the list)
+sudo bash scripts/vm_bootstrap.sh  # instals python/ffmpeg/venv + systemd 24×7
+```
+
+What the bootstrap does: system packages (git, python3-venv, **ffmpeg**) →
+venv + requirements → `data/`+`logs/` → `.env` checklist → `deploy.sh`
+(two systemd services: poster + panel, auto-start on boot, auto-restart).
+`--no-start` runs the setup without starting anything.
+
+**ARM note:** imageio-ffmpeg may ship no ARM binary — `video_maker.ffmpeg_exe()`
+falls back to the system ffmpeg (which the script installs), and points
+imageio-ffmpeg at it via `IMAGEIO_FFMPEG_EXE`. Reels keep rendering.
+
+**Security:** never open port 5000 to the internet. Reach the panel through an
+SSH tunnel — `ssh -L 5000:127.0.0.1:5000 ubuntu@<vm-ip>` → http://localhost:5000.
+Oracle's default security list already blocks it; leave it that way.
+
 ## 💰 Conversion Engine — products EKUVA KONIPINCHADAM (sales focus)
 
 Views alone ≠ money. These systems turn views into PURCHASES:

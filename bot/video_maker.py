@@ -153,6 +153,37 @@ def _sticker(canvas: Image.Image, text: str, cx: int, cy: int, *,
     return canvas.convert("RGB")
 
 
+def ffmpeg_exe() -> str:
+    """Path to a WORKING ffmpeg — bundled wheel first, system binary second.
+
+    imageio-ffmpeg ships a binary for x86_64; on ARM VMs (Oracle Ampere,
+    Raspberry Pi) it can be missing, and then every reel render dies with a
+    confusing error. Here we fall back to the system ffmpeg (installed by
+    scripts/vm_bootstrap.sh / deploy.sh) and point imageio-ffmpeg at it via
+    IMAGEIO_FFMPEG_EXE, which its own get_ffmpeg_exe() honours.
+    """
+    import os
+    import shutil
+    env_exe = os.getenv("IMAGEIO_FFMPEG_EXE", "").strip()
+    if env_exe and Path(env_exe).exists():
+        return env_exe
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and Path(exe).exists():
+            return exe
+    except Exception as exc:  # noqa: BLE001 — fall through to the system one
+        log.warning("ffmpeg: bundled binary unavailable (%s)", str(exc)[:80])
+    system = shutil.which("ffmpeg") or ""
+    if system:
+        os.environ["IMAGEIO_FFMPEG_EXE"] = system   # helps write_frames too
+        log.info("ffmpeg: using system binary %s", system)
+        return system
+    raise RuntimeError(
+        "ffmpeg ledu — 'sudo apt install ffmpeg' cheyyandi (leda "
+        "pip install --force-reinstall imageio-ffmpeg)")
+
+
 def pick_video(cfg) -> str:
     """Pick a video the USER uploaded (data/videos/).
 
@@ -197,9 +228,8 @@ def music_usable(path: str | None) -> bool:
         return False
     try:
         import subprocess
-        import imageio_ffmpeg
         r = subprocess.run(
-            [imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-i", str(path),
+            [ffmpeg_exe(), "-v", "error", "-i", str(path),
              "-f", "null", "-"], capture_output=True, timeout=60)
         _MUSIC_CACHE[key] = r.returncode == 0
         return _MUSIC_CACHE[key]
@@ -418,8 +448,7 @@ class ReelMaker:
     def _mix_audio(self, silent: Path, out: Path, voiceover: str | None,
                    music: str | None) -> Path:
         import subprocess
-        import imageio_ffmpeg
-        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        exe = ffmpeg_exe()
         # never let a corrupt upload kill the soundtrack: swap in original BGM
         if music:
             music = usable_or_auto_bgm(self.cfg, music) or None
