@@ -1620,6 +1620,7 @@ def cmd_telegram(cfg, rest: list[str]) -> int:
     `python -m bot telegram --whoami` → find your chat id (message the bot first)
     `python -m bot telegram --once`   → answer pending messages once
     `python -m bot telegram --test`   → prove the token + owner chat work
+    `python -m bot telegram --test-channel` → prove the deals channel works
     """
     from .db import DB
     from .notify import Notifier
@@ -1659,6 +1660,21 @@ def cmd_telegram(cfg, rest: list[str]) -> int:
             print("\n⚠️  Okati kanna ekkuva chat lu — nuvvu deniki kavalo aa "
                   "chat id ni .env lo TELEGRAM_CHAT_ID=… ga pettandi.")
         return 0
+    if "--test-channel" in rest:
+        ch = ctl.notify.deals_channel
+        if not ch:
+            print("⚠️  TELEGRAM_DEALS_CHANNEL ledu .env lo — prati deal "
+                  "channel ki velladu. Channel id (e.g. -100…) pettandi.")
+            return 1
+        ok = ctl.notify.send_to(
+            ch, "✅ Gharvanaa deals channel test\n\nBot ki admin + Post "
+                "Messages permission undi. Ippati nunchi prati deal ikkada "
+                "vastundi — discount %, ★ rating, price tho 🛍")
+        print(f"✅ channel ({ch}) ki test message vellindi — deals live!"
+              if ok else
+              f"❌ channel ({ch}) ki pampalekapoyam — bot ADMIN aa? "
+              f"'Post Messages' permission unda? Channel id sari ga unda?")
+        return 0 if ok else 1
     if "--test" in rest:
         ok = ctl.notify.send_to(ctl.owner, "✅ Gharvanaa control bot test — "
                                            "ivi nijam ga nee phone ki vachinaya?")

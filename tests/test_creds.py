@@ -986,3 +986,52 @@ class TestTelegramChatDiscovery(unittest.TestCase):
             from bot.tgcontrol import TelegramControl
             ctl2 = TelegramControl(self.cfg, db=self.db)
         self.assertEqual(ctl2.owner, "555")
+
+
+class TestTelegramChannelBroadcast(unittest.TestCase):
+    """R76 — deals channel: bot admin ayyaka okka command tho verify."""
+
+    def test_deal_card_goes_to_the_channel_chat(self):
+        from unittest import mock
+        from bot.notify import Notifier
+        n = Notifier()
+        n.token, n.deals_channel = "tok", "-1003806078080"
+        sent = {}
+
+        class _Resp:
+            status_code = 200
+
+        def fake_post(url, data=None, timeout=None, **kw):
+            sent.update(data or {})
+            return _Resp()
+
+        import bot.notify as mod
+        orig = mod.requests.post
+        mod.requests.post = fake_post
+        try:
+            ok = n.deal("Black Kurti", "₹200", "https://l", "",
+                        discount=40, rating=4.0, reviews=136104, source="meesho")
+        finally:
+            mod.requests.post = orig
+        self.assertTrue(ok)
+        self.assertEqual(sent.get("chat_id"), "-1003806078080")
+        body = sent.get("caption", "") + sent.get("text", "")
+        self.assertIn("40% OFF", body)
+
+    def test_channel_test_uses_send_to(self):
+        from unittest import mock
+        from bot.notify import Notifier
+        n = Notifier()
+        n.token, n.deals_channel = "tok", "-1003806078080"
+        with mock.patch("bot.notify.requests.post") as post:
+            post.return_value.status_code = 200
+            ok = n.send_to(n.deals_channel, "test")
+            self.assertTrue(ok)
+            self.assertEqual(post.call_args.kwargs["data"]["chat_id"],
+                             "-1003806078080")
+
+    def test_missing_channel_is_not_a_crash(self):
+        from bot.notify import Notifier
+        n = Notifier()
+        n.token, n.deals_channel = "tok", ""
+        self.assertFalse(n.deal("t", "₹1", "https://l"))
