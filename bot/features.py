@@ -390,6 +390,9 @@ def print_how_it_works() -> None:
    whitelist `*.onelink.me` + `*.meesho.com`, leda **phone lo** open cheyyi.
    Bot publish mundu server-side nunchi (extension effect undadu) link ni
    fetch chesi check chestundi — `python scripts/meesho_audit.py --live`.
+   ✅ R71 (owner phone/browser proof): bot build chesina link nijam ga correct product page
+   ki vellindi — landing URL lo `pid=meesho_affiliate_portal` + `utm_source=<surface token>`
+   rendu intact (Meesho aa click ni affiliate ga log chesindi).
    🐛 R68 deep-probe lo pattukunna rendu nijamaina bugs (fix ayyayi):
    (1) p_id leni Meesho URL (search/category/truncated) kuda af_invite link
    build ayyedi → click generic page ki velli commission miss, kani leak gate
