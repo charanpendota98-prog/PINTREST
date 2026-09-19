@@ -193,7 +193,9 @@ def save(cfg, name: str, path: str | Path | None = None) -> dict:
     cfg.raw.setdefault("design", {})["brand_name"] = strip
     cfg.raw.setdefault("brand", {})["display_name"] = name
     cfg.raw["brand"]["bio"] = bio
+    source = getattr(cfg, "source_path", None)
     target = (Path(path) if path
+              else Path(source) if source
               else Path(__file__).resolve().parent.parent / "config.yaml")
     try:
         target.write_text(_patch_yaml_text(target.read_text(), strip, name, bio))

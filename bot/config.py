@@ -248,4 +248,12 @@ def load_config(path: str | Path | None = None) -> Config:
         with open(cfg_path, "r", encoding="utf-8") as fh:
             user_cfg = yaml.safe_load(fh) or {}
     merged = _deep_merge(DEFAULTS, user_cfg)
-    return Config(raw=merged)
+    return _attach_source(Config(raw=merged), cfg_path)
+
+def _attach_source(cfg: Config, path: Path) -> Config:
+    """Remember the YAML file a config came from (writers need it)."""
+    try:
+        cfg.source_path = path
+    except Exception:  # noqa: BLE001
+        pass
+    return cfg

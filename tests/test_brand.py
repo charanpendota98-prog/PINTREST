@@ -167,35 +167,43 @@ class TestCliAndLines(unittest.TestCase):
                 self.assertIn(needle, text)
 
     def test_cli_brand_view_and_save(self):
+        """Regression: this test used to write the REPO config.yaml (real bug).
+
+        `brand.save` now targets `cfg.source_path`, so a temp config is safe.
+        """
         import contextlib
         import io
+
         from bot.main import cmd_brand
         with tempfile.TemporaryDirectory() as d:
             tmp = Path(d)
             cfg = _cfg(tmp)
             cfg_file = tmp / "config.yaml"
             cfg_file.write_text("design:\n  brand_name: Old\n")
+            cfg.source_path = cfg_file                 # what load_config sets
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
                 self.assertEqual(cmd_brand(cfg, []), 0)      # view mode
             self.assertIn("BRAND & PROFILE SEO", buf.getvalue())
-            # save mode — point it at the temp file via the module default path
-            import bot.brand as B
-            orig = B.Path
-            try:
-                buf = io.StringIO()
-                with contextlib.redirect_stdout(buf):
-                    code = cmd_brand(cfg, ["Ghar Finds | Home & Kitchen"])
-                self.assertEqual(code, 0)
-            finally:
-                B.Path = orig
+
+            repo_before = (Path(__file__).resolve().parents[1] / "config.yaml").read_text()
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = cmd_brand(cfg, ["Ghar Finds | Home & Kitchen"])
+            self.assertEqual(code, 0)
+            self.assertIn("Ghar Finds", cfg_file.read_text())      # temp written
+            repo_after = (Path(__file__).resolve().parents[1] / "config.yaml").read_text()
+            self.assertEqual(repo_before, repo_after)              # repo untouched
 
     def test_bad_name_exit_code(self):
         import contextlib
         import io
+
         from bot.main import cmd_brand
         with tempfile.TemporaryDirectory() as d:
-            cfg = _cfg(Path(d))
+            tmp = Path(d)
+            cfg = _cfg(tmp)
+            cfg.source_path = tmp / "config.yaml"
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
                 code = cmd_brand(cfg, ["X" * 70])
