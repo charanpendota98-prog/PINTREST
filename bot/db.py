@@ -99,6 +99,9 @@ MIGRATIONS = [
     # which hook archetype (pas/list/pov) was used for this product's posts —
     # clicks per archetype feed the self-learning hook chooser
     "ALTER TABLE products ADD COLUMN hook TEXT NOT NULL DEFAULT ''",
+    # trending signals scraped off the product page (★ average + count)
+    "ALTER TABLE products ADD COLUMN rating REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE products ADD COLUMN reviews INTEGER NOT NULL DEFAULT 0",
 ]
 
 

@@ -846,7 +846,9 @@ def cmd_simulate(cfg) -> int:
     music = pick_music(cfg)
     print(f"   ✅ BGM: {Path(music).name if music else '(none)'}")
     reel = media / "sim_reel.mp4"
-    ReelMaker(cfg).make(img, hook_for(label, prod["title"], datetime.now().day),
+    ReelMaker(cfg).make(img, hook_for(label, prod["title"],
+                                      datetime.now().day,
+                                      prod.get("source", "")),
                         prod["title"], label, reel, prod["source"],
                         voiceover=vo_path or None, music=music or None,
                         vo_seconds=vo.estimate_seconds(script) if vo_path else 0)

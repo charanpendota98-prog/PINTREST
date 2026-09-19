@@ -12,6 +12,24 @@ import pathlib
 
 FEATURES = [
     # (name, category, what it does, enablement check, how to enable)
+    ("Trending signals (★ + rating count)", "sourcing",
+     "page's own ★/ratings scraped into the radar — 'em trending unnayo' "
+     "with REAL numbers, never invented",
+     lambda cfg: True, "always on (meesho/amazon/flipkart parsers)"),
+    ("Photos → ONE reel (whole gallery)", "posting",
+     "product gallery becomes one reel: model-wearing shot first, a different "
+     "camera move on every photo (pick_hero)",
+     lambda cfg: bool(cfg.get("video.auto_reel", True)),
+     "video.auto_reel=true (default on)"),
+    ('"JUST ₹299" price sticker', "money",
+     "slanted impulse-price tag on reels + pins, with % OFF + real ★ rating "
+     "chip when the page provides them",
+     lambda cfg: bool(str(cfg.get("design.price_prefix", "JUST")).strip()),
+     'design.price_prefix="JUST" ("" = plain price)'),
+    ("Store-true hooks", "content",
+     "a hook never names a store the product did not come from (no 'Amazon' "
+     "hook on a Meesho post)",
+     lambda cfg: True, "always on (hook_for(source=…))"),
     ("Pinterest carousel pins", "posting",
      "2-5 product photos in one pin (highest-engagement format)",
      lambda cfg: bool(cfg.get("pinterest.carousel", True)),
@@ -494,7 +512,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   664 automated tests.
+   680 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

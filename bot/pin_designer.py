@@ -97,6 +97,8 @@ class PinDesigner:
         self.accent = _hex(cfg.get("design.accent_color", "#E60023"))
         self.brand = str(cfg.get("design.brand_name", "")).strip()
         self.cta = str(cfg.get("design.cta_text", "Shop Now ➜") or "Shop Now ➜")
+        # "JUST ₹299" wording — the impulse trigger the owner asked for
+        self.price_prefix = str(cfg.get("design.price_prefix", "JUST")).strip()
 
     # ==================================================================
     def create(self, product_image_path: str, title: str, price_label: str,
@@ -155,7 +157,8 @@ class PinDesigner:
         if not price_label:
             return
         f = _font(True, 62)
-        label = f"  {price_label}  "
+        text = f"{self.price_prefix} {price_label}".strip()
+        label = f"  {text}  "
         w = int(draw.textlength(label, font=f) + 36)
         h = 102
         box = (x2 - w, y_center - h // 2, x2, y_center + h // 2)

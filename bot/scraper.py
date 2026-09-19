@@ -41,6 +41,19 @@ DOMAIN_SOURCES = {
 }
 
 
+def human_int(text) -> int:
+    """'1,36,104' / '13.6k' / '1.2L' -> int (Indian comma grouping handled)."""
+    if isinstance(text, int):
+        return text
+    s = str(text or "").strip().lower().replace(",", "").replace(" ", "")
+    m = re.match(r"(\d+(?:\.\d+)?)\s*([kmkl]?)", s)
+    if not m:
+        return 0
+    val = float(m.group(1))
+    mult = {"k": 1_000, "m": 1_000_000, "l": 100_000}.get(m.group(2), 1)
+    return int(val * mult)
+
+
 def detect_source(url: str) -> str:
     host = urlparse(url).netloc.lower()
     for src, domains in DOMAIN_SOURCES.items():
@@ -59,6 +72,8 @@ class Product:
     image_url: str = ""
     images: list = field(default_factory=list)   # full gallery (multiple pins!)
     video_url: str = ""
+    rating: float = 0.0        # ★ average when the page exposes it
+    reviews: int = 0           # rating/review count → trending signal
     category: str = ""
     description: str = ""
     source: str = field(default="other")
@@ -301,6 +316,18 @@ class Scraper:
                     if img:
                         prod.image_url = prod.image_url or str(img)
                     prod.description = prod.description or str(node.get("description", ""))[:400]
+                    agg = node.get("aggregateRating") or {}
+                    if isinstance(agg, list):
+                        agg = agg[0] if agg else {}
+                    if isinstance(agg, dict):
+                        try:
+                            if not prod.rating:
+                                prod.rating = float(agg.get("ratingValue") or 0)
+                        except (TypeError, ValueError):
+                            pass
+                        if not prod.reviews:
+                            prod.reviews = human_int(
+                                agg.get("reviewCount") or agg.get("ratingCount") or 0)
                     if not prod.video_url:
                         video = node.get("video")
                         if isinstance(video, dict):
@@ -365,6 +392,40 @@ class Scraper:
             t = soup.select_one("h1")
             if t:
                 prod.title = t.get_text(strip=True)
+        self._social_proof(soup, prod)
+
+    def _social_proof(self, soup: BeautifulSoup, prod: Product) -> None:
+        """Real ★ rating + rating-count = the trending signal.
+
+        Meesho prints "136104 Ratings", Amazon uses #acrCustomerReviewText,
+        Flipkart ._3LWZlK / ._2_R_DZ. We only ever read what the page
+        shows — never invent social proof. 0 stays 0.
+        """
+        if prod.rating or prod.reviews:
+            return
+        if not prod.reviews:
+            rc = soup.select_one("#acrCustomerReviewText, ._2_R_DZ")
+            if rc:
+                prod.reviews = human_int(re.sub(r"[^\d,]", "", rc.get_text()))
+        if not prod.rating:
+            pop = soup.select_one("#acrPopover, ._3LWZlK, .XQDdHH")
+            if pop:
+                m = re.search(r"([0-5](?:\.\d)?)\s*(?:out of|★|$)",
+                              (pop.get("title") or "") + " " + pop.get_text(strip=True))
+                if m:
+                    try:
+                        prod.rating = float(m.group(1))
+                    except ValueError:
+                        pass
+        text = soup.get_text(" ", strip=True)
+        if not prod.rating:
+            m = re.search(r"([0-5]\.\d)\s*★?\s*[\d,]+\s*(?:Ratings|ratings)", text)
+            if m:
+                prod.rating = float(m.group(1))
+        if not prod.reviews:
+            m = re.search(r"([\d,]{2,})\s*(?:Ratings|ratings|Reviews|reviews)", text)
+            if m:
+                prod.reviews = human_int(m.group(1))
 
     # -- MRP / list price (for % OFF badges) -----------------------------
     def _collect_mrp(self, soup: BeautifulSoup, prod: Product) -> None:

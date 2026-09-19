@@ -581,3 +581,174 @@ class TestIngestPipelineMocked(unittest.TestCase):
                     -1)
             finally:
                 os.environ.pop("MEESHO_TEMPLATE_LINK", None)
+
+
+class TestTrendingSignals(unittest.TestCase):
+    """R72 — real ★ rating + rating-count must reach the ranking.
+
+    Owner: "meesho products em trending unnayo andaru em pedthunnaro ani
+    pettali". Trending = the numbers the page itself shows (4.0★, 136104
+    ratings) — never invented, and 0 stays 0 when the page hides them.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = _cfg(self.tmp.name)
+        self.scraper = None
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _scraper(self):
+        from bot.scraper import Scraper
+        if self.scraper is None:
+            self.scraper = Scraper(self.cfg)
+        return self.scraper
+
+    def test_human_int_indian_grouping(self):
+        from bot.scraper import human_int
+        self.assertEqual(human_int("1,36,104"), 136104)
+        self.assertEqual(human_int("13.6k"), 13600)
+        self.assertEqual(human_int("1.2L"), 120000)
+        self.assertEqual(human_int(""), 0)
+        self.assertEqual(human_int(420), 420)
+
+    def test_meesho_page_text_social_proof(self):
+        from bs4 import BeautifulSoup
+        from bot.scraper import Product
+        soup = BeautifulSoup(
+            "<html><body><h1>KURTI RAYON</h1><p>₹200 ₹209 4% off</p>"
+            "<span>4.0</span><span>136104 Ratings</span>"
+            "<span>35108 Reviews</span></body></html>", "html.parser")
+        prod = Product(url="https://www.meesho.com/kurti/p/35pwo2",
+                       source="meesho")
+        self._scraper()._site_specific(soup, prod)
+        self.assertEqual(prod.rating, 4.0)
+        self.assertEqual(prod.reviews, 136104)
+
+    def test_amazon_selectors_social_proof(self):
+        from bs4 import BeautifulSoup
+        from bot.scraper import Product
+        soup = BeautifulSoup(
+            '<html><body><span id="acrCustomerReviewText">1,234 ratings</span>'
+            '<span id="acrPopover" title="4.3 out of 5 stars"></span>'
+            "</body></html>", "html.parser")
+        prod = Product(url="https://www.amazon.in/dp/X", source="amazon")
+        self._scraper()._site_specific(soup, prod)
+        self.assertEqual(prod.reviews, 1234)
+        self.assertEqual(prod.rating, 4.3)
+
+    def test_jsonld_aggregate_rating(self):
+        from bs4 import BeautifulSoup
+        from bot.scraper import Product
+        soup = BeautifulSoup(
+            '<html><head><script type="application/ld+json">'
+            '{"@type":"Product","name":"Kurti","aggregateRating":'
+            '{"ratingValue":"4.4","ratingCount":"4,321"}}</script></head>'
+            "<body></body></html>", "html.parser")
+        prod = Product(url="https://www.meesho.com/kurti/p/35pwo2",
+                       source="meesho")
+        self._scraper()._from_jsonld(soup, prod)
+        self.assertEqual(prod.rating, 4.4)
+        self.assertEqual(prod.reviews, 4321)
+
+    def test_radar_trending_volume_changes_the_ranking(self):
+        from bot.radar import rank, usefulness
+        row = {"title": "Women Cotton Kurta Set", "price": "₹499"}
+        plain, _ = usefulness(row)
+        hot, why = usefulness(row, rating=4.1, reviews=136104)
+        self.assertGreater(hot, plain)
+        self.assertTrue(any("🔥 trending volume" in w for w in why))
+        ranked = rank([{**row, "rating": 4.1, "reviews": 136104, "id": 1}])
+        self.assertTrue(any("🔥" in w for w in ranked[0]["why"]))
+
+    def test_db_stores_rating_and_reviews(self):
+        db = DB(f"{self.tmp.name}/t.db")
+        pid = db.add_product(url="https://x/p/1", title="t", source="meesho",
+                             rating=4.2, reviews=987)
+        row = next(p for p in db.all_products() if p["id"] == pid)
+        self.assertEqual(row["rating"], 4.2)
+        self.assertEqual(row["reviews"], 987)
+
+
+class TestPhotoToVideoReel(unittest.TestCase):
+    """R72 — photos → ONE video, the worn ("ela untundi") shot first."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.cfg = _cfg(self.tmp.name)
+        Path(self.cfg.media_dir).mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _photo(self, name, size, color=(30, 60, 200)):
+        from PIL import Image
+        p = self.dir / name
+        Image.new("RGB", size, color).save(p)
+        return str(p)
+
+    def test_pick_hero_prefers_portrait_person_shot(self):
+        from PIL import Image, ImageDraw
+        from bot.video_maker import pick_hero
+        flat = self._photo("flat.jpg", (1000, 500), (240, 240, 240))
+        model = self.dir / "model.jpg"
+        img = Image.new("RGB", (600, 1000), (252, 250, 248))
+        d = ImageDraw.Draw(img)
+        d.ellipse((150, 120, 450, 620), fill=(196, 150, 120))   # skin tones
+        d.rectangle((180, 600, 420, 980), fill=(20, 20, 20))
+        img.save(model)
+        self.assertEqual(pick_hero([flat, str(model)])[0], str(model))
+
+    def test_proof_label_real_numbers_only(self):
+        from bot.video_maker import _proof_label
+        self.assertEqual(_proof_label(4.0, 136104), "4.0★ · 1.36L ratings")
+        self.assertEqual(_proof_label(4.5, 250), "4.5★ · 250 ratings")
+        self.assertEqual(_proof_label(0, 5000), "")
+        self.assertEqual(_proof_label(4.5, 0), "")
+
+    def test_make_multi_renders_gallery_reel(self):
+        from bot.video_maker import ReelMaker
+        a = self._photo("a.jpg", (500, 800), (200, 30, 30))
+        b = self._photo("b.jpg", (800, 500), (30, 200, 30))
+        out = self.dir / "reel.mp4"
+        got = ReelMaker(self.cfg).make_multi(
+            [a, b], "Wait for it…", "Cotton Kurta Set", "₹299", out, "meesho",
+            scene_seconds=0.3, discount=20, rating=4.2, reviews=15000)
+        self.assertTrue(Path(got).exists())
+        self.assertGreater(Path(got).stat().st_size, 5000)
+
+    def test_make_multi_raises_without_usable_photo(self):
+        from bot.video_maker import ReelMaker
+        with self.assertRaises(ValueError):
+            ReelMaker(self.cfg).make_multi(["/nope.jpg", ""], "H", "T", "₹1",
+                                           self.dir / "x.mp4", "x",
+                                           scene_seconds=0.2)
+
+    def test_pin_price_prefix_is_just(self):
+        from bot.pin_designer import PinDesigner
+        self.assertEqual(PinDesigner(self.cfg).price_prefix, "JUST")
+
+
+class TestHookFrameNeverTruncates(unittest.TestCase):
+    """R72 — a cut-off hook ("3 reasons this black embroidered IS") kills the
+    reel: every word of the hook must survive the auto-fit."""
+
+    def test_long_hook_keeps_every_word(self):
+        from PIL import Image, ImageDraw
+        from bot.video_maker import _fit_text
+        d = ImageDraw.Draw(Image.new("RGB", (720, 1280)))
+        long_hook = ("3 reasons this black embroidered rayon kurti is worth "
+                     "every single rupee you spend today")
+        lines, size = _fit_text(d, long_hook, 640, 5)
+        self.assertEqual(" ".join(lines), " ".join(long_hook.split()))
+        self.assertGreaterEqual(size, 26)
+
+    def test_hook_frame_renders_with_long_text(self):
+        import tempfile
+        from bot.video_maker import ReelMaker
+        with tempfile.TemporaryDirectory() as tmp:
+            img = ReelMaker(_cfg(tmp))._frame_hook(
+                "rating viral meesho finds until i go broke day 41", 1.0)
+            self.assertEqual(img.size, (720, 1280))

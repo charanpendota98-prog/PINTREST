@@ -265,7 +265,8 @@ class Engine:
         if not video_path and self.cfg.get("video.auto_reel", True):
             try:
                 from . import voiceover as vo
-                hook = hook_for(label, prod.title, datetime.now(self.tz).day)
+                hook = hook_for(label, prod.title, datetime.now(self.tz).day,
+                                prod.source)
                 lang = str(self.cfg.get("video.lang", "en-IN"))
                 script = vo.script_for(lang, prod.title, label)
                 vo_path = vo.generate(script, lang,
@@ -273,10 +274,14 @@ class Engine:
                 vo_secs = vo.estimate_seconds(script) if vo_path else 0.0
                 music = pick_music(self.cfg)   # user's manually-added trending audio
                 reel_path = self.cfg.media_dir / f"reel_{int(time.time()*1000)}.mp4"
-                video_path = self.reel.make(local_imgs[0], hook, prod.title, label,
-                                            reel_path, network,
-                                            voiceover=vo_path or None,
-                                            music=music or None, vo_seconds=vo_secs)
+                # the whole gallery, model shot first (pick_hero) — one
+                # video built out of the photos, not a single still
+                video_path = self.reel.make_multi(
+                    local_imgs, hook, prod.title, label, reel_path, network,
+                    voiceover=vo_path or None, music=music or None,
+                    vo_seconds=vo_secs, discount=prod.discount_pct,
+                    rating=float(getattr(prod, "rating", 0.0) or 0.0),
+                    reviews=int(getattr(prod, "reviews", 0) or 0))
                 self.db.log("INFO", f"Auto-reel {'with voiceover' if vo_path else ''} "
                                     f"generated: {reel_path.name}")
             except Exception as exc:  # noqa: BLE001 — reel is a bonus, never fatal
@@ -329,6 +334,8 @@ class Engine:
                 score=score_product(prod.title, prod.price, prod.source),
                 discount=disc,
                 template=tpl,
+                rating=float(getattr(prod, "rating", 0.0) or 0.0),
+                reviews=int(getattr(prod, "reviews", 0) or 0),
             )
             if first_id < 0:
                 first_id = pid

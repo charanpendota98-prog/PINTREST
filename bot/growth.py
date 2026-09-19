@@ -64,9 +64,49 @@ def seo_title(title: str, price_label: str, source: str, phrase: str = "") -> st
     return cand[:100]
 
 
-def hook_for(price_label: str, title: str, day: int) -> str:
+# ------------------------------------------------- platform-true hooks
+# Naming the WRONG store is a lie the audience catches instantly (and both
+# marketplaces hate it). A hook is therefore either store-NEUTRAL or it
+# belongs to the store it names — `hook_for(source=…)` keeps them apart.
+STORE_MENTIONS = {
+    "amazon": ("amazon",),
+    "meesho": ("meesho",),
+    "flipkart": ("flipkart",),
+}
+SOURCE_HOOKS = {
+    "meesho": [
+        "Meesho lo ee {kw} chala mandi miss avutunnaru 👀",
+        "₹{price} ki ilanti {kw}? nammalem 😳",
+        "Meesho haul lo top pick — {kw} under {price} 🛍️",
+        "Idi viral avvadaniki reason undi 😤 ({kw})",
+    ],
+    "amazon": [
+        "Amazon didn't want you to find this 🤫",
+        "Amazon finds under {price} — saving this one 📌",
+    ],
+    "flipkart": [
+        "Flipkart price-drop 📉 {kw} under {price}",
+        "Flipkart lo ee deal miss avvakandi 😱 ({kw})",
+    ],
+}
+
+
+def hook_for(price_label: str, title: str, day: int, source: str = "") -> str:
+    """Curiosity hook — never names a store the product did not come from.
+
+    Pass the product's source ("meesho"/"amazon"/"flipkart"): every hook that
+    names a DIFFERENT store is filtered out and the store-native pool is
+    added. source="" keeps the old behaviour (all generic hooks).
+    """
     kw = " ".join(title.split()[:2]).lower() or "find"
-    h = random.choice(HOOKS)
+    src = str(source or "").strip().lower()
+    pool = list(HOOKS)
+    if src:
+        foreign = tuple(w for store, words in STORE_MENTIONS.items()
+                        if store != src for w in words)
+        pool = [h for h in pool if not any(w in h.lower() for w in foreign)]
+        pool += SOURCE_HOOKS.get(src, [])
+    h = random.choice(pool)
     return h.format(kw=kw, price=price_label.replace("₹", "₹") or "₹499", n=day)
 
 

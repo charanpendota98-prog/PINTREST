@@ -90,6 +90,8 @@ radar:
   hunt_count: 3            # how many top products to queue per hunt
 
 design:
+  # sticker wording on pins/reels: "JUST ₹299" ("" = plain price)
+  price_prefix: "JUST"
   width: 1000
   height: 1500             # Pinterest's ideal 2:3 vertical ratio
   accent_color: "#E60023"

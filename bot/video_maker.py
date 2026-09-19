@@ -56,6 +56,100 @@ def _accent() -> tuple[int, int, int]:
     return (230, 0, 35)
 
 
+def _fit_text(draw, text: str, max_w: int, max_lines: int,
+              start: int = 64, floor: int = 26):
+    """Shrink the font until EVERY word fits — a cut-off hook kills the reel.
+
+    Returns (lines, size). Never returns a truncated string: if even the
+    floor size cannot hold it, the caller still gets all words wrapped.
+    """
+    words = " ".join(str(text or "").split())
+    size = int(start)
+    while size >= floor:
+        font = _font(True, size)
+        lines = _wrap(draw, words, font, max_w, max_lines)
+        if " ".join(lines) == words:
+            return lines, size
+        size -= 6
+    return _wrap(draw, words, _font(True, floor), max_w, max_lines + 2), floor
+
+
+# --------------------------------------------------- "model shot" picking
+def _person_score(img: Image.Image) -> int:
+    """Rough "is somebody WEARING it in this photo?" score (0-100).
+
+    Honest heuristic, no ML: product galleries front-load the model shot and
+    model shots are portrait crops full of skin tones. It never claims more
+    than it is — ties keep the gallery's own order.
+    """
+    small = img.copy()
+    small.thumbnail((160, 160))
+    w, h = small.size
+    px = small.load()
+    skin = total = 0
+    for y in range(0, h, 2):
+        for x in range(0, w, 2):
+            r, g, b = px[x, y][:3]
+            total += 1
+            if (r > 95 and g > 40 and b > 20 and r > g > b and (r - b) > 15
+                    and abs(r - g) > 15 and max(r, g, b) - min(r, g, b) > 15):
+                skin += 1
+    return int(100 * skin / total) if total else 0
+
+
+def pick_hero(paths: list) -> list:
+    """Order gallery photos: likely model-wearing shot first, rest as given."""
+    scored = []
+    for i, p in enumerate(paths or []):
+        try:
+            img = Image.open(p)
+            w, h = img.size
+            portrait = 12 if h >= w * 1.1 else 0
+            big = 6 if max(w, h) >= 900 else 0
+            person = min(20, _person_score(img) // 3)
+            scored.append((-(portrait + big + person), i, p))
+        except Exception:  # noqa: BLE001 — unreadable file sorts last
+            scored.append((0, i, p))
+    scored.sort()
+    return [p for _, _, p in scored]
+
+
+def _proof_label(rating: float, reviews: int) -> str:
+    """'4.0★ · 1.36L ratings' — real numbers only; '' when the page had none."""
+    try:
+        r, n = float(rating or 0), int(reviews or 0)
+    except (TypeError, ValueError):
+        return ""
+    if r <= 0 or n <= 0:
+        return ""
+    if n >= 100_000:
+        cnt = f"{n / 100000:.2f}".rstrip("0").rstrip(".") + "L"
+    elif n >= 1000:
+        cnt = f"{n / 1000:.1f}".rstrip("0").rstrip(".") + "k"
+    else:
+        cnt = str(n)
+    return f"{r:.1f}★ · {cnt} ratings"
+
+
+def _sticker(canvas: Image.Image, text: str, cx: int, cy: int, *,
+             fill=(255, 214, 0), text_fill=(24, 20, 16), angle: float = -9,
+             size: int = 52) -> Image.Image:
+    """Slanted price sticker — "JUST ₹299" popping on the photo."""
+    font = _font(True, size)
+    probe = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
+    tw = int(probe.textlength(text, font=font))
+    w, h = tw + int(size * 1.3), int(size * 1.9)
+    tag = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(tag)
+    d.rounded_rectangle((0, 0, w - 1, h - 1), radius=h // 3, fill=fill,
+                        outline=(255, 255, 255, 240), width=4)
+    d.text((w / 2, h / 2), text, font=font, fill=text_fill, anchor="mm")
+    tag = tag.rotate(angle, expand=True, resample=Image.BICUBIC)
+    canvas = canvas.convert("RGBA")
+    canvas.alpha_composite(tag, (int(cx - tag.width / 2), int(cy - tag.height / 2)))
+    return canvas.convert("RGB")
+
+
 def pick_video(cfg) -> str:
     """Pick a video the USER uploaded (data/videos/).
 
@@ -182,22 +276,46 @@ class ReelMaker:
     def make(self, image_path: str, hook: str, title: str, price_label: str,
              out_path: str | Path, source: str = "",
              voiceover: str | None = None, music: str | None = None,
-             vo_seconds: float = 0.0) -> str:
-        """Render the reel; returns the mp4 path.
+             vo_seconds: float = 0.0, *, discount: int = 0,
+             rating: float = 0.0, reviews: int = 0) -> str:
+        """Single-photo reel — kept for compatibility; see `make_multi`."""
+        return self.make_multi([image_path], hook, title, price_label, out_path,
+                               source, voiceover=voiceover, music=music,
+                               vo_seconds=vo_seconds, discount=discount,
+                               rating=rating, reviews=reviews)
 
-        voiceover: path to a TTS mp3 (voiceover.py) — mixed in with ffmpeg.
-        music:     optional BGM mp3 the user drops in (ducked under voice).
+    # ------------------------------------------------------------------
+    def make_multi(self, images: list, hook: str, title: str, price_label: str,
+                   out_path: str | Path, source: str = "",
+                   voiceover: str | None = None, music: str | None = None,
+                   vo_seconds: float = 0.0, *, discount: int = 0,
+                   rating: float = 0.0, reviews: int = 0,
+                   scene_seconds: float | None = None) -> str:
+        """PHOTOS → ONE reel: model shot first, every photo its own camera move.
+
+        A still frame gets scrolled past; 3 photos with movement keep people
+        watching. `pick_hero()` puts the worn shot ("ela untundi" frame) first,
+        the price rides a slanted JUST ₹ sticker, and the social-proof chip
+        only appears when the page really showed ★ + count.
         """
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            photo = Image.open(image_path).convert("RGB")
-        except Exception as exc:  # noqa: BLE001
-            raise ValueError(f"reel: bad image {image_path}: {exc}") from exc
+        photos = []
+        for p in pick_hero([p for p in (images or []) if p]):
+            try:
+                photos.append(Image.open(p).convert("RGB"))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("reel: skipping unreadable photo %s (%s)", p, exc)
+        if not photos:
+            raise ValueError(f"reel: no usable photo in {images!r}")
 
-        # stretch product scene to fit the voiceover length
-        global T_PROD
-        T_PROD = max(3.2, vo_seconds - T_HOOK - T_CTA + 1.0) if vo_seconds else 3.2
+        if scene_seconds is None:
+            stretch = (max(3.2, vo_seconds - T_HOOK - T_CTA + 1.0)
+                       if vo_seconds else T_PROD)
+            scene_seconds = max(1.4, min(3.4, stretch))
+        n_hook = max(6, int(T_HOOK * FPS))
+        n_scene = max(8, int(scene_seconds * FPS))
+        n_cta = max(6, int(T_CTA * FPS))
 
         import imageio_ffmpeg
         silent = out_path.with_suffix(".silent.mp4")
@@ -207,18 +325,24 @@ class ReelMaker:
             output_params=["-crf", "27", "-preset", "veryfast"],
         )
         writer.send(None)  # init
-
-        n_hook = int(T_HOOK * FPS)
-        n_prod = int(T_PROD * FPS)
-        n_cta = int(T_CTA * FPS)
+        frames = 0
         for i in range(n_hook):
             writer.send(self._frame_hook(hook, i / n_hook).tobytes())
-        for i in range(n_prod):
-            t = i / n_prod
-            writer.send(self._frame_product(photo, title, price_label, t,
-                                            caption=hook).tobytes())
+            frames += 1
+        proof = _proof_label(rating, reviews)
+        for idx, photo in enumerate(photos):
+            motion = idx % 3                      # push-in → pan → pull-out
+            for i in range(n_scene):
+                frame = self._frame_scene(
+                    photo, title, price_label, i / max(1, n_scene - 1),
+                    caption=hook, motion=motion,
+                    discount=discount if idx == 0 else 0, proof=proof,
+                    scene_no=idx + 1, scenes=len(photos))
+                writer.send(frame.tobytes())
+                frames += 1
         for i in range(n_cta):
             writer.send(self._frame_cta(source, i / n_cta).tobytes())
+            frames += 1
         writer.close()
 
         final = self._mix_audio(silent, out_path, voiceover, music)
@@ -226,9 +350,65 @@ class ReelMaker:
             silent.unlink(missing_ok=True)
         except OSError:
             pass
-        log.info("Reel rendered: %s (%d frames, voice=%s)",
-                 out_path.name, n_hook + n_prod + n_cta, bool(voiceover))
+        log.info("Reel rendered: %s (%d frames, %d photo(s), voice=%s)",
+                 out_path.name, frames, len(photos), bool(voiceover))
         return str(final)
+
+    # ------------------------------------------------------- scene frame
+    def _frame_scene(self, photo: Image.Image, title: str, price: str, t: float,
+                     caption: str = "", motion: int = 0, discount: int = 0,
+                     proof: str = "", scene_no: int = 1,
+                     scenes: int = 1) -> Image.Image:
+        """One photo with a camera move + title band + JUST ₹ sticker."""
+        z = (1.18 - 0.13 * t) if motion == 2 else (1.05 + 0.13 * t)
+        zw, zh = max(W + 2, int(W * z)), max(H + 2, int(H * z))
+        base = ImageOps.fit(photo, (zw, zh), method=Image.LANCZOS,
+                            centering=(0.5, 0.35))
+        if motion == 1:                            # pan left → right
+            left = int((zw - W) * t)
+            box = (left, (zh - H) // 2, left + W, (zh - H) // 2 + H)
+        else:                                      # centered push / pull
+            top = int((zh - H) * (0.35 if motion == 0 else 0.35 + 0.2 * t))
+            box = ((zw - W) // 2, top, (zw - W) // 2 + W, top + H)
+        img = base.crop(box)
+
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        od.rectangle((0, 0, W, 230), fill=(0, 0, 0, 135))
+        od.rectangle((0, H - 240, W, H), fill=(0, 0, 0, 155))
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+        d = ImageDraw.Draw(img)
+
+        f_title = _font(True, 46)
+        for i, ln in enumerate(_wrap(d, title[:60], f_title, W - 120, 2)):
+            d.text((W / 2, 34 + i * 56), ln, font=f_title, fill=(255, 255, 255),
+                   anchor="ma")
+        if scenes > 1:
+            d.text((W / 2, 176), f"{scene_no}/{scenes}", font=_font(True, 30),
+                   fill=(235, 235, 235), anchor="ma")
+
+        if price and t > 0.12:                     # sticker pops in
+            label = f"JUST {price}"
+            if discount >= 15:
+                label += f"  •  {discount}% OFF"
+            img = _sticker(img, label, W // 2, int(H * 0.56))
+
+        if proof:
+            d2 = ImageDraw.Draw(img)
+            f = _font(True, 34)
+            tw = int(d2.textlength(proof, font=f))
+            y0 = int(H * 0.56) + 86
+            box = ((W - tw) // 2 - 30, y0, (W + tw) // 2 + 30, y0 + 62)
+            d2.rounded_rectangle(box, radius=31, fill=(0, 0, 0, 170))
+            d2.text((W / 2, y0 + 31), proof, font=f, fill=(255, 236, 130),
+                    anchor="mm")
+
+        if caption and t < 0.5:
+            d.text((W / 2, H - 150), caption[:44], font=_font(True, 40),
+                   fill=(255, 255, 255), anchor="ma")
+        d.text((W / 2, H - 74), "link in bio / tap to shop",
+               font=_font(True, 30), fill=(255, 230, 120), anchor="ma")
+        return img
 
     # ------------------------------------------------------------ audio
     def _mix_audio(self, silent: Path, out: Path, voiceover: str | None,
@@ -287,15 +467,14 @@ class ReelMaker:
         if self.brand:
             d.text((W / 2, 45), self.brand.upper(), font=_font(True, 40),
                    fill=(255, 255, 255), anchor="mm")
-        f = _font(True, 64)
-        lines = _wrap(d, hook, f, int(W * 0.84), 3)
-        scale = min(1.0, t * 3 + 0.4)          # pop-in
-        fh = _font(True, max(20, int(64 * scale)))
-        lines = _wrap(d, hook, fh, int(W * 0.84), 3)
-        y = H / 2 - len(lines) * 45
+        scale = min(1.0, t * 3 + 0.45)          # pop-in
+        lines, size = _fit_text(d, hook, int(W * 0.88), 5,
+                                start=max(26, int(64 * scale)), floor=26)
+        fh = _font(True, size)
+        y = H / 2 - len(lines) * (size * 0.75)
         for ln in lines:
             d.text((W / 2, y), ln, font=fh, fill=(255, 255, 255), anchor="ma")
-            y += 90 * scale
+            y += size * 1.5
         d.text((W / 2, H - 45), "wait for it…", font=_font(True, 30),
                fill=(255, 220, 220), anchor="mm")
         return img

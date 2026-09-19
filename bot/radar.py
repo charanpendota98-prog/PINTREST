@@ -204,6 +204,10 @@ def usefulness(product: dict, *, rating: float = 0.0,
     elif r >= 4.0:
         score += 5
         reasons.append(f"good rating {r:.1f}★ (+5)")
+    # 7b) pure VOLUME — thousands of ratings = it is trending RIGHT NOW
+    if r >= 4.0 and n >= 1000:
+        score += 6
+        reasons.append(f"🔥 trending volume: {n:,} ratings (+6)")
 
     return min(100, score), reasons
 
@@ -214,7 +218,8 @@ def rank(products: list[dict], limit: int = 20) -> list[dict]:
     for p in products or []:
         if not p or not str(p.get("title", "")).strip():
             continue
-        s, why = usefulness(p)
+        s, why = usefulness(p, rating=p.get("rating", 0),
+                            reviews=p.get("reviews", 0))
         row = dict(p)
         row["usefulness"] = s
         row["why"] = why
@@ -327,8 +332,11 @@ def radar_hunt(cfg, engine, n: int = 4, min_score: int = 40,
             row = {"title": getattr(prod, "title", "") or "",
                    "price": getattr(prod, "price", "") or "",
                    "url": url, "source": getattr(prod, "source", store),
-                   "seo_text": getattr(prod, "seo_text", "") or ""}
-            score, why = usefulness(row)
+                   "seo_text": getattr(prod, "seo_text", "") or "",
+                   "rating": float(getattr(prod, "rating", 0.0) or 0.0),
+                   "reviews": int(getattr(prod, "reviews", 0) or 0)}
+            score, why = usefulness(row, rating=row["rating"],
+                                    reviews=row["reviews"])
             candidates.append(({**row, "usefulness": score, "why": why}, prod))
             try:
                 engine.scraper.polite_wait()

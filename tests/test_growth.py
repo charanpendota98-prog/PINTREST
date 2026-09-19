@@ -691,3 +691,21 @@ class TestYouTubeUploader(unittest.TestCase):
                              "currency": "INR", "source": "meesho",
                              "url": "u", "affiliate_url": "a",
                              "video_path": ""})   # must not raise
+
+
+class TestStoreTrueHooks(unittest.TestCase):
+    """R72 — a hook must never name a store the product did not come from."""
+
+    def test_meesho_never_mentions_amazon_or_flipkart(self):
+        for day in range(1, 60):
+            h = hook_for("₹299", "Cotton Kurta Set", day, "meesho")
+            self.assertTrue(h)
+            self.assertNotIn("amazon", h.lower())
+            self.assertNotIn("flipkart", h.lower())
+
+    def test_amazon_pool_keeps_its_own_hook(self):
+        seen = {hook_for("₹999", "Earbuds", d, "amazon") for d in range(1, 80)}
+        self.assertTrue(any("Amazon" in h for h in seen))
+
+    def test_source_optional_backwards_compatible(self):
+        self.assertTrue(hook_for("₹99", "Kurta", 3))
