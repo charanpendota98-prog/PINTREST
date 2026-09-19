@@ -187,6 +187,12 @@ def main(argv: list[str]) -> int:
             print(f"      → {pr['url'][:110] or '(no response)'}")
             if pr["title"]:
                 print(f"      → title: {pr['title'][:80]}")
+            if pr.get("attributed") is True:
+                print("      → attribution param present ✅ "
+                      "(c=<publisher>:<token>:<campaign> / pid=meesho_affiliate_portal)")
+            elif pr.get("attributed") is False:
+                print("      → ⚠️  attribution param MISSING — click credit "
+                      "avvakapovachu (commission leak risk)")
 
     print()
     print("=" * 78)

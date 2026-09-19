@@ -429,6 +429,11 @@ def print_how_it_works() -> None:
    ✅ R71 (owner phone/browser proof): bot build chesina link nijam ga correct product page
    ki vellindi — landing URL lo `pid=meesho_affiliate_portal` + `utm_source=<surface token>`
    rendu intact (Meesho aa click ni affiliate ga log chesindi).
+   ✅ R73 (owner second phone test, 2 products): bot link AND his own portal link rendu
+   correct product pages ki vellayi; bot link landing lo
+   `?c=24197020:instagram_stories:11174107` (publisher:token:campaign) — attribution
+   intact. Ippudu `meesho_landing_probe()` prati link ki `attributed` field istundi
+   (audit `--live` lo print avutundi; missing aithe warning — leak risk).
    🐛 R68 deep-probe lo pattukunna rendu nijamaina bugs (fix ayyayi):
    (1) p_id leni Meesho URL (search/category/truncated) kuda af_invite link
    build ayyedi → click generic page ki velli commission miss, kani leak gate
@@ -530,7 +535,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   693 automated tests.
+   695 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

@@ -675,3 +675,31 @@ def _pin_like(path, size=(1000, 1500)):
     d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
                 fill=(200, 30, 60))
     im.save(path)
+
+
+class TestMeeshoAttribution(unittest.TestCase):
+    """R73 — the owner's phone test showed Meesho carrying the affiliate id in
+    `c=<publisher>:<token>:<campaign>`; a landing WITHOUT it = leak risk."""
+
+    def test_attribution_markers(self):
+        from bot.affiliate import AffiliateLinker as L
+        link = ("https://www.meesho.com/af_invite/24197020:instagram_stories:"
+                "11174107?utm_source=instagram_stories&p_id=21cuip&ext_id=21cuip")
+        self.assertTrue(L.meesho_attribution_ok(
+            "https://www.meesho.com/s/p/21cuip?c=24197020:instagram_stories:11174107", link))
+        self.assertTrue(L.meesho_attribution_ok(
+            "https://www.meesho.com/s/p/1d6b70?pid=meesho_affiliate_portal&x=1", link))
+        self.assertFalse(L.meesho_attribution_ok(
+            "https://www.meesho.com/s/p/21cuip?product_id=21cuip", link))
+        self.assertFalse(L.meesho_attribution_ok("", link))
+
+    def test_probe_reports_attribution_field(self):
+        from bot.affiliate import AffiliateLinker
+        probe = AffiliateLinker.meesho_landing_probe
+        # offline sandbox: probe must fail open and still carry the field
+        import bot.config as C
+        cfg = C.Config(raw={"affiliate": {"meesho_affid": "24197020"}})
+        out = AffiliateLinker(cfg).meesho_landing_probe(
+            "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"
+            "?p_id=21cuip&ext_id=21cuip", timeout=1)
+        self.assertIn("attributed", out)

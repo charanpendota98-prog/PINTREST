@@ -293,6 +293,22 @@ class AffiliateLinker:
                     f"?p_id={pid}&ext_id={pid}&utm_source={tok}")
         return ""
 
+    @staticmethod
+    def meesho_attribution_ok(final_url: str, link: str) -> bool:
+        """Did the AFFILIATE attribution survive the whole redirect chain?
+
+        The owner's own phone test (R73) showed Meesho carrying it two ways:
+          /s/p/21cuip?c=24197020:instagram_stories:11174107   ← publisher:token:campaign
+          /s/p/1d6b70?...&pid=meesho_affiliate_portal          ← affiliate portal
+        If neither is present the visitor still sees the product but the click
+        would NOT be credited — that is a commission leak, worth warning about.
+        """
+        u = (final_url or "").lower()
+        if "pid=meesho_affiliate_portal" in u:
+            return True
+        m = re.search(r"/af_invite/(\d+):", link or "")
+        return bool(m and f"c={m.group(1)}" in u)
+
     def meesho_landing_probe(self, link: str, timeout: int = 8) -> dict:
         """What does this link ACTUALLY open? Full answer, not just yes/no.
 
@@ -309,7 +325,8 @@ class AffiliateLinker:
         False = Meesho itself said Not Found / share route with no code
         None  = couldn't tell (offline, robot-blocked, HTTP error) — never a verdict
         """
-        out = {"ok": None, "url": "", "title": "", "reason": "", "hops": []}
+        out = {"ok": None, "url": "", "title": "", "reason": "", "hops": [],
+               "attributed": None}
         if "af_invite/" not in link:
             out["reason"] = "not a Meesho af_invite link"
             return out
@@ -338,6 +355,11 @@ class AffiliateLinker:
             out.update(reason=f"HTTP {r.status_code} — blocked? not a verdict")
         else:
             out.update(ok=True, reason="lands on a product page")
+        out["attributed"] = self.meesho_attribution_ok(out["url"], link)
+        if out["ok"] and not out["attributed"]:
+            log.warning("MEESHO ATTRIBUTION: product page vachindi kani "
+                        "affiliate param (c=/pid=) kanipinchaledu — click "
+                        "credit avvakapovachu. Link: %s", link[:90])
         return out
 
     def meesho_landing_ok(self, link: str, timeout: int = 8):
