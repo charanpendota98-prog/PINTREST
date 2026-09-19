@@ -1616,6 +1616,7 @@ def cmd_telegram(cfg, rest: list[str]) -> int:
     """🤖 Two-way Telegram control — run the bot from your phone.
 
     `python -m bot telegram`          → listen (long polling)
+    `python -m bot telegram --whoami` → find your chat id (message the bot first)
     `python -m bot telegram --once`   → answer pending messages once
     `python -m bot telegram --test`   → prove the token + owner chat work
     """
@@ -1632,6 +1633,31 @@ def cmd_telegram(cfg, rest: list[str]) -> int:
               "      → 'chat':{'id':…} → TELEGRAM_CHAT_ID\n"
               "   3) (optional) deals channel: TELEGRAM_DEALS_CHANNEL=@yourchannel")
         return 1
+    if "--whoami" in rest or "--discover" in rest:
+        try:
+            found = ctl.discover_chats()
+        except Exception as exc:  # noqa: BLE001
+            print(f"❌ Telegram nunchi reply ravaledu: {type(exc).__name__}: "
+                  f"{str(exc)[:160]}\n   (nee machine nunchi internet check "
+                  f"cheyyandi — sandbox lo Telegram blocked)")
+            return 1
+        if not found:
+            print("❓ Evaru bot ki message pampaledu. Telegram lo nee bot ni "
+                  "open chesi /start pampandi, tarvata malli run cheyyandi.")
+            return 1
+        print("✅ Ee chat(s) kanipinchayi:")
+        for cid, name in found:
+            print(f"   • {name}  (chat id {cid})")
+        if len(found) == 1:
+            from .tgcontrol import env_set
+            env_set(".env", "TELEGRAM_CHAT_ID", found[0][0])
+            print(f"\n✅ TELEGRAM_CHAT_ID={found[0][0]} ni .env lo save chesanu "
+                  f"({found[0][1]}).")
+            print("   Tarvata: python -m bot telegram --test")
+        else:
+            print("\n⚠️  Okati kanna ekkuva chat lu — nuvvu deniki kavalo aa "
+                  "chat id ni .env lo TELEGRAM_CHAT_ID=… ga pettandi.")
+        return 0
     if "--test" in rest:
         ok = ctl.notify.send_to(ctl.owner, "✅ Gharvanaa control bot test — "
                                            "ivi nijam ga nee phone ki vachinaya?")

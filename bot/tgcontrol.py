@@ -49,6 +49,28 @@ def parse_command(text: str) -> tuple[str, list[str]]:
     return cmd, parts[1:]
 
 
+def env_set(path, key: str, value: str) -> bool:
+    """Surgically set KEY=value in a .env file (comments preserved)."""
+    import re as _re
+    p = Path(path)
+    try:
+        text = p.read_text()
+    except OSError:
+        text = ""
+    line = f"{key}={value}"
+    if _re.search(rf"^{_re.escape(key)}=", text, _re.M):
+        text = _re.sub(rf"^{_re.escape(key)}=.*$", line, text, flags=_re.M)
+    else:
+        text = text.rstrip() + "\n" + line + "\n"
+    p.write_text(text)
+    try:
+        import os as _os
+        _os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return True
+
+
 class TelegramControl:
     """Two-way controller. `reply()` is pure logic; `serve()` is the loop."""
 
@@ -204,6 +226,49 @@ class TelegramControl:
         control.pause(self.db, "telegram /pause", until_ts=until)
         return (f"⏸ Paused{'' if not hours else f' for {hours:g}h'} — "
                 "/resume tho malli start.")
+
+    def discover_chats(self, drop_pending: bool = True) -> list[tuple[str, str]]:
+        """Who has messaged this bot? → [(chat_id, name)].
+
+        Telegram only reveals a chat id AFTER that person messages the bot, so
+        the owner sends any message and this finds him. Used by
+        `python -m bot telegram --whoami`, which also writes TELEGRAM_CHAT_ID.
+        """
+        import requests
+        if not self.notify.token:
+            raise RuntimeError("TELEGRAM_TOKEN ledu")
+        resp = requests.get(
+            f"https://api.telegram.org/bot{self.notify.token}/getUpdates",
+            params={"offset": -20, "timeout": 0,
+                    "allowed_updates": '["message","channel_post"]'},
+            timeout=20)
+        data = resp.json() if resp.status_code == 200 else {}
+        if not data.get("ok"):
+            raise RuntimeError(str(data.get("description") or
+                                   f"HTTP {resp.status_code}"))
+        found: list[tuple[str, str]] = []
+        seen_ids: set[str] = set()
+        for upd in data.get("result", []) or []:
+            msg = upd.get("message") or upd.get("channel_post") or {}
+            chat = msg.get("chat") or {}
+            cid = str(chat.get("id", ""))
+            if not cid:
+                continue
+            name = (chat.get("title") or chat.get("username")
+                    or " ".join(x for x in (chat.get("first_name"),
+                                            chat.get("last_name")) if x)
+                    or chat.get("type", "?"))
+            if cid in seen_ids:
+                continue                      # one entry per chat, best name
+            seen_ids.add(cid)
+            found.append((cid, name))
+        if drop_pending:
+            try:
+                self._write_offset(max(int(u.get("update_id", 0))
+                                       for u in data.get("result", [])))
+            except ValueError:
+                pass
+        return found
 
     # ---------------------------------------------------------------- loop
     def _read_offset(self) -> int:

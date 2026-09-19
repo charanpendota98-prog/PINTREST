@@ -101,7 +101,8 @@ FEATURES = [
      "phone nunchi machine ni control: /status /deals /link <url> /post <url> "
      "/surfaces /pause /resume — owner chat matrame (scheduler lo auto-start)",
      lambda cfg: bool(__import__("os").getenv("TELEGRAM_TOKEN", "").strip()),
-     "TELEGRAM_TOKEN + TELEGRAM_CHAT_ID in .env → python -m bot telegram"),
+     "TELEGRAM_TOKEN in .env → python -m bot telegram --whoami (chat id ni "
+     "automatic ga kanukoni .env lo save chestundi) → python -m bot telegram"),
     ("Per-surface posting records", "money",
      "prati platform ki enni posts vellayo DB lo record — `bot platforms` lo "
      "real counts (pinterest/instagram/facebook/youtube/telegram)",
@@ -544,7 +545,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   709 automated tests.
+   713 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

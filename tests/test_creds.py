@@ -903,3 +903,86 @@ class TestTelegramControlAutostart(unittest.TestCase):
                 eng._start_telegram_control()
                 eng._start_telegram_control()          # second call = no-op
             self.assertTrue(eng._tg_started)
+
+
+class TestTelegramChatDiscovery(unittest.TestCase):
+    """R75 — one command finds the owner's chat id and saves it to .env."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        from bot.config import Config
+        from bot.db import DB
+        self.cfg = Config(raw={
+            "storage": {"db_path": f"{self.tmp.name}/t.db",
+                        "media_dir": f"{self.tmp.name}/m"}})
+        self.db = DB(self.cfg.get("storage.db_path"))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _ctl(self, token="tok"):
+        import os
+        from unittest import mock
+        from bot.tgcontrol import TelegramControl
+        with mock.patch.dict(os.environ, {"TELEGRAM_TOKEN": token}):
+            ctl = TelegramControl(self.cfg, db=self.db)
+        return ctl
+
+    def test_env_set_updates_and_preserves_comments(self):
+        import pathlib
+        from bot.tgcontrol import env_set
+        p = pathlib.Path(self.tmp.name) / ".env"
+        p.write_text("# my secrets\nAMAZON_TAG=x-21\nTELEGRAM_CHAT_ID=\n")
+        env_set(str(p), "TELEGRAM_CHAT_ID", "999")
+        text = p.read_text()
+        self.assertIn("# my secrets", text)          # comment survives
+        self.assertIn("TELEGRAM_CHAT_ID=999", text)
+        self.assertIn("AMAZON_TAG=x-21", text)
+        env_set(str(p), "NEW_KEY", "v")              # appends when missing
+        self.assertIn("NEW_KEY=v", p.read_text())
+        import os, stat
+        self.assertEqual(stat.S_IMODE(os.stat(p).st_mode), 0o600)
+
+    def test_discover_chats_from_updates(self):
+        from unittest import mock
+        ctl = self._ctl()
+        payload = {"ok": True, "result": [
+            {"update_id": 11, "message": {"chat": {"id": 555, "first_name": "Charan",
+                                                   "username": "charan"}}},
+            {"update_id": 12, "message": {"chat": {"id": 555, "first_name": "Charan"}}},
+            {"update_id": 13, "channel_post": {"chat": {"id": -1001, "title": "Gharvanaa Deals"}}},
+        ]}
+
+        class _Resp:
+            status_code = 200
+            def json(self):
+                return payload
+        with mock.patch("requests.get", return_value=_Resp()) as g:
+            found = ctl.discover_chats()
+        self.assertEqual(found[0], ("555", "charan"))
+        self.assertIn(("-1001", "Gharvanaa Deals"), found)
+        self.assertEqual(len(found), 2)              # deduped same chat
+        self.assertIn("getUpdates", g.call_args.args[0])
+
+    def test_discover_chats_reports_bad_token(self):
+        from unittest import mock
+        ctl = self._ctl()
+
+        class _Resp:
+            status_code = 401
+            def json(self):
+                return {"ok": False, "description": "Unauthorized"}
+        with mock.patch("requests.get", return_value=_Resp()):
+            with self.assertRaises(RuntimeError):
+                ctl.discover_chats()
+
+    def test_owner_id_used_for_replies(self):
+        import os
+        from unittest import mock
+        ctl = self._ctl()
+        with mock.patch.dict(os.environ, {"TELEGRAM_TOKEN": "tok",
+                                          "TELEGRAM_CHAT_ID": "555"}):
+            from bot.tgcontrol import TelegramControl
+            ctl2 = TelegramControl(self.cfg, db=self.db)
+        self.assertEqual(ctl2.owner, "555")
