@@ -621,3 +621,46 @@ class TestMeeshoPasteHygiene(unittest.TestCase):
         self.assertTrue(res["ok"])
         self.assertNotIn("&amp;", res["link"])
         self.assertIn("&ext_id=1d6b70", res["link"])
+
+
+class TestMeeshoLandingProbeDetail(unittest.TestCase):
+    """R70: the probe must explain WHY (ad-blocker vs real 404)."""
+
+    def test_probe_reports_final_url_and_title(self):
+        from unittest import mock
+        from bot.affiliate import AffiliateLinker
+
+        class Cfg:
+            amazon_tag = ""
+
+            def get(self, key, default=None):
+                return default
+
+        class Resp:
+            url = "https://www.meesho.com/s/p/35pwo2?product_id=35pwo2"
+            text = "<html><title>Black Embroidered Rayon Kurti | Meesho</title></html>"
+            status_code = 200
+
+        with mock.patch("requests.get", return_value=Resp()):
+            pr = AffiliateLinker(Cfg()).meesho_landing_probe(
+                "https://www.meesho.com/af_invite/24197020:facebook:1?p_id=35pwo2&ext_id=35pwo2")
+        self.assertTrue(pr["ok"])
+        self.assertIn("/s/p/35pwo2", pr["url"])
+        self.assertIn("Kurti", pr["title"])
+        self.assertEqual(pr["reason"], "lands on a product page")
+
+    def test_probe_never_claims_a_verdict_when_offline(self):
+        from unittest import mock
+        from bot.affiliate import AffiliateLinker
+
+        class Cfg:
+            amazon_tag = ""
+
+            def get(self, key, default=None):
+                return default
+
+        with mock.patch("requests.get", side_effect=Exception("dns")):
+            pr = AffiliateLinker(Cfg()).meesho_landing_probe(
+                "https://www.meesho.com/af_invite/24197020:facebook:1?p_id=1&ext_id=1")
+        self.assertIsNone(pr["ok"])
+        self.assertIn("dns", pr["reason"])

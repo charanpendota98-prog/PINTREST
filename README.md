@@ -723,6 +723,8 @@ bot builds, for ANY scraped product:
 
 Full proof (every component + edge cases, no network): `python scripts/meesho_audit.py`
 Live proof (fetch every built link and ask Meesho what it opens): `python scripts/meesho_audit.py --live`
+
+**Troubleshooting — “meesho.onelink.me is blocked / ERR_BLOCKED_BY_CLIENT”:** that is your ad-blocker, not the link. Meesho routes every affiliate click through AppsFlyer (`meesho.onelink.me`) before landing on the product page, and tracker blockers kill that domain. Disable the extension for the test, whitelist `*.onelink.me` + `*.meesho.com`, or open the link on your **phone** — then the same link lands on the product. The `--live` audit fetches the link server-side (extensions cannot interfere) and prints the whole redirect chain, so you can see the hop for yourself.
 Verify in one command: `python -m bot meesho "https://www.meesho.com/<product>"` →
 prints the exact link per platform + structural checks. `python -m bot platforms`
 shows every surface + its token. Honest limit: only your phone + the Meesho

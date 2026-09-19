@@ -293,18 +293,26 @@ class AffiliateLinker:
                     f"?p_id={pid}&ext_id={pid}&utm_source={tok}")
         return ""
 
-    def meesho_landing_ok(self, link: str, timeout: int = 8):
-        """LIVE check: does this built Meesho link really open the product?
+    def meesho_landing_probe(self, link: str, timeout: int = 8) -> dict:
+        """What does this link ACTUALLY open? Full answer, not just yes/no.
 
-        Returns True (lands on a product page), False (definitive failure —
-        Meesho's "Not Found page", or /s/p with no code) or None (couldn't
-        tell: network/robot-blocking — never quarantine on a None).
+        R69: the guard that catches a link which looks perfectly monetized and
+        still 404s on Meesho's side. R70: the same probe now also explains the
+        redirect chain, because the last hop goes through Meesho's AppsFlyer
+        domain (meesho.onelink.me) — ad-blocker extensions block that domain
+        with ERR_BLOCKED_BY_CLIENT, which looks like "the bot's link is broken"
+        but is really the visitor's own extension. This probe runs from the
+        server, so it sees the truth the browser cannot.
 
-        This is the check that R69 taught us we needed: a link can look
-        perfectly monetized and still 404 on the Meesho side.
+        Returns {ok: True|False|None, url, title, reason}.
+        True  = lands on a real product page
+        False = Meesho itself said Not Found / share route with no code
+        None  = couldn't tell (offline, robot-blocked, HTTP error) — never a verdict
         """
+        out = {"ok": None, "url": "", "title": "", "reason": "", "hops": []}
         if "af_invite/" not in link:
-            return None
+            out["reason"] = "not a Meesho af_invite link"
+            return out
         try:
             import requests
             r = requests.get(
@@ -312,19 +320,29 @@ class AffiliateLinker:
                 headers={"User-Agent": MOBILE_UA,
                          "Accept-Language": "en-IN,en;q=0.9"})
         except Exception as e:                                   # noqa: BLE001
+            out["reason"] = f"{type(e).__name__}: {str(e)[:80]}"
             log.warning("MEESHO LANDING: check cheyyalekapoyam (%s) — link ni "
-                        "nammakam tho vadilestunnam.", str(e)[:90])
-            return None
-        final = r.url or ""
-        if re.search(r"/s/p(\?|$)", final):
-            return False                       # no code in the share route
+                        "nammakam tho vadilestunnam.", out["reason"][:90])
+            return out
+        out["url"] = r.url or ""
+        # R70: show the whole chain — the hop through Meesho's AppsFlyer domain
+        # (meesho.onelink.me) is what ad-blockers kill in the visitor's browser
+        out["hops"] = [h.url for h in getattr(r, "history", []) or []]
         m = re.search(r"<title[^>]*>(.*?)</title>", r.text or "", re.S | re.I)
-        title = (m.group(1) if m else "").strip().lower()
-        if "not found" in title:
-            return False
-        if r.status_code >= 400:
-            return None                        # blocked/ratelimited ≠ broken
-        return True
+        out["title"] = (m.group(1) if m else "").strip()
+        if re.search(r"/s/p(\?|$)", out["url"]):
+            out.update(ok=False, reason="share route without a product code")
+        elif "not found" in out["title"].lower():
+            out.update(ok=False, reason="Meesho returned its Not Found page")
+        elif r.status_code >= 400:
+            out.update(reason=f"HTTP {r.status_code} — blocked? not a verdict")
+        else:
+            out.update(ok=True, reason="lands on a product page")
+        return out
+
+    def meesho_landing_ok(self, link: str, timeout: int = 8):
+        """True / False / None — see meesho_landing_probe for the detail."""
+        return self.meesho_landing_probe(link, timeout)["ok"]
 
     def meeshoize(self, url: str, platform: str = "") -> str:
         if self.MEESHO_MONETIZED.search(url):

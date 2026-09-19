@@ -383,6 +383,13 @@ def print_how_it_works() -> None:
    deterministic. QA gate kotha rule: af_invite lo p_id + ext_id rendu
    undali, and publish mundu bot **live ga fetch chesi** Meesho "Not Found"
    ante pin ni QUARANTINE chestundi (offline/internet lekapote block cheyyadu).
+   🧱 Browser lo link open avvaka "meesho.onelink.me is blocked —
+   ERR_BLOCKED_BY_CLIENT" vaste: adi nee **ad-blocker extension**, bot tappu
+   kaadu. Meesho affiliate link AppsFlyer (`meesho.onelink.me`) gunda
+   redirect avutundi; blockers aa domain ni aadukuntayi. Fix: extension off /
+   whitelist `*.onelink.me` + `*.meesho.com`, leda **phone lo** open cheyyi.
+   Bot publish mundu server-side nunchi (extension effect undadu) link ni
+   fetch chesi check chestundi — `python scripts/meesho_audit.py --live`.
    🐛 R68 deep-probe lo pattukunna rendu nijamaina bugs (fix ayyayi):
    (1) p_id leni Meesho URL (search/category/truncated) kuda af_invite link
    build ayyedi → click generic page ki velli commission miss, kani leak gate
@@ -484,7 +491,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   662 automated tests.
+   664 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

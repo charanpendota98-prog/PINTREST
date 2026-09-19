@@ -174,14 +174,19 @@ def main(argv: list[str]) -> int:
         print("=" * 78)
         print("5b) LIVE LANDING CHECK — what Meesho actually opens (network)")
         print("=" * 78)
+        print("   (server-side fetch — browser extensions cannot affect this)")
         for plat in PLATFORMS:
             built = lk.meesho_link_for(product, plat)
-            res = lk.meesho_landing_ok(built)
-            verdict = {True: "lands on a product page", False: "NOT FOUND ❌",
-                       None: "couldn't tell (network / robot block)"}[res]
+            pr = lk.meesho_landing_probe(built)
+            res = pr["ok"]
             fails += 1 if res is False else 0
-            print(f"   {'✅' if res else ('❌' if res is False else '…')} "
-                  f"{plat:18s} {verdict}")
+            icon = "✅" if res else ("❌" if res is False else "…")
+            print(f"   {icon} {plat:18s} {pr['reason']}")
+            for hop in pr["hops"][:3]:
+                print(f"      ↪ {hop[:110]}")
+            print(f"      → {pr['url'][:110] or '(no response)'}")
+            if pr["title"]:
+                print(f"      → title: {pr['title'][:80]}")
 
     print()
     print("=" * 78)
@@ -201,7 +206,8 @@ def main(argv: list[str]) -> int:
         return 1
     print(" 🏆 ALL CHECKS PASSED — Meesho links are built exactly like your own")
     print("    share links: same publisher, same token per surface, newest")
-    print("    campaign, the real product id, and a fresh click id every time.")
+    print("    campaign, and p_id == ext_id == the product's own code (the value")
+    print("    Meesho resolves the landing page from).")
     print("-" * 78)
     return 0
 
