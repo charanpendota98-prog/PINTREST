@@ -853,11 +853,20 @@ up end-to-end:
 
 ```bash
 # 1) Oracle Cloud → Create Instance:
-#    - Image:   Ubuntu 22.04/24.04 LTS (ARM ok)
-#    - Shape:   VM.Standard.A1.Flex (Ampere ARM) 2 OCPU / 12 GB  → Always Free
-#               (or the 2 × VM.Standard.E2.1.Micro AMD micro instances)
+#    - Image:   Canonical Ubuntu 22.04/24.04 (Minimal ok) — aarch64 or amd64
+#    - Shape:   VM.Standard.A1.Flex (Ampere ARM) → 2 OCPU / 12 GB = FULL free
+#               allowance (see the quota note below!)
+#               alternative: 2 × VM.Standard.E2.1.Micro (AMD, 1 GB each) —
+#               works, but 1 GB needs the auto-swap the bootstrap installs
 #    - Region:  Mumbai / Hyderabad (lowest latency to Meesho/Amazon)
 #    - SSH key: paste your public key (Oracle asks for it at creation)
+
+# ⚠️ ALWAYS-FREE A1 QUOTA (changed 15 June 2026): Oracle HALVED the Ampere
+# allowance from 4 OCPU/24 GB to **2 OCPU / 12 GB** (1,500 OCPU-hours +
+# 9,000 GB-hours/month). Sizes above that on a free account are stopped until
+# you resize; on PAYG they can bill. So the correct free config is exactly
+# 2 OCPU / 12 GB (runs 24/7 = 1,488 h/month, just inside 1,500).
+# If the console caps memory, raise OCPUs to 2 first, then set memory 12.
 
 # 2) SSH into the VM, then:
 gh auth login                      # repo private → GitHub lo okasari login
@@ -872,9 +881,11 @@ venv + requirements → `data/`+`logs/` → `.env` checklist → `deploy.sh`
 (two systemd services: poster + panel, auto-start on boot, auto-restart).
 `--no-start` runs the setup without starting anything.
 
-**ARM note:** imageio-ffmpeg may ship no ARM binary — `video_maker.ffmpeg_exe()`
-falls back to the system ffmpeg (which the script installs), and points
-imageio-ffmpeg at it via `IMAGEIO_FFMPEG_EXE`. Reels keep rendering.
+**ARM note (verified):** the aarch64 wheel of imageio-ffmpeg DOES bundle a
+binary (`ffmpeg-linux-aarch64-v7.0.2`, 48 MB — checked against the real
+wheel), so reels render on Ampere too. As a safety net `video_maker.ffmpeg_exe()`
+still falls back to the system ffmpeg (installed by the bootstrap) and points
+imageio-ffmpeg at it via `IMAGEIO_FFMPEG_EXE`.
 
 **⚠️ Oracle idle-reclaim (Always Free):** OCI may RECLAIM an instance that
 looks idle for 7 days — CPU 95th percentile < 10%, network < 10%, and (A1
