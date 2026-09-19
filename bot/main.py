@@ -445,10 +445,16 @@ def cmd_doctor(cfg) -> int:
         _pin_ok, _pin_how = False, "python -m bot auth-url  +  auth --code"
     ck("Pinterest token (auth done)", _pin_ok, _pin_how)
     ck("Amazon tag", bool(cfg.amazon_tag), "affiliate-program.amazon.in")
-    ck("Meesho/EarnKaro/Cuelinks (any)", bool(
-        cfg.get("affiliate.meesho_affid") or os.getenv("MEESHO_AFFID")
-        or cfg.get("affiliate.earnkaro_prefix") or os.getenv("EARNKARO_PREFIX")
-        or cfg.get("affiliate.cuelinks_template")), "see README affiliate guide")
+    # R77: ask the LINKER, not the raw config — the owner's real setup is
+    # .env MEESHO_TEMPLATE_LINK (af_invite), which this check used to ignore
+    # and report a false ❌ while the money path was actually ready.
+    from .affiliate import AffiliateLinker as _AL0
+    _lk0 = _AL0(cfg)
+    _any_aff = bool(_lk0.meesho_template_links or _lk0.meesho_affid
+                    or _lk0.earnkaro_prefix
+                    or str(cfg.get("affiliate.cuelinks_template", "") or ""))
+    ck("Affiliate identity (Meesho af_invite / EarnKaro / Cuelinks / Flipkart)",
+       _any_aff, "see README affiliate guide")
     ck("Meesho DIRECT af_invite (recommended)", bool(
         os.getenv("MEESHO_TEMPLATE_LINK") or cfg.get("affiliate.meesho_template_link")),
        "paste ONE af_invite link from affiliate.meesho.com → .env MEESHO_TEMPLATE_LINK")

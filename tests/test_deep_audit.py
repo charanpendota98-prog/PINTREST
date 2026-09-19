@@ -991,3 +991,29 @@ class TestSmallVMMode(unittest.TestCase):
                            created_at=__import__("datetime").datetime.now(
                                eng.tz).isoformat(timespec="seconds"))
         self.assertFalse(eng._reel_budget_ok())
+
+
+class TestDoctorAffiliateHonesty(unittest.TestCase):
+    """R77 — `bot doctor` must not report a false ❌ for the money path.
+
+    The owner's whole Meesho setup lives in .env as MEESHO_TEMPLATE_LINK
+    (af_invite); the old check only looked at config.yaml keys and printed
+    "Meesho/EarnKaro/Cuelinks (any) ❌" while links were perfectly ready.
+    """
+
+    def test_env_af_invite_counts_as_configured(self):
+        import os
+        from unittest import mock
+        from bot.config import Config
+        from bot.affiliate import AffiliateLinker
+        with mock.patch.dict(os.environ, {
+                "MEESHO_TEMPLATE_LINK":
+                    "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"}):
+            lk = AffiliateLinker(Config(raw={}))
+            self.assertTrue(lk.meesho_template_links)
+            self.assertEqual(lk.meesho_ids[0], "24197020")
+
+    def test_doctor_line_uses_the_linker(self):
+        src = (Path(__file__).resolve().parent.parent / "bot/main.py").read_text()
+        self.assertIn("Affiliate identity (Meesho af_invite", src)
+        self.assertNotIn('ck("Meesho/EarnKaro/Cuelinks (any)"', src)
