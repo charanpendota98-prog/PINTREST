@@ -17,6 +17,8 @@ Usage:
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
   python -m bot app [--site URL]         # 📝 Pinterest app form — exact answers
+  python -m bot app --where              # 🧭 app page open cheyyadam ela (click path)
+  python -m bot token-check [--write-test]  # 🔐 token entha cheyyagaladu (live)
   python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
   python -m bot name --next              # 🚨 handle taken? → variants + auto-pick
   python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
@@ -922,6 +924,16 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+def cmd_token_check(cfg, rest: list[str]) -> int:
+    """🔐 What can the current Pinterest token actually do? (live proof)"""
+    from . import tokencheck as _tc
+    write_test = any(w in ("--write-test", "--write", "-w") for w in rest)
+    print()
+    print("\n".join(_tc.lines(cfg, write_test)))
+    print()
+    return 0
+
+
 def cmd_app(cfg, rest: list[str]) -> int:
     """📝 Pinterest 'Connect app' form — exact answers (+ --site to save URL)."""
     from . import appform as _appform
@@ -932,6 +944,11 @@ def cmd_app(cfg, rest: list[str]) -> int:
             site = rest[i + 1]
         elif word.startswith("--site="):
             site = word.split("=", 1)[1]
+    if any(w in ("--where", "-w", "where") for w in rest):
+        print()
+        print("\n".join(_appform.where_lines(cfg)))
+        print()
+        return 0
     if any(w in ("--upgrade", "--standard") for w in rest):
         print()
         print("\n".join(_appform.upgrade_lines(cfg)))
@@ -1306,6 +1323,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd in ("token-check", "tokencheck", "whoami"):
+        return cmd_token_check(cfg, rest)
     if cmd in ("app", "app-form", "appform"):
         return cmd_app(cfg, rest)
     if cmd in ("name", "naming", "brand-name"):

@@ -174,12 +174,16 @@ Form answers (personal-use app ki — idi correct, honest route):
 
 **2a-5. App create ayyaka — Trial → Standard (public pins) path**
 
+App page malli open cheyyali ante (console tab close aithe):
+`python -m bot app --where` → click-path + nee app ID tho direct URL.
+
 App approve ayyaka ee 4 steps (order lo):
 
 | # | Step | Command / place |
 |---|---|---|
 | 1 | **Redirect URI** add | app page → Redirect URLs → `http://localhost:8888/callback` (http+localhost allowed) |
 | 2 | **Trial token** (immediate testing) | app page → "Generate access tokens" (Trial) → copy → `.env`: `PINTEREST_ACCESS_TOKEN='...'` |
+| 2b | **Proof** kavali ante | `python -m bot token-check` (read live) · `python -m bot token-check --write-test` (private board create+delete) |
 | 3 | **OAuth** (permanent) | app secret unlock ayyaka: `python -m bot auth-url` → code → `python -m bot auth --code <CODE>` |
 | 4 | **Standard access request** | app page → **Upgrade** → `python -m bot app --upgrade` answers copy-paste |
 

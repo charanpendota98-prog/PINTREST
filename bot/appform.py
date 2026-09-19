@@ -116,6 +116,8 @@ def lines(cfg=None) -> list[str]:
         "      Ecommerce · Recommendations & experimentation · MCP/AI connector",
         "",
         "─" * 70,
+        "🧭 App page malli open cheyyadam: python -m bot app --where",
+        "",
         "SUBMIT TARVATA: redirect URI + scopes → app secret unlock → OAuth.",
         "⏭️  TARVATA KAAVALSINADI: public pins ki **Standard access request** —",
         "    python -m bot app --upgrade   (answers ready, scope justification tho)",
@@ -140,6 +142,58 @@ def lines(cfg=None) -> list[str]:
             f"   Check: curl -s -o /dev/null -w '%{{http_code}}\\n' {site_url}",
         ]
     return out
+
+
+def where_lines(cfg=None) -> list[str]:
+    """Exact click-path back to the app page (people lose the console tab)."""
+    app_id = ""
+    try:
+        import os
+        app_id = str(os.getenv("PINTEREST_APP_ID", "") or "")
+    except Exception:  # noqa: BLE001
+        app_id = ""
+    direct = (f"https://developers.pinterest.com/apps/{app_id}/" if app_id
+              else "https://developers.pinterest.com/apps/")
+    shown_id = app_id or "1613412"
+    return [
+        "═" * 70,
+        "🧭 APP PAGE EKKADA? (ee 30 seconds lo open cheyyi)",
+        "═" * 70,
+        "1. Browser lo:  https://developers.pinterest.com",
+        "   → login cheyyi **gharvanaa** account tho (app ee account kinda undi).",
+        "",
+        "2. Top-right lo nee profile icon click → **My apps**",
+        "   leda direct ga:  https://developers.pinterest.com/apps/",
+        "",
+        f"3. App card 'Gharvanaa Deals Publisher' (App ID {shown_id}) "
+        "kanipistundi",
+        "   → aa card meeda **Manage** button click cheyyi",
+        f"   leda direct:  {direct}",
+        "",
+        "4. App page lo TABS:  Configure | Collaborators | Details",
+        "   → **Configure** tab (default eh untundi) → kindaki scroll:",
+        "",
+        "   ▸ **Redirect URLs**  →  input box lo pedu:",
+        "        http://localhost:8888/callback",
+        "     → **Enter** kottu (leda 'Add' click) → URL chip ga kanipinchali ✅",
+        "",
+        "   ▸ **Generate Access Tokens** (same tab, kindaki) →",
+        "        Environment: Production Limited → **Generate token**",
+        "     → token copy (ventane, browser nunchi vellaka mundu)",
+        "     → .env lo:  PINTEREST_ACCESS_TOKEN='<token>'",
+        "",
+        "   ▸ **API scopes** (same tab, chivari section) → ee 5 read/write",
+        "     scopes nee app ki kaavali:",
+        "        boards:read · boards:write · pins:read · pins:write ·",
+        "        user_accounts:read",
+        "     (dashboard trial token ee write scopes ivvadu — adi OAuth tarvata)",
+        "",
+        "5. Verify (VPS lo):  python -m bot token-check",
+        '   → "READ works ✅" vasthe token correct;  --write-test tho write kuda',
+        "",
+        "💡 Tab close aithe parvaledu — paiki unna URL bookmark chesuko:",
+        f"   {direct}",
+    ]
 
 
 def upgrade_lines(cfg=None) -> list[str]:

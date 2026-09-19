@@ -340,6 +340,16 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+23) TOKEN CAPABILITY PROOF + CONSOLE NAVIGATION (R63)
+   🧭 `python -m bot app --where`: dev console malli open cheyyadam click-path
+   (My apps → Manage → Configure → Redirect URLs → Generate token), app ID tho
+   direct URL tho saha. Console tab close aithe ee command chalu.
+   🔐 `python -m bot token-check [--write-test]`: token **nijamga em cheyyagaladu**
+   ani live ga prove chestundi — read (user_account + boards) + optional write
+   test (private board create → ventane delete; account lo emi miguladu).
+   Dashboard trial token write scopes ivvadu ani cheptundi, and write block
+   aithe OAuth path + `app --upgrade` ki direct chestundi. Guess ledu.
+
 22) TRIAL → STANDARD ACCESS PATH (R62)
    🔑 `PINTEREST_ACCESS_TOKEN` (.env): developer dashboard lo "Generate access
    tokens" (Trial env) token ni paste cheyyandi → app review pending unna kuda
@@ -403,7 +413,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   528 automated tests.
+   544 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
