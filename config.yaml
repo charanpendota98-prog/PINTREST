@@ -90,7 +90,7 @@ design:
   width: 1000
   height: 1500             # Pinterest's ideal 2:3 vertical ratio
   accent_color: "#E60023"
-  brand_name: Gharvana  # your page/brand strip on every pin ("" = off)
+  brand_name: Gharvanaa  # your page/brand strip on every pin ("" = off)
   cta_text: "Shop Now ➜"
 
 affiliate:
@@ -173,7 +173,7 @@ dashboard:
 timezone: Asia/Kolkata
 
 brand:
-  display_name: "Gharvana | Home Deals & Finds"
-  bio: "Gharvana shares hand-picked deals — home, kitchen, fashion & beauty finds under ₹999. Organizers, gadgets & kurtas. New drops daily. Tap the pin to shop."
-  handle: gharvana
+  display_name: "Gharvanaa | Home Deals & Finds"
+  bio: "Gharvanaa shares hand-picked deals — home, kitchen, fashion & beauty finds under ₹999. Organizers, gadgets & kurtas. New drops daily. Tap the pin to shop."
+  handle: gharvanaa
 

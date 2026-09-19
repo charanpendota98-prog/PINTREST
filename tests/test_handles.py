@@ -404,6 +404,29 @@ class TestProfileWiring(unittest.TestCase):
             self.assertFalse(item(no_handle)["done"])
             self.assertIn("python -m bot handle", item(no_handle)["how"])
 
+    def test_incoherent_strip_and_name_is_caught(self):
+        """Strip 'Gharvana' + name 'Gharvanaa | ...' must NOT read as done."""
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._cfg(Path(d), brand={"handle": "gharvanaa",
+                                            "display_name": "Gharvanaa | Home Deals & Finds",
+                                            "bio": "bio"},
+                            design={"brand_name": "Gharvana"})   # stale strip
+            item = {i["key"]: i for i in ready.checks(cfg)}["profile"]
+            self.assertFalse(item["done"])
+            self.assertIn("match avvatledu", item["how"])
+
+    def test_variant_applied_to_both_fields_is_done(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._cfg(Path(d), brand={"handle": "gharvanaa",
+                                            "display_name": "Gharvanaa | Home Deals & Finds",
+                                            "bio": "bio"},
+                            design={"brand_name": "Gharvanaa"})
+            item = {i["key"]: i for i in ready.checks(cfg)}["profile"]
+            self.assertTrue(item["done"])
+            self.assertIn("@gharvanaa", item["how"])
+
     def test_ready_profile_item_never_raises_on_broken_config(self):
         from bot import ready
 

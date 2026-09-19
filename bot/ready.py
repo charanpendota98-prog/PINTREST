@@ -93,15 +93,36 @@ def _checks(cfg, os) -> list[dict]:
         profile_bits = {}
     profile_done = all(profile_bits.get(k) for k in
                        ("handle", "display", "bio", "strip"))
+    # Coherence guard (R59): the artwork strip must be the opening words of the
+    # ranked NAME field. A spelling variant applied to one field but not the
+    # other makes pins and profile disagree — cheap to detect, annoying to notice.
+    _strip = str(profile_bits.get("strip") or "")
+    _display = str(profile_bits.get("display") or "")
+    # Word-boundary match, not a bare prefix: strip "Gharvana" is a prefix of
+    # "Gharvanaa | ..." but they are DIFFERENT brand words — exactly the stale
+    # state a spelling-variant change can leave behind.
+    coherent = bool(_strip and (_display == _strip
+                                or _display.startswith(_strip + " ")))
+    if profile_done and coherent:
+        profile_how = ("set in config ✅ — Pinterest lo ide values paste "
+                       f"cheyyandi: Name '{profile_bits['display']}' · "
+                       f"@{profile_bits['handle']}")
+        profile_done_final = True
+    elif profile_done:
+        profile_how = ("pin strip vs NAME field match avvatledu — NAME field "
+                       f"'{profile_bits['display']}' lo strip "
+                       f"'{profile_bits['strip']}' tho start avvali → "
+                       'python -m bot brand "Brand | Home Deals & Finds"')
+        profile_done_final = False
+    else:
+        profile_how = ("python -m bot onboard  (screen-by-screen) · "
+                       "python -m bot brand (form values) · python -m bot "
+                       "handle  (username taken? ranked fallbacks + "
+                       "python -m bot handle check)")
+        profile_done_final = False
     items.append(_item(
         "profile", "Pinterest profile fields (name/bio/handle)",
-        profile_done,
-        ("set in config ✅ — Pinterest lo ide values paste cheyyandi: "
-         f"Name '{profile_bits.get('display', '')}' · @{profile_bits.get('handle', '')}'"
-         if profile_done else
-         "python -m bot onboard  (screen-by-screen) · python -m bot brand "
-         "(form values) · python -m bot handle  (username taken? ranked "
-         "fallbacks + python -m bot handle check)"),
+        profile_done_final, profile_how,
         optional=True, recommended=True, minutes=4))
 
     try:

@@ -193,13 +193,13 @@ Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 > leda `pindrop_deals` vaadandi. `python -m bot handle <name>` cleaner variants
 > ni cheptundi.
 
-### 🏆 FINAL BRAND (R56): **Gharvana** — `@gharvana`
+### 🏆 FINAL BRAND (R59): **Gharvanaa** — `@gharvanaa`
 
 | Field | Value |
 |---|---|
-| **Name** (ranked keyword field) | `Gharvana | Home Deals & Finds` (29 chars) |
-| **Username / handle** | `gharvana` (same on Pinterest + Instagram) |
-| **Pin strip** (artwork) | `Gharvana` |
+| **Name** (ranked keyword field) | `Gharvanaa | Home Deals & Finds` (30 chars ✨) |
+| **Username / handle** | `gharvanaa` (same on Pinterest + Instagram) |
+| **Pin strip** (artwork) | `Gharvanaa` |
 | **About** | `Gharvana shares hand-picked deals — home, kitchen, fashion & beauty finds under ₹999. Organizers, gadgets & kurtas. New drops daily. Tap the pin to shop.` (153) |
 
 **Enduku "deals" vadilesamu** (research tho, opinion kaadu):
@@ -211,8 +211,14 @@ Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 - Descriptive names anni crowded → **coined name = ownable**, and keywords
   belong in the NAME field (adi ranked), not in the handle (URL matrame).
 
-**Gharvana = Ghar + Nirvana** ("home bliss") — 8 letters, 3 syllables, spam-coding
-ledu (loot/free/cheap ledu), numbers ledu.
+**Gharvanaa = Ghar + Nirvana** ("home bliss") — 9 letters, spam-coding ledu
+(loot/free/cheap ledu), numbers ledu.
+
+> ✍️ **Enduku double 'a'?** `gharvana` handle already taken. Spelling variant
+> theesukunnam → **brand word kuda ippudu fully ownable**: ee spelling tho
+> inkevaru ledu, so Pinterest search lo "gharvanaa" = 100% nee account.
+> Rendu fields oke spelling lo undali (strip + NAME) — `bot ready` adi
+> automatic ga check chestundi.
 
 #### "Deals" ni brand name lo pettala? (R57 — research tho answer)
 
@@ -257,7 +263,8 @@ handle matrame unique. Order lo try cheyyandi:
 
 | # | Handle | Enduku |
 |---|---|---|
-| 1 | `gharvanahome` | Brand + niche (Home) — SEO-friendly, mundu ide try cheyyi |
+| 0 | `gharvanaa` | ✅ **TEESUKUNNADI** — spelling variant, brand word fully ownable |
+| 1 | `gharvanahome` | Brand + niche (Home) — SEO-friendly (ee line nunchi fallback) |
 | 2 | `gharvanadeals` | Brand + "deals" — positioning ki match |
 | 3 | `gharvanafinds` | Brand + "finds" — NAME field wording ki match |
 | 4 | `thegharvana` | Official account la kanipistundi |

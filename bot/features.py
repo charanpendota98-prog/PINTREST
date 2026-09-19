@@ -340,6 +340,13 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+19) BRAND COHERENCE GUARD (R59)
+   ✅ `bot ready` ippudu pin strip vs NAME field ni word-boundary tho compare
+   chestundi (prefix kaadu): strip `Gharvana` + name `Gharvanaa | ...` laanti
+   stale state ni pattukoni "match avvatledu" ani cheptundi. Spelling variant
+   okka field ki matrame apply aithe pins/profile veru veru ga kanipistayi —
+   adi ippudu impossible.
+
 18) HANDLE TAKEN PLAYBOOK (R58) — "handle already taken ani vachindi"
    🚨 `python -m bot name --next`: config lo unna brand ki full plan —
    (1) brand + suffix/prefix (`gharvanahome` · `gharvanadeals` · `thegharvana` ·
@@ -369,7 +376,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   487 automated tests.
+   489 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
