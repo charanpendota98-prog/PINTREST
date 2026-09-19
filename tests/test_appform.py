@@ -187,5 +187,88 @@ class TestCli(unittest.TestCase):
         self.assertIn("python -m bot app", src)
 
 
+class TestUpgradePack(unittest.TestCase):
+    """R62: the standard-access request is the gate to PUBLIC pins."""
+
+    def test_explains_why_trial_is_not_enough(self):
+        text = "\n".join(appform.upgrade_lines(_cfg(Path("/tmp"))))
+        self.assertIn("visible only to the user", text)
+        self.assertIn("Standard", text)
+        self.assertIn("public", text.lower())
+
+    def test_scope_justification_covers_every_requested_scope(self):
+        text = "\n".join(appform.upgrade_lines(_cfg(Path("/tmp"))))
+        for scope in ("boards:read", "boards:write", "pins:read", "pins:write",
+                      "user_accounts:read"):
+            self.assertIn(scope, text, scope)
+
+    def test_uses_the_configured_urls(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d), link={"public_base": "https://gharvanaa.in"})
+            text = "\n".join(appform.upgrade_lines(cfg))
+            self.assertIn("https://gharvanaa.in/about", text)
+            self.assertIn("https://gharvanaa.in/privacy", text)
+
+    def test_pre_submit_checklist_is_present(self):
+        text = "\n".join(appform.upgrade_lines(_cfg(Path("/tmp"))))
+        self.assertIn("BEFORE YOU SUBMIT", text)
+        self.assertIn("deploy.sh", text)
+        self.assertIn("bot doctor", text)
+
+    def test_never_raises_without_config(self):
+        self.assertIn("STANDARD ACCESS", "\n".join(appform.upgrade_lines()))
+
+    def test_main_sheet_points_at_it(self):
+        text = "\n".join(appform.lines(_cfg(Path("/tmp"))))
+        self.assertIn("bot app --upgrade", text)
+
+
+class TestTrialToken(unittest.TestCase):
+    """R62: the dashboard trial token must be usable before app approval."""
+
+    def _api(self, tmp, **env):
+        import os
+        from bot.pinterest_api import PinterestAPI
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        self.addCleanup(lambda: [os.environ.pop(k, None) if v is None
+                                 else os.environ.update({k: v})
+                                 for k, v in old.items()])
+        cfg = _cfg(tmp)
+        cfg.raw["pinterest"] = {"redirect_uri": "http://localhost:8888/callback"}
+        return PinterestAPI(cfg)
+
+    def test_trial_token_makes_the_api_configured(self):
+        with tempfile.TemporaryDirectory() as d:
+            api = self._api(Path(d), PINTEREST_ACCESS_TOKEN="tok-123",
+                            PINTEREST_APP_ID="1613412")
+            self.assertTrue(api.configured)
+            self.assertEqual(api.ensure_access_token(), "tok-123")
+            self.assertEqual(api.auth_mode, "trial token (dashboard)")
+
+    def test_oauth_still_wins_when_a_refresh_token_exists(self):
+        with tempfile.TemporaryDirectory() as d:
+            api = self._api(Path(d), PINTEREST_ACCESS_TOKEN="tok-123",
+                            PINTEREST_REFRESH_TOKEN="refresh-abc")
+            self.assertEqual(api.auth_mode, "oauth refresh token")
+
+    def test_no_credentials_reports_not_connected(self):
+        with tempfile.TemporaryDirectory() as d:
+            api = self._api(Path(d))
+            self.assertFalse(api.configured)
+            self.assertEqual(api.auth_mode, "not connected")
+
+    def test_doctor_and_ready_know_about_the_trial_token(self):
+        src_main = (Path(__file__).resolve().parents[1] / "bot" / "main.py").read_text()
+        src_ready = (Path(__file__).resolve().parents[1] / "bot" / "ready.py").read_text()
+        self.assertIn("trial token in .env", src_main)
+        self.assertIn("trial token in .env", src_ready)
+
+    def test_env_example_documents_the_trial_token(self):
+        env = (Path(__file__).resolve().parents[1] / ".env.example").read_text()
+        self.assertIn("PINTEREST_ACCESS_TOKEN", env)
+        self.assertIn("Trial", env)
+
+
 if __name__ == "__main__":
     unittest.main()

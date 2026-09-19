@@ -340,6 +340,16 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+22) TRIAL → STANDARD ACCESS PATH (R62)
+   🔑 `PINTEREST_ACCESS_TOKEN` (.env): developer dashboard lo "Generate access
+   tokens" (Trial env) token ni paste cheyyandi → app review pending unna kuda
+   pipeline test cheyyochu (app secret lock lo undochu). `auth_mode` (doctor lo
+   kanipistundi) oauth / trial / not connected ani cheptundi.
+   🚀 `python -m bot app --upgrade`: **Standard access request** pack — Pinterest
+   "Trial = writing Pins visible only to the creator" ani cheptundi, so public
+   pins (money reach) ki standard access kavali; app lo 'Upgrade' → ee answers
+   (scope-by-scope justification, volume, website/privacy URLs) copy-paste.
+
 21) APP-FORM ANSWER SHEET (R61)
    📝 `python -m bot app [--site URL]`: Pinterest 'Connect app' form lo prati
    field ki exact answer print (app name, company, purpose free-text, developer
@@ -393,7 +403,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   517 automated tests.
+   528 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

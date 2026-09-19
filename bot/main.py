@@ -416,8 +416,15 @@ def cmd_doctor(cfg) -> int:
        "python -m bot setup")
     ck("Pinterest App ID/Secret", bool(cfg.pinterest_app_id and cfg.pinterest_app_secret),
        "developers.pinterest.com → create app → .env")
-    ck("Pinterest token (auth done)", cfg.token_path.exists(),
-       "python -m bot auth-url  +  auth --code")
+    _trial_tok = str(getattr(cfg, "pinterest_access_token", "") or "")
+    if cfg.token_path.exists():
+        _pin_ok, _pin_how = True, "OAuth refresh token saved"
+    elif _trial_tok:
+        _pin_ok, _pin_how = True, ("trial token in .env — testing only; public "
+                                   "pins ki: auth-url + auth --code")
+    else:
+        _pin_ok, _pin_how = False, "python -m bot auth-url  +  auth --code"
+    ck("Pinterest token (auth done)", _pin_ok, _pin_how)
     ck("Amazon tag", bool(cfg.amazon_tag), "affiliate-program.amazon.in")
     ck("Meesho/EarnKaro/Cuelinks (any)", bool(
         cfg.get("affiliate.meesho_affid") or os.getenv("MEESHO_AFFID")
@@ -925,6 +932,11 @@ def cmd_app(cfg, rest: list[str]) -> int:
             site = rest[i + 1]
         elif word.startswith("--site="):
             site = word.split("=", 1)[1]
+    if any(w in ("--upgrade", "--standard") for w in rest):
+        print()
+        print("\n".join(_appform.upgrade_lines(cfg)))
+        print()
+        return 0
     print()
     if site:
         res = _appform.save_site(cfg, site)

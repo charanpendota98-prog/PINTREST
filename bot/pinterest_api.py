@@ -49,7 +49,22 @@ class PinterestAPI:
 
     # ---------------------------------------------------------------- auth
     @property
+    def trial_token(self) -> str:
+        return str(getattr(self.cfg, "pinterest_access_token", "") or "").strip()
+
+    @property
+    def auth_mode(self) -> str:
+        """Which credential path is live — printed by status/doctor."""
+        if self.trial_token and not self._refresh_token:
+            return "trial token (dashboard)"
+        if self._refresh_token:
+            return "oauth refresh token"
+        return "not connected"
+
+    @property
     def configured(self) -> bool:
+        if self.trial_token and not self._refresh_token:
+            return bool(self.app_id or True)      # app id optional for trial use
         return bool(self.app_id and self.app_secret and self._refresh_token)
 
     @property
@@ -95,10 +110,18 @@ class PinterestAPI:
         return self._token
 
     def ensure_access_token(self) -> str:
-        """Return a valid access token, refreshing when needed."""
+        """Return a valid access token, refreshing when needed.
+
+        Trial tokens (dashboard) are returned directly: they carry no refresh
+        token, so the only recovery is generating a fresh one.
+        """
         exp = self._token.get("expires_at", 0)
         if self._token.get("access_token") and time.time() < exp - 300:
             return self._token["access_token"]
+        if self.trial_token and not self._refresh_token:
+            # Dashboard trial token: use as-is. It cannot be refreshed — when it
+            # expires the owner generates a new one (or finishes OAuth).
+            return self.trial_token
         if not self._refresh_token:
             raise PinterestError(
                 "No Pinterest credentials. Run: python -m bot auth   (first time)"
@@ -137,6 +160,10 @@ class PinterestAPI:
                 self._token = json.loads(self._token_path.read_text())
             except json.JSONDecodeError:
                 self._token = {}
+        if not self._token and self.trial_token:
+            # Seed from the env token so status/doctor report "connected" and the
+            # first API call works without an OAuth round trip.
+            self._token = {"access_token": self.trial_token, "trial": True}
 
     # ------------------------------------------------------------- request
     def _headers(self) -> dict:

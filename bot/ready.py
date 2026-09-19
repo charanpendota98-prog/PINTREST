@@ -54,11 +54,19 @@ def _checks(cfg, os) -> list[dict]:
         "Create content | Brand focus: Home\n"
         "2) developers.pinterest.com/apps → create app → copy into .env "
         "(or: python -m bot setup)", minutes=4))
+    _trial = ""
+    try:
+        _trial = str(getattr(cfg, "pinterest_access_token", "") or "")
+    except Exception:  # noqa: BLE001
+        _trial = ""
     items.append(_item(
         "pinterest_token", "Pinterest account connected (click ALLOW once)",
-        cfg.token_path.exists(),
-        "python -m bot auth-url  →  paste code:\n"
-        "python -m bot auth --code <CODE>", minutes=3))
+        cfg.token_path.exists() or bool(_trial),
+        ("trial token in .env ✅ — test ki chalu. Public pins ki OAuth cheyyi: "
+         "python -m bot auth-url  →  python -m bot auth --code <CODE>"
+         if _trial and not cfg.token_path.exists() else
+         "python -m bot auth-url  →  paste code:\n"
+         "python -m bot auth --code <CODE>"), minutes=3))
 
     money_any = bool(cfg.amazon_tag or cfg.get("affiliate.meesho_affid")
                      or cfg.get("affiliate.earnkaro_prefix")

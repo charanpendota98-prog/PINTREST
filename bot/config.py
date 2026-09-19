@@ -221,6 +221,18 @@ class Config:
         return os.getenv("PINTEREST_REFRESH_TOKEN", "")
 
     @property
+    def pinterest_access_token(self) -> str:
+        """Trial access token copied straight from the developer dashboard.
+
+        Pinterest's app page has "Generate access tokens" (Trial env) which hands
+        out a ready token — useful to test the pipeline before/while the app is
+        pending review, because the app secret is locked until approval. It is a
+        short-lived convenience path; OAuth (refresh token) stays the permanent
+        one.
+        """
+        return os.getenv("PINTEREST_ACCESS_TOKEN", "").strip()
+
+    @property
     def amazon_tag(self) -> str:
         return os.getenv("AMAZON_TAG", "") or self.get("affiliate.amazon_tag", "")
 

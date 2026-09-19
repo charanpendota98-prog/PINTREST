@@ -172,6 +172,26 @@ Form answers (personal-use app ki — idi correct, honest route):
 > Ecommerce / Recommendations vaddu — avi nee use case kaadu — review slow avutundi, extra questions vasthayi.
 > 🖼️ App icon: `brand/app_icon_1024.png` (house+heart+bag, Pinterest logo ledu).
 
+**2a-5. App create ayyaka — Trial → Standard (public pins) path**
+
+App approve ayyaka ee 4 steps (order lo):
+
+| # | Step | Command / place |
+|---|---|---|
+| 1 | **Redirect URI** add | app page → Redirect URLs → `http://localhost:8888/callback` (http+localhost allowed) |
+| 2 | **Trial token** (immediate testing) | app page → "Generate access tokens" (Trial) → copy → `.env`: `PINTEREST_ACCESS_TOKEN='...'` |
+| 3 | **OAuth** (permanent) | app secret unlock ayyaka: `python -m bot auth-url` → code → `python -m bot auth --code <CODE>` |
+| 4 | **Standard access request** | app page → **Upgrade** → `python -m bot app --upgrade` answers copy-paste |
+
+> ⚠️ **Trial = public pins kaadu.** Pinterest access table lo unde: Trial mode lo
+> "Writing standard Pins → **visible only to the user who creates them**"
+> (1000 req/day). Ante pins create avutayi kani **evariki kanipistavi kaavu** →
+> reach/clicks/commission ledu. So **Standard access** eh real go-live gate;
+> trial ni pipeline test ki vaadandi.
+>
+> `python -m bot doctor` → "Pinterest token (auth done)" line lo ee mode live
+> ga undo chupistundi (OAuth / trial token).
+
 **2b. Developer app (API access):**
 1. Go to **https://developers.pinterest.com/apps/** → *Create app*.
 2. In the app: add the redirect URI exactly as: `http://localhost:8888/callback`

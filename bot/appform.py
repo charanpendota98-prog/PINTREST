@@ -116,6 +116,10 @@ def lines(cfg=None) -> list[str]:
         "      Ecommerce · Recommendations & experimentation · MCP/AI connector",
         "",
         "─" * 70,
+        "SUBMIT TARVATA: redirect URI + scopes → app secret unlock → OAuth.",
+        "⏭️  TARVATA KAAVALSINADI: public pins ki **Standard access request** —",
+        "    python -m bot app --upgrade   (answers ready, scope justification tho)",
+        "",
         "SUBMIT TARVATA (redirect URI + scopes screen):",
         f"   Redirect URI: {REDIRECT_URI}",
         f"   Scopes      : {SCOPES}",
@@ -136,6 +140,66 @@ def lines(cfg=None) -> list[str]:
             f"   Check: curl -s -o /dev/null -w '%{{http_code}}\\n' {site_url}",
         ]
     return out
+
+
+def upgrade_lines(cfg=None) -> list[str]:
+    """Standard access request — the step that makes pins PUBLIC.
+
+    Pinterest's own access-tier table says it plainly: on Trial, writing standard
+    Pins is "visible only to the user who creates them". An affiliate page earns
+    nothing from pins only the owner can see, so this request is the real go-live
+    gate — not a formality.
+    """
+    site_url, privacy_url = urls(cfg) if cfg is not None else (
+        "https://yourdomain.com/about", "https://yourdomain.com/privacy")
+    return [
+        "═" * 70,
+        "🚀 STANDARD ACCESS REQUEST — public pins ki ide gate",
+        "═" * 70,
+        "   Pinterest access tiers (their own table):",
+        "     Trial    : writing standard Pins → 'visible only to the user who",
+        "                creates them' (1000 req/day)",
+        "     Standard : pins are PUBLIC + variable rate limits",
+        "   So trial = pipeline test matrame. Money ki Standard access kavali.",
+        "",
+        "WHERE: developers.pinterest.com → My apps → your app → 'Upgrade' /",
+        "       'Request standard access' (top-right of the app page).",
+        "",
+        "HOW TO ANSWER (copy-paste):",
+        "",
+        "   What will your app do?",
+        "   → Internal publishing tool for our own Pinterest business account:",
+        "     it creates our boards, publishes our own product pins on a daily",
+        "     schedule, and reads our own pins/boards to avoid duplicates and",
+        "     report performance. Single account, single owner, no third-party",
+        "     users.",
+        "",
+        "   Scope justification:",
+        "   • boards:read    → find our own board ids by name before posting",
+        "   • boards:write   → create our niche boards once (Home & Kitchen,",
+        "                      Fashion, Beauty, Deals…)",
+        "   • pins:read      → check the last N pins to skip duplicates",
+        "   • pins:write     → publish our own curated pins (5-15/day)",
+        "   • user_accounts:read → confirm which account is connected",
+        "",
+        "   Expected volume: ~15-40 API calls/day (a few pins + duplicate checks).",
+        "   Data use: only our own account data; nothing is shared or resold.",
+        f"   Company website : {site_url}",
+        f"   Privacy policy  : {privacy_url}",
+        "",
+        "BEFORE YOU SUBMIT (ee rendu ready ga undali):",
+        "   1) Public pages live:  curl -s -o /dev/null -w '%{http_code}\\n' "
+        f"{site_url}",
+        "      (200 ravali — leda: sudo ./deploy.sh  +  python -m bot app "
+        "--site <url>)",
+        "   2) Trial lo pipeline run ayyi undali (pins create avvadam proof):",
+        "      python -m bot doctor  →  python -m bot run   (oka pin test)",
+        "",
+        "⏳ Review tharvata: OAuth (`python -m bot auth-url` + `auth --code`) "
+        "okasari",
+        "   chesi, .env lo trial token ni theeseyyandi — appudu permanent refresh",
+        "   token tho 24x7 autopilot.",
+    ]
 
 
 def _wrap(text: str, width: int) -> list[str]:
