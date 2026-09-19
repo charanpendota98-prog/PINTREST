@@ -3,8 +3,10 @@
 Runs the live affiliate code against the owner's real pasted links and prints
 a component-by-component verdict. No network needed, nothing is published.
 
-    python scripts/meesho_audit.py            # full audit
-    python scripts/meesho_audit.py <url>      # audit one product URL
+    python scripts/meesho_audit.py                 # full audit (offline)
+    python scripts/meesho_audit.py <url>           # audit one product URL
+    python scripts/meesho_audit.py --live <url>    # also fetch each built link
+                                                  # and ask Meesho what it opens
 
 Checks
   1. what the templates parsed to (publisher / token / campaign per token)
@@ -12,7 +14,8 @@ Checks
   3. every Meesho product-URL shape → is the p_id right?
   4. edge cases: search/category URLs (must NOT build), HTML-escaped pastes,
      already-monetized links (must pass through untouched), collection links
-  5. click-id hygiene: 20 builds → unique ext_id, correct p_id
+  5. R69 landing rule: ext_id == the product's own code (a random ext_id
+     404s, or opens a stranger's product) and the link is deterministic
   6. the QA gate: would a built link pass the commission-leak check?
 """
 from __future__ import annotations
@@ -51,6 +54,9 @@ def comps(link: str) -> dict:
 
 
 def main(argv: list[str]) -> int:
+    argv = list(argv)
+    live = "--live" in argv
+    argv = [a for a in argv if a != "--live"]
     product = argv[0] if argv else PRODUCT
     lk = AffiliateLinker(load_config())
     fails = 0
@@ -74,9 +80,10 @@ def main(argv: list[str]) -> int:
         tok = lk.meesho_source_for(plat)
         built = lk.meesho_link_for(product, plat)
         c = comps(built)
+        code = lk.meesho_product_id(product)
         good = (c.get("pub") == lk.meesho_ids[0] and c.get("tok") == tok
-                and c.get("p_id") == lk.meesho_product_id(product)
-                and c.get("utm") == tok and c.get("ext_id"))
+                and c.get("p_id") == code and c.get("ext_id") == code
+                and c.get("utm") == tok)
         fails += 0 if good else 1
         print(f"   {OK if good else NO} {plat:18s} token={tok:22s} "
               f"camp={c.get('camp', '(none)')}")
@@ -146,17 +153,35 @@ def main(argv: list[str]) -> int:
 
     print()
     print("=" * 78)
-    print("5) CLICK-ID HYGIENE — 20 builds")
+    print("5) LANDING RULE — ext_id must be the product's own code (R69)")
     print("=" * 78)
-    exts, pids = set(), set()
+    bad = []
     for i in range(20):
-        c = comps(lk.meesho_link_for(f"https://www.meesho.com/x/p/1k1b{i}", "instagram"))
-        exts.add(c["ext_id"])
-        pids.add(c["p_id"])
-    good = len(exts) == 20 and len(pids) == 20
+        u = f"https://www.meesho.com/x/p/code{i:02d}"
+        c = comps(lk.meesho_link_for(u, "instagram"))
+        if c["ext_id"] != f"code{i:02d}" or c["p_id"] != f"code{i:02d}":
+            bad.append((u, c))
+    good = not bad
     fails += 0 if good else 1
-    print(f"   {OK if good else NO} ext_id unique {len(exts)}/20 · "
-          f"p_id correct {len(pids)}/20")
+    print(f"   {OK if good else NO} 20/20 links: p_id == ext_id == product code")
+    same = (lk.meesho_link_for(product, "instagram")
+            == lk.meesho_link_for(product, "instagram"))
+    fails += 0 if same else 1
+    print(f"   {OK if same else NO} same product → identical link (deterministic)")
+
+    if live:
+        print()
+        print("=" * 78)
+        print("5b) LIVE LANDING CHECK — what Meesho actually opens (network)")
+        print("=" * 78)
+        for plat in PLATFORMS:
+            built = lk.meesho_link_for(product, plat)
+            res = lk.meesho_landing_ok(built)
+            verdict = {True: "lands on a product page", False: "NOT FOUND ❌",
+                       None: "couldn't tell (network / robot block)"}[res]
+            fails += 1 if res is False else 0
+            print(f"   {'✅' if res else ('❌' if res is False else '…')} "
+                  f"{plat:18s} {verdict}")
 
     print()
     print("=" * 78)

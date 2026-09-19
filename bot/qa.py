@@ -32,6 +32,19 @@ _DUMMY_MARKERS = (
 )
 
 
+def _verify_meesho_landing(cfg) -> bool:
+    """Is the live Meesho landing check enabled? (default: on)
+
+    Offline / robot-blocked checks return None and never block a pin, so this
+    can stay on for everyone — it only bites when Meesho itself says the link
+    is broken.
+    """
+    try:
+        return bool(cfg.get("link.verify_meesho_landing", True))
+    except Exception:                                            # noqa: BLE001
+        return True
+
+
 def looks_dummy(product: dict) -> bool:
     """True when a product is clearly a demo/sample — must never post.
 
@@ -96,11 +109,19 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
         if not AffiliateLinker(cfg).is_monetized(link, product.get("source", "")):
             issues.append("COMMISSION LEAK: link carries no affiliate tracking — "
                           "add your affiliate IDs (.env) — pin quarantined")
-        # R68: a Meesho af_invite link WITHOUT p_id looks monetized but drops
-        # the visitor on a generic page — a lost click the leak gate cannot see
-        if "af_invite" in link and "p_id=" not in link:
-            issues.append("Meesho link has no product id (p_id) — click generic "
-                          "page ki veltundi, commission miss — pin quarantined")
+        # R68/R69: a Meesho af_invite link must carry BOTH ids, and Meesho
+        # resolves the landing page from ext_id — so an invented ext_id means
+        # the visitor gets "Not Found" while the leak gate sees nothing wrong.
+        if "af_invite" in link:
+            if "p_id=" not in link or "ext_id=" not in link:
+                issues.append("Meesho link is missing p_id/ext_id — click generic "
+                              "Meesho page ki veltundi — pin quarantined")
+            elif _verify_meesho_landing(cfg):
+                from .affiliate import AffiliateLinker
+                landing = AffiliateLinker(cfg).meesho_landing_ok(link)
+                if landing is False:
+                    issues.append("Meesho link landing FAILED live check "
+                                  "(Not Found / no product page) — pin quarantined")
 
     # ---- title
     t = (seo_title or "").strip()

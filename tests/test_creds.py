@@ -482,6 +482,9 @@ class TestMeeshoLinkCorrectness(unittest.TestCase):
         out = lk.meesho_link_for(self.PRODUCT, "instagram")
         self.assertIn("p_id=1k1b6", out)
         self.assertIn("24197020:instagram_stories:11174107", out)
+        # R69: BOTH ids are the product's own code — Meesho resolves the
+        # landing page from ext_id, a random one 404s.
+        self.assertIn("ext_id=1k1b6", out)
 
     def test_html_escaped_link_is_normalised_not_shredded(self):
         escaped = self.TEMPLATE.replace("&", "&amp;")
@@ -528,6 +531,86 @@ class TestMeeshoLinkCorrectness(unittest.TestCase):
                 "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"
                 "?p_id=1k1b6&ext_id=abc123&utm_source=instagram_stories")
             self.assertFalse(any("p_id" in i for i in issues2), issues2)
+
+
+class TestMeeshoLandingCheck(unittest.TestCase):
+    """R69: the only check that would have caught the ext_id bug — asking
+    Meesho what the link actually opens."""
+
+    def _linker(self):
+        import os
+        from unittest import mock
+        from bot.affiliate import AffiliateLinker
+
+        class Cfg:
+            amazon_tag = ""
+
+            def get(self, key, default=None):
+                return default
+
+        env = mock.patch.dict(os.environ, {"MEESHO_TEMPLATE_LINK": ""})
+        env.start()
+        self.addCleanup(env.stop)
+        return AffiliateLinker(Cfg())
+
+    def test_landing_true_false_and_unknown(self):
+        from unittest import mock
+
+        class Resp:
+            def __init__(self, url, text, code=200):
+                self.url, self.text, self.status_code = url, text, code
+
+        lk = self._linker()
+        link = "https://www.meesho.com/af_invite/24197020:facebook:1?p_id=1k1b6&ext_id=1k1b6"
+        with mock.patch("requests.get", return_value=Resp(
+                "https://www.meesho.com/s/p/1k1b6", "<title>Kurti | Meesho</title>")):
+            self.assertTrue(lk.meesho_landing_ok(link))
+        with mock.patch("requests.get", return_value=Resp(
+                "https://www.meesho.com/s/p/zzzzzz", "<title>Not Found page</title>")):
+            self.assertFalse(lk.meesho_landing_ok(link))
+        with mock.patch("requests.get", return_value=Resp(
+                "https://www.meesho.com/s/p", "<title>Not Found page</title>")):
+            self.assertFalse(lk.meesho_landing_ok(link))
+        with mock.patch("requests.get", side_effect=Exception("no net")):
+            self.assertIsNone(lk.meesho_landing_ok(link))     # fail-open
+        # never touches the network for a non-Meesho link
+        self.assertIsNone(lk.meesho_landing_ok("https://www.amazon.in/dp/B0?tag=x"))
+
+    def test_qa_quarantines_a_definitively_broken_landing(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from PIL import Image
+        from bot.config import load_config
+        from bot.db import DB
+        from bot import qa
+
+        cfg = load_config()
+        cfg.raw.setdefault("link", {})["verify_meesho_landing"] = True
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        db = DB(f"{tmp.name}/t.db")
+        img = Path(tmp.name) / "p.jpg"
+        Image.new("RGB", (800, 1200), "white").save(img)
+        prod = {"id": 1, "source": "meesho", "title": "Floral Printed Kurta Set"}
+        seo_t = "Floral Printed Kurta Set | best deal 2026"
+        seo_d = ("Floral printed kurta set — soft rayon, all sizes. Grab today! #ad")
+
+        class Resp:
+            def __init__(self, url, text, code=200):
+                self.url, self.text, self.status_code = url, text, code
+
+        link = ("https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"
+                "?p_id=1k1b6&ext_id=1k1b6&utm_source=instagram_stories")
+        with mock.patch("requests.get", return_value=Resp(
+                "https://www.meesho.com/s/p/zzzzzz", "<title>Not Found page</title>")):
+            ok, issues = qa.qa_pin(cfg, db, prod, seo_t, seo_d, str(img), link)
+        self.assertFalse(ok)
+        self.assertTrue(any("landing FAILED" in i for i in issues), issues)
+
+        with mock.patch("requests.get", side_effect=Exception("no net")):
+            ok2, issues2 = qa.qa_pin(cfg, db, prod, seo_t, seo_d, str(img), link)
+        self.assertFalse(any("landing FAILED" in i for i in issues2), issues2)
 
 
 class TestMeeshoPasteHygiene(unittest.TestCase):

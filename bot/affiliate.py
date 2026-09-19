@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import logging
 import os
-import random
 import re
-import string
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 from .scraper import detect_source
+
+# R69: Meesho serves the mobile page (with the SSR product title we grep in
+# the live landing check); desktop UA gets a thinner shell.
+MOBILE_UA = ("Mozilla/5.0 (Linux; Android 13; SM-A536E) AppleWebKit/537.36 "
+             "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
 
 log = logging.getLogger("pindrop.affiliate")
 
@@ -237,8 +240,15 @@ class AffiliateLinker:
         """Build the exact link the bot would publish for this product URL.
 
         Faithful by design: the af_invite base + every parameter from YOUR
-        matching share link are copied verbatim; only p_id (this product) and
-        ext_id (fresh click id) change. Nothing is invented.
+        matching share link are copied verbatim; only p_id and ext_id change —
+        and BOTH are set to this product's own code. Nothing is invented.
+
+        R69 (live-verified): Meesho resolves the landing page by looking the
+        code up on /s/p/<code>, and it reads that code from `ext_id`. A
+        RANDOM ext_id therefore 404s ("Not Found page") or, by collision,
+        drops the visitor on a completely different product's page. The
+        product's own code (what your "Get Commission Link" link carries as
+        ext_id) is the only correct value.
         """
         pid = self.meesho_product_id(url)
         pub, src, camps = self.meesho_ids
@@ -264,10 +274,10 @@ class AffiliateLinker:
             tparams = [(k, v) for k, v in
                        parse_qsl(urlparse(template).query)
                        if k not in ("p_id", "ext_id")]
-            if pid:
-                tparams.append(("p_id", pid))
-            tparams.append(("ext_id", "".join(
-                random.choices(string.ascii_lowercase + string.digits, k=6))))
+            tparams.append(("p_id", pid))
+            # R69: ext_id decides the LANDING PAGE (Meesho -> /s/p/<code>).
+            # It must be the product's own code, never a random click id.
+            tparams.append(("ext_id", pid))
             # source token stays visible as utm_source (Meesho's report reads
             # the af_invite path token; this keeps the two consistent)
             has_utm = any(k == "utm_source" for k, _ in tparams)
@@ -278,12 +288,43 @@ class AffiliateLinker:
                 tparams.append(("utm_source", token))
             return f"{base}?{urlencode(tparams)}"
         if pub and camps and pid:
-            ext = "".join(random.choices(string.ascii_lowercase + string.digits,
-                                         k=6))
             tok = token or src
             return (f"https://www.meesho.com/af_invite/{pub}:{tok}:{camps[-1]}"
-                    f"?p_id={pid}&ext_id={ext}&utm_source={tok}")
+                    f"?p_id={pid}&ext_id={pid}&utm_source={tok}")
         return ""
+
+    def meesho_landing_ok(self, link: str, timeout: int = 8):
+        """LIVE check: does this built Meesho link really open the product?
+
+        Returns True (lands on a product page), False (definitive failure —
+        Meesho's "Not Found page", or /s/p with no code) or None (couldn't
+        tell: network/robot-blocking — never quarantine on a None).
+
+        This is the check that R69 taught us we needed: a link can look
+        perfectly monetized and still 404 on the Meesho side.
+        """
+        if "af_invite/" not in link:
+            return None
+        try:
+            import requests
+            r = requests.get(
+                link, timeout=timeout, allow_redirects=True,
+                headers={"User-Agent": MOBILE_UA,
+                         "Accept-Language": "en-IN,en;q=0.9"})
+        except Exception as e:                                   # noqa: BLE001
+            log.warning("MEESHO LANDING: check cheyyalekapoyam (%s) — link ni "
+                        "nammakam tho vadilestunnam.", str(e)[:90])
+            return None
+        final = r.url or ""
+        if re.search(r"/s/p(\?|$)", final):
+            return False                       # no code in the share route
+        m = re.search(r"<title[^>]*>(.*?)</title>", r.text or "", re.S | re.I)
+        title = (m.group(1) if m else "").strip().lower()
+        if "not found" in title:
+            return False
+        if r.status_code >= 400:
+            return None                        # blocked/ratelimited ≠ broken
+        return True
 
     def meeshoize(self, url: str, platform: str = "") -> str:
         if self.MEESHO_MONETIZED.search(url):

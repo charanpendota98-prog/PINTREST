@@ -33,6 +33,9 @@ link:
                            # + Pinterest never sees a flagged affiliate domain)
   public_base: ""          # e.g. https://yourdeals.in — host the dashboard there
   landing: true            # warm-up landing page (converts 3-8× raw links)
+  verify_meesho_landing: true  # R69: fetch the built Meesho link before publishing and
+                               # quarantine it if Meesho answers "Not Found" (a link can
+                               # look monetized and still 404). Offline check = no block.
 
 scraping:
   delay_seconds: 4         # pause between scrapes (be polite, avoid blocks)

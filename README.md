@@ -722,6 +722,7 @@ bot builds, for ANY scraped product:
 | Pinterest | override in `affiliate.meesho_platform_tokens` | Meesho has no Pinterest option — map it to any token (commission is unaffected; publisher id decides the money) |
 
 Full proof (every component + edge cases, no network): `python scripts/meesho_audit.py`
+Live proof (fetch every built link and ask Meesho what it opens): `python scripts/meesho_audit.py --live`
 Verify in one command: `python -m bot meesho "https://www.meesho.com/<product>"` →
 prints the exact link per platform + structural checks. `python -m bot platforms`
 shows every surface + its token. Honest limit: only your phone + the Meesho

@@ -475,9 +475,22 @@ class TestMeeshoLinkCorrectness(unittest.TestCase):
         self.assertIn("af_invite/24197020:instagram_stories:11049016", out)
         self.assertIn("p_id=1k1b6", out)
         self.assertNotIn("p_id=2&", out)          # template's own p_id dropped
-        self.assertIn("ext_id=", out)
-        self.assertNotIn("ext_id=oldid", out)     # fresh click id every time
+        # R69: ext_id decides the LANDING page on Meesho (/s/p/<code>) — it
+        # must be the product's own code, never an invented/random id.
+        self.assertNotIn("ext_id=oldid", out)     # template's id dropped
+        self.assertIn("ext_id=1k1b6", out)        # = the product's own code
+        self.assertIn("p_id=1k1b6", out)          # both ids = the product code
         self.assertIn("utm_source=instagram_stories", out)  # params preserved
+
+    def test_ext_id_is_product_code_and_link_is_deterministic(self):
+        lk = self._lk(self.TPL)
+        a = lk.meesho_link_for("https://www.meesho.com/kurta/p/1k1b6")
+        b = lk.meesho_link_for("https://www.meesho.com/kurta/p/1k1b6")
+        self.assertEqual(a, b)                    # same product → same link
+        c = lk.meesho_link_for("https://www.meesho.com/saree/p/489088490")
+        self.assertIn("p_id=489088490", c)
+        self.assertIn("ext_id=489088490", c)
+        self.assertNotEqual(a, c)
 
     def test_earnkaro_never_used_for_meesho_when_template_present(self):
         lk = self._lk(self.TPL)
