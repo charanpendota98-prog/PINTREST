@@ -785,6 +785,9 @@ def create_app(cfg, db: DB | None = None) -> Flask:
             "credentials_ok": api.configured,
             "amazon_tag": bool(cfg.amazon_tag),
             "earnkaro": bool(cfg.get("affiliate.earnkaro_prefix")),
+            "earnkaro_api": bool(os.getenv("EARNKARO_API_TOKEN", "")
+                                 or os.getenv("EARNKARO_TOKEN", "")
+                                 or cfg.get("affiliate.earnkaro_api_token")),
             "cuelinks": bool(cfg.get("affiliate.cuelinks_template")),
             "meesho": bool(cfg.get("affiliate.meesho_affid")),
             "board": cfg.get("pinterest.board_name"),
