@@ -109,6 +109,17 @@ line chupistundi.
 
 ## 7. What is PROVEN vs what needs your VPS
 
+| Pani | 1 GB micro VM (E2.1.Micro) lo |
+|---|---|
+| Links, trending hunt, Telegram control, deals channel | ✅ Fast |
+| Pins design (1000×1500) | ✅ Fine |
+| Reels render (720×1280) | ⚠️ Slow (1-3 nimushalu). **Auto guard:** RAM thin + swap ledu → reel skip, image pin still posts |
+| 24×7 posting | ✅ 6-8 pins/day chalutundi |
+
+Tuning (1 GB box): swap auto (bootstrap), `video.max_reels_per_day: 2`,
+`posting.pins_per_day: 6`. Render-time lo `bot/sysres.py` memory check chestundi
+— OOM killer scheduler ni champadu.
+
 ## 7b. Platforms — ekada post avutundi (2026-09 update)
 
 | Surface | Status | Link delivery |
