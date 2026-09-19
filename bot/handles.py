@@ -174,6 +174,130 @@ def save_handle(cfg, handle: str, path: str | Path | None = None) -> dict:
     return {"saved": wrote, **check}
 
 
+
+# ---------------------------------------------------------------- availability
+# Honest note: Pinterest serves a client-rendered 404 page, so a status code
+# alone is not proof. We therefore classify with BOTH the status code and the
+# "we couldn't find that page" markers, and we say "unknown" out loud instead of
+# pretending. One request per handle per platform — no hammering.
+UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+      "Chrome/126.0 Safari/537.36")
+NOT_FOUND_MARKERS = (
+    "couldn't find that page", "couldn’t find that page", "user not found",
+    "page not found", "sorry! we couldn", "profile isn\'t available",
+    "this page isn\'t available", "content isn\'t available",
+)
+
+
+def _probe(url: str, timeout: float = 8.0) -> tuple[str, str]:
+    """('free' | 'taken' | 'unknown', detail) for one profile URL."""
+    try:
+        import requests
+    except Exception:  # noqa: BLE001 — requests is a hard dep, but never crash
+        return "unknown", "requests missing"
+    try:
+        r = requests.get(url, timeout=timeout, headers={
+            "User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"})
+    except Exception as exc:  # noqa: BLE001 — offline/VPS-blocked is normal
+        return "unknown", f"network: {type(exc).__name__}"
+    if r.status_code == 404:
+        return "free", "404"
+    if r.status_code in (403, 429):
+        return "unknown", f"blocked ({r.status_code})"
+    body = (r.text or "")[:200000].lower()
+    if any(m in body for m in NOT_FOUND_MARKERS):
+        return "free", "not-found page"
+    if r.status_code == 200:
+        return "taken", "profile loads"
+    return "unknown", f"http {r.status_code}"
+
+
+def check_handle(handle: str, timeout: float = 8.0) -> dict:
+    """Check one handle on Pinterest AND Instagram (both must be free)."""
+    h = clean_handle(handle.lower().lstrip("@"))
+    out = {"handle": h, "pinterest": {}, "instagram": {}}
+    if len(h) < HANDLE_MIN:
+        out["verdict"] = "invalid"
+        return out
+    for name, url in (("pinterest", f"https://www.pinterest.com/{h}/"),
+                      ("instagram", f"https://www.instagram.com/{h}/")):
+        state, detail = _probe(url, timeout)
+        out[name] = {"state": state, "detail": detail, "url": url}
+    states = {out["pinterest"]["state"], out["instagram"]["state"]}
+    if states == {"free"}:
+        out["verdict"] = "free_both"
+    elif "taken" in states:
+        out["verdict"] = "taken"
+    elif "unknown" in states and "free" in states:
+        out["verdict"] = "partial"
+    else:
+        out["verdict"] = "unknown"
+    return out
+
+
+def check_lines(candidates: list[str], timeout: float = 8.0,
+                limit: int = 6) -> list[str]:
+    """Probe the top of the ladder and say which handle to actually pick."""
+    out = ["🔎 LIVE AVAILABILITY CHECK (Pinterest + Instagram — both must be free)"]
+    picked = ""
+    for h in candidates[:limit]:
+        res = check_handle(h, timeout)
+        tag = {"free_both": "✅ FREE on both",
+               "taken": "❌ taken",
+               "partial": "⚠️ half-known",
+               "unknown": "❔ could not check"}.get(res["verdict"], "❔")
+        detail = (res["pinterest"]["detail"] + " / " +
+                  res["instagram"]["detail"])
+        out.append(f"   {tag:<17} {h:<22} ({detail})")
+        if res["verdict"] == "free_both" and not picked:
+            picked = h
+    out.append("")
+    if picked:
+        out.append(f"👉 Pick: {picked}   (save: python -m bot handle {picked})")
+    else:
+        out.append("👉 Ee list lo full-free dorakaledu — kindaki vellandi "
+                   "(plan-C names) leda manual ga okati check cheyyandi.")
+    out.append("   ℹ️ Pinterest client-side render chestundi, so 'half-known' "
+               "ante browser lo okasari open chesi confirm cheyyandi.")
+    return out
+
+
+def verdict(handle: str, cfg=None) -> list[str]:
+    """Honest quality read on a handle — not just 'valid', but 'worth it'."""
+    check = validate_handle(handle)
+    h = check["handle"]
+    out = [f"🔍 '{h}' — {len(h)} chars"]
+    for e in check["errors"]:
+        out.append(f"   ⛔ {e}")
+    for w in check["warnings"]:
+        out.append(f"   ⚠️ {w}")
+    if not check["ok"]:
+        return out
+
+    niche_words = ("home", "decor", "kitchen", "ghar", "deals", "deal", "finds")
+    found = [w for w in niche_words if w in h]
+    brand_words = ("pindrop", "pin_drop", "drop")
+    brand_ok = any(w in h for w in brand_words)
+    if brand_ok:
+        out.append("   ✅ Brand word undi — profile search lo brand + keyword "
+                   "kalisi kanipistundi.")
+    else:
+        out.append("   ⚠️ Brand word ledu — ee handle brand ni gurthu pettadu.")
+    if found:
+        out.append(f"   ✅ Keyword in handle: {', '.join(found)} (URL/mentions "
+                   "lo signal — mild, kani ilaanti signal manchide).")
+    out.append("   ℹ️ Handle = URL, ranking field kaadu. Ranking NAME field lo "
+               "vastundi ('PinDrop Deals | Home & Kitchen').")
+    if not h.endswith(("01", "1")):
+        out.append("   ✅ Numbers ledu — fan/duplicate account la kanipistaledu.")
+    if len(h) <= 18:
+        out.append(f"   ✅ Short enough ({len(h)} chars) — chat lo/typing lo "
+                   "easy.")
+    out.append(f"   ✅ Instagram ki kuda ide vaadachu ({HANDLE_MIN}-"
+               f"{HANDLE_MAX} chars, letters/numbers/underscore — IG allow "
+               "chestundi) → rendu platforms oke handle tho brand consistent.")
+    return out
+
 def advice(cfg=None, handle: str = "") -> list[str]:
     """Everything the owner needs to end the 'username already taken' loop."""
     derived = "pindropdeals"
@@ -232,6 +356,7 @@ def advice(cfg=None, handle: str = "") -> list[str]:
             out.append(f"   ⚠️ {w}")
         for n in check["notes"]:
             out.append(f"   ℹ️ {n}")
+        out += verdict(handle)
         if check["ok"] and not check["warnings"]:
             out.append("   ✅ Instagram ki kuda idi vaadachu.")
     return out

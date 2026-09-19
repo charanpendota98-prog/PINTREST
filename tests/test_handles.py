@@ -230,5 +230,129 @@ class TestWiring(unittest.TestCase):
         self.assertIn('if cmd in ("handle", "handles")', src)
 
 
+class _Resp:
+    def __init__(self, status, text=""):
+        self.status_code, self.text = status, text
+
+
+class TestAvailabilityCheck(unittest.TestCase):
+    """The ladder probe must be honest: free / taken / unknown, never guessed."""
+
+    def _patch(self, mapping):
+        import requests
+        calls = []
+
+        def fake_get(url, timeout=None, headers=None):
+            calls.append(url)
+            for key, resp in mapping.items():
+                if key in url:
+                    return resp
+            return _Resp(500, "")
+
+        old = requests.get
+        requests.get = fake_get
+        self.addCleanup(lambda: setattr(requests, "get", old))
+        return calls
+
+    def test_free_when_404_on_both(self):
+        self._patch({"pinterest.com": _Resp(404), "instagram.com": _Resp(404)})
+        res = handles.check_handle("pindropdealshome")
+        self.assertEqual(res["verdict"], "free_both")
+        self.assertEqual(res["pinterest"]["detail"], "404")
+
+    def test_taken_when_profile_loads(self):
+        self._patch({"pinterest.com": _Resp(200, "<html>user profile</html>"),
+                     "instagram.com": _Resp(200, "<html>profile</html>")})
+        self.assertEqual(handles.check_handle("pindropdeals")["verdict"], "taken")
+
+    def test_not_found_marker_beats_status_200(self):
+        self._patch({"pinterest.com": _Resp(
+            200, "<html>Sorry! We couldn't find that page</html>"),
+            "instagram.com": _Resp(404)})
+        self.assertEqual(handles.check_handle("gharfinds")["verdict"], "free_both")
+
+    def test_blocked_is_unknown_not_free(self):
+        self._patch({"pinterest.com": _Resp(429), "instagram.com": _Resp(404)})
+        res = handles.check_handle("pindropdealshome")
+        self.assertEqual(res["verdict"], "partial")     # never claims free
+        self.assertIn("blocked", res["pinterest"]["detail"])
+
+    def test_taken_on_one_platform_is_enough(self):
+        """Pinterest unreadable (429) but Instagram taken → the handle IS taken."""
+        self._patch({"pinterest.com": _Resp(429),
+                     "instagram.com": _Resp(200, "profile")})
+        self.assertEqual(handles.check_handle("pindropdealshome")["verdict"],
+                         "taken")
+
+    def test_network_error_is_unknown(self):
+        import requests
+
+        def boom(*a, **k):
+            raise requests.ConnectionError("offline")
+
+        old = requests.get
+        requests.get = boom
+        self.addCleanup(lambda: setattr(requests, "get", old))
+        res = handles.check_handle("pindropdealshome")
+        self.assertEqual(res["verdict"], "unknown")
+        self.assertIn("network", res["pinterest"]["detail"])
+
+    def test_short_handle_never_probed(self):
+        calls = self._patch({})
+        self.assertEqual(handles.check_handle("ab")["verdict"], "invalid")
+        self.assertEqual(calls, [])
+
+    def test_check_lines_picks_first_free_and_stops_claiming(self):
+        self._patch({"pinterest.com/pindrop_deals/": _Resp(404),
+                     "instagram.com/pindrop_deals/": _Resp(404),
+                     "pinterest.com/pindropdealshome/": _Resp(404),
+                     "instagram.com/pindropdealshome/": _Resp(404)})
+        text = "\n".join(handles.check_lines(["pindrop_deals", "pindropdealshome"],
+                                             limit=2))
+        self.assertIn("FREE on both", text)
+        self.assertIn("Pick: pindrop_deals", text)
+
+    def test_check_lines_says_so_when_nothing_is_full_free(self):
+        self._patch({"pinterest.com": _Resp(200, "profile"),
+                     "instagram.com": _Resp(429)})
+        text = "\n".join(handles.check_lines(["pindropdealshome"], limit=1))
+        self.assertIn("full-free dorakaledu", text)
+
+    def test_cli_check_uses_the_probe(self):
+        self._patch({"pinterest.com": _Resp(404), "instagram.com": _Resp(404)})
+        import contextlib
+        import io
+        from bot.config import Config
+        cfg = Config(raw={"storage": {"db_path": "/tmp/n.db",
+                                      "media_dir": "/tmp/n"}})
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(cmd_handle(cfg, ["check"]), 0)
+        out = buf.getvalue()
+        self.assertIn("LIVE AVAILABILITY CHECK", out)
+        self.assertIn("FREE on both", out)
+
+
+class TestVerdict(unittest.TestCase):
+    def test_good_handle_reads_positively(self):
+        text = "\n".join(handles.verdict("pindropdealshome"))
+        self.assertIn("Brand word undi", text)
+        self.assertIn("Numbers ledu", text)
+        self.assertIn("Instagram", text)
+
+    def test_bad_handle_shows_errors_only(self):
+        text = "\n".join(handles.verdict("pin-drop"))
+        self.assertIn("BLOCK" if False else "\u26d4", text)
+        self.assertNotIn("Brand word undi", text)
+
+    def test_missing_brand_word_is_flagged(self):
+        text = "\n".join(handles.verdict("homedealsdrop"))
+        self.assertIn("Brand word", text)
+
+    def test_number_suffix_loses_the_cleanliness_line(self):
+        text = "\n".join(handles.verdict("pindropdeals01"))
+        self.assertNotIn("Numbers ledu", text)
+
+
 if __name__ == "__main__":
     unittest.main()

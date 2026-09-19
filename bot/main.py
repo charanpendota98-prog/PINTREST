@@ -17,6 +17,7 @@ Usage:
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
   python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
+  python -m bot handle check             # 🔎 live: which handles are free?
   python -m bot onboard                  # 📋 every Pinterest screen → what to select
   python -m bot claim [token]            # 🔖 claim your website (Rich Pins)
   python -m bot brand ["Name | Niche"]   # 🏷️ profile name/bio/boards for reach
@@ -915,6 +916,13 @@ def cmd_handle(cfg, rest: list[str]) -> int:
     """🔗 Pinterest/IG handle: rules, ranked fallbacks, save the choice."""
     from . import handles as _handles
     arg = " ".join(rest).strip().lstrip("@")
+    if arg.lower() in ("check", "--check", "verify"):
+        from . import handles as _h
+        cands = [i["handle"] for i in _h.handle_ideas()] + _h.plan_c()
+        print()
+        print("\n".join(_h.check_lines(cands)))
+        print()
+        return 0
     saved_line = ""
     if arg:
         res = _handles.save_handle(cfg, arg)

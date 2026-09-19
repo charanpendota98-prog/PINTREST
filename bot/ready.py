@@ -81,6 +81,14 @@ def _checks(cfg, os) -> list[dict]:
         bool(cfg.amazon_tag), "affiliate-program.amazon.in → your tag → .env",
         minutes=2, optional=True, recommended=True))
 
+    items.append(_item(
+        "profile", "Pinterest profile fields (name/bio/handle)",
+        False,
+        "python -m bot onboard  (screen-by-screen) · python -m bot brand "
+        "(form values) · python -m bot handle  (username taken? ranked "
+        "fallbacks + python -m bot handle check)",
+        optional=True, recommended=True, minutes=4))
+
     try:
         from . import claim as _claim
         claimed = bool(_claim.token_of(cfg))
