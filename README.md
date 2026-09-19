@@ -197,10 +197,10 @@ Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 
 | Field | Value |
 |---|---|
-| **Name** (ranked keyword field) | `Gharvana | Home & Kitchen` |
+| **Name** (ranked keyword field) | `Gharvana | Home Deals & Finds` (29 chars) |
 | **Username / handle** | `gharvana` (same on Pinterest + Instagram) |
 | **Pin strip** (artwork) | `Gharvana` |
-| **About** | `Gharvana shares easy home, kitchen & style finds under ₹999 — organizers, gadgets, kurtas and beauty picks. New deals daily. Tap the pin to shop.` |
+| **About** | `Gharvana shares hand-picked deals — home, kitchen, fashion & beauty finds under ₹999. Organizers, gadgets & kurtas. New drops daily. Tap the pin to shop.` (153) |
 
 **Enduku "deals" vadilesamu** (research tho, opinion kaadu):
 - `NestKart` → nestkart.in live store, same categories
@@ -213,6 +213,35 @@ Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 
 **Gharvana = Ghar + Nirvana** ("home bliss") — 8 letters, 3 syllables, spam-coding
 ledu (loot/free/cheap ledu), numbers ledu.
+
+#### "Deals" ni brand name lo pettala? (R57 — research tho answer)
+
+**Ledu** — "SuperDeals" laanti peru = **promo phrase, brand kaadu**:
+
+| Check | SuperDeals |
+|---|---|
+| Already in use | Super Deals India (FB), Superdeals.in (FB), Online SUPER DEALS (Chandigarh) — plus every deals page ever |
+| Recall | Generic — evaru gurthu pettukoru (brand identity ledu) |
+| Pinterest | `super/hot/daily` promo words spam signal → distribution thakkuva |
+| Ownership | Trademark/claim cheyyalem — evadaina vaadagaladu |
+
+**Correct formula:** owned brand word + `Deals` keyword **NAME field** lo —
+
+| Slot | Value | Enduku ikkada |
+|---|---|---|
+| Brand word (pin strip) | `Gharvana` | Short, ownable, gurthu pettukuntaru |
+| NAME field | `Gharvana | Home Deals & Finds` | **Ranked + visible** — keywords ikkada pani chestayi |
+| Bio / boards | "hand-picked deals" + categories | Keyword + trust |
+
+```bash
+python -m bot name "Gharvana"          # score + deals formula + collisions
+python -m bot name "SuperDeals"        # ⛔ "already in use — vaddu" ani cheptundi
+```
+
+> 📦 **"Anni products pedudtham"** — correct, kani oka **anchor niche** undali
+> (home & kitchen). Pinterest topical authority istundi (focus unna account ki
+> ekkuva distribution); "everything store" accounts tagguthayi. Boards lo
+> Fashion/Beauty/Kids unnayi — so ani categories vestham, anchor okate.
 
 ```bash
 python -m bot name "Gharvana" --live   # score + live handle/domain check

@@ -26,7 +26,8 @@ SPAM_WORDS = ("loot", "free", "cheap", "sale", "offer", "discount", "dealz",
               "sasta", "bumper", "mega", "cash", "win", "prize")
 # "deal(s)" is not banned outright — the owner's model IS deals — but it is a
 # weak, heavily-used word, so it costs points instead of failing outright.
-WEAK_WORDS = ("deal", "deals", "store", "shop", "mart", "mall", "buy", "cart")
+WEAK_WORDS = ("deal", "deals", "store", "shop", "mart", "mall", "buy", "cart",
+              "super", "mega", "hot", "best", "top", "big", "daily")
 HOME_ROOTS = ("ghar", "griha", "gruha", "nest", "home", "aangan", "angan",
               "nivaas", "nivas", "kutir")
 # Evidence-backed collisions (checked in this round, see module docstring).
@@ -45,6 +46,14 @@ KNOWN_USED = {
     "pindropdealshome": "Pinterest handle already taken",
     "gharfinds": "descriptive — expect close variants in the same niche",
     "homefinds": "descriptive — heavily used across Pinterest/IG",
+    "superdeals": "Super Deals India (FB), Superdeals.in (FB), Online SUPER DEALS "
+                  "(Chandigarh) — plus the same name on every platform: generic "
+                  "promo phrase, not a brand",
+    "superdeal": "same clutter as 'superdeals' — every deals page uses it",
+    "dropvana": "dropvana.org — live store (clothing/sports accessories)",
+    "pickora": "pickora.com + @pickora on IG/TikTok — the name is taken "
+               "platform-wide",
+    "haulvana": "haulvana.com — waste-management SaaS (unrelated, still taken)",
 }
 
 # Meaningful blends: home root + an aspirational/behavioural root.
@@ -131,7 +140,8 @@ def score(name: str) -> dict:
 
     # 6. distinctiveness (20)
     weak = [w for w in WEAK_WORDS if w in plain]
-    if plain in KNOWN_USED:
+    already_used = plain in KNOWN_USED
+    if already_used:
         risks.append(f"⚠️ Already in use: {KNOWN_USED[plain]}")
     elif weak:
         pts += 8
@@ -142,11 +152,63 @@ def score(name: str) -> dict:
                        "(thokkalo, brand build avutundi).")
 
     total = max(0, min(100, pts))
-    grade = ("🏆 FINAL pick" if total >= 85 else
-             "✅ strong" if total >= 70 else
-             "⚠️ usable" if total >= 55 else "❌ vaddu")
+    if already_used:
+        # Honest ceiling: a name that is already out there cannot be "strong",
+        # however tidy it looks on paper.
+        total = min(total, 60)
+        grade = "⛔ already in use — vaddu"
+    else:
+        grade = ("🏆 FINAL pick" if total >= 85 else
+                 "✅ strong" if total >= 70 else
+                 "⚠️ usable" if total >= 55 else "❌ vaddu")
     return {"name": raw, "plain": plain, "score": total, "grade": grade,
             "reasons": reasons, "risks": risks, "syllables": syll}
+
+
+NAME_FIELD_MAX = 30       # Pinterest truncates longer names on mobile
+
+
+def name_field_options(brand: str) -> list[str]:
+    """Keyword-rich NAME fields for a brand word (≤30 chars so nothing truncates).
+
+    This is where "deals" belongs: the NAME field is the ranked, visible field,
+    while the brand word stays short so it can be owned and remembered.
+    """
+    plain = re.sub(r"[^A-Za-z0-9 ]", "", str(brand or "")).strip()
+    if not plain:
+        return []
+    tails = ("Home Deals & Finds", "Deals & Home Finds", "Home, Kitchen & Deals",
+             "Deals & Finds", "Home & Kitchen")
+    out: list[str] = []
+    for tail in tails:
+        cand = f"{plain} | {tail}"
+        if len(cand) <= NAME_FIELD_MAX:
+            out.append(cand)
+    return out
+
+
+def deals_formula(brand: str) -> list[str]:
+    """The honest answer to 'shall we just call it SuperDeals?'."""
+    plain = re.sub(r"[^A-Za-z0-9]", "", str(brand or "")).lower() or "yourbrand"
+    return [
+        "🎯 DEALS POSITIONING — formula (why 'SuperDeals' is not the move)",
+        "",
+        "   ⛔ 'SuperDeals' problem: it is a PROMO PHRASE, not a brand.",
+        "      • Already in use: Super Deals India (FB), Superdeals.in (FB),",
+        "        Online SUPER DEALS (Chandigarh) — plus every deals page ever.",
+        "      • Generic = no recall: evaru gurthu pettukoru, and Pinterest",
+        "        'super/hot/daily' promo words ni spam-la chustundi (reach down).",
+        "      • Trademark/claim cheyyalem — evadaina vaadagaladu.",
+        "",
+        "   ✅ Correct formula: OWNED brand word + 'Deals' keyword in the NAME field",
+        f"      Name field  : {plain.title()} | Home Deals & Finds   (ranked, visible)",
+        f"      Pin strip   : {plain.title()}   (short artwork word)",
+        f"      Handle      : @{plain}",
+        "      Bio/boards  : 'deals' word + categories (home, kitchen, fashion…)",
+        "",
+        "   💡 Enduku ila: Pinterest lo NAME field = keyword ranking,",
+        "      brand word = recall + ownability. Rendu kalipithe 2x labham.",
+    ]
 
 
 def blends(limit: int = 12) -> list[dict]:
@@ -209,12 +271,22 @@ def report(name: str, cfg=None, live: bool = False) -> list[str]:
         out.append(f"   ⚠️ {r}")
 
     if plain:
+        # When the candidate is already taken, show the formula with the
+        # configured brand word instead of the rejected one.
+        suggest = res["name"]
+        if plain in KNOWN_USED and cfg is not None:
+            try:
+                configured = str(cfg.get("design.brand_name", "") or "").strip()
+                suggest = configured or suggest
+            except Exception:  # noqa: BLE001
+                pass
+        out += deals_formula(suggest) + [""]
         handle = plain[:20]
         out += [
             "",
             f"   Handle candidate: @{handle}",
             f"   NAME field (unique kaadu, ranking ikkada): "
-            f"{res['name']} | Home & Kitchen Finds",
+            f"{(name_field_options(res['name']) or [res['name']])[0]}",
             "",
         ]
         if live:

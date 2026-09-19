@@ -340,13 +340,25 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
-17) SAFETY (account safe, money safe)
+17) DEALS POSITIONING (R57) — "SuperDeals ani pedudama?"
+   🎯 `python -m bot name "<Brand>"` ippudu **deals formula** kuda chupistundi:
+   "SuperDeals" = promo phrase (Super Deals India / Superdeals.in / Online SUPER
+   DEALS already unnayi) → generic, no recall, spam-la kanipistundi. Correct:
+   **owned brand word + 'Deals' keyword NAME field lo**
+   (ex: `Gharvana | Home Deals & Finds` — 29 chars, kotha ga truncate avvadu).
+   ⛔ Collision memory perigindi: superdeals · dropvana (dropvana.org) ·
+   pickora (pickora.com + @pickora) · haulvana (haulvana.com) — ee peru isthe
+   bot "⛔ already in use — vaddu" ani cheptundi (score cap 60).
+   📛 `name_field_options()` — NAME field options ≤30 chars (deals + home +
+   finds keywords tho).
+
+
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   459 automated tests.
+   466 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

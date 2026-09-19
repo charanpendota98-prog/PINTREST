@@ -66,9 +66,49 @@ class TestScore(unittest.TestCase):
         self.assertEqual(naming.score("")["score"], 0)
         self.assertEqual(naming.score("   ")["grade"], "❌")
 
+    def test_known_collision_cannot_grade_strong(self):
+        for taken in ("SuperDeals", "NestBazaar", "Dropvana", "Pickora",
+                      "Haulvana"):
+            res = naming.score(taken)
+            self.assertLessEqual(res["score"], 60, taken)
+            self.assertIn("already in use", res["grade"], taken)
+
+    def test_new_collisions_are_remembered(self):
+        for key in ("superdeals", "dropvana", "pickora", "haulvana"):
+            self.assertIn(key, naming.KNOWN_USED)
+
+    def test_promo_words_cost_points(self):
+        self.assertGreater(naming.score("Gharvana")["score"],
+                           naming.score("SuperHome")["score"])
+
     def test_grade_bands(self):
         self.assertIn("🏆", naming.score("Gharvana")["grade"])
         self.assertIn("❌", naming.score("Loot Free Cheap")["grade"])
+
+
+class TestDealsFormula(unittest.TestCase):
+    def test_name_field_options_fit_and_carry_deals(self):
+        for cand in naming.name_field_options("Gharvana"):
+            self.assertLessEqual(len(cand), naming.NAME_FIELD_MAX, cand)
+            self.assertTrue(cand.startswith("Gharvana"), cand)
+        first = naming.name_field_options("Gharvana")[0]
+        self.assertIn("Deals", first)
+        self.assertIn("Home", first)
+
+    def test_name_field_options_empty_for_empty_brand(self):
+        self.assertEqual(naming.name_field_options(""), [])
+        self.assertEqual(naming.name_field_options("   "), [])
+
+    def test_formula_talks_about_superdeals_and_the_fix(self):
+        text = "\n".join(naming.deals_formula("Gharvana"))
+        self.assertIn("SuperDeals", text)
+        self.assertIn("PROMO PHRASE", text)
+        self.assertIn("NAME field", text)
+        self.assertIn("Gharvana | Home Deals & Finds", text)
+
+    def test_report_includes_the_formula(self):
+        text = "\n".join(naming.report("Gharvana", _cfg()))
+        self.assertIn("DEALS POSITIONING", text)
 
 
 class TestBlends(unittest.TestCase):
@@ -202,14 +242,23 @@ class TestCli(unittest.TestCase):
         self.assertIn('if cmd in ("name", "naming", "brand-name")', src)
         self.assertIn("python -m bot name", src)
 
-    def test_real_config_has_the_final_brand(self):
+    def test_real_config_has_a_healthy_configured_brand(self):
+        """Invariant, not a hardcoded name: whatever is configured must be sane."""
         import yaml
         repo = Path(__file__).resolve().parents[1] / "config.yaml"
         data = yaml.safe_load(repo.read_text())
-        self.assertTrue(data["brand"]["display_name"].startswith("Gharvana"))
-        self.assertEqual(data["brand"]["handle"], "gharvana")
-        self.assertEqual(data["design"]["brand_name"], "Gharvana")
-        self.assertIn("Gharvana", data["brand"]["bio"])
+        display = data["brand"]["display_name"]
+        strip = data["design"]["brand_name"]
+        handle = data["brand"]["handle"]
+        self.assertTrue(display.startswith(strip))          # strip inside name
+        self.assertTrue(strip)                              # artwork word set
+        self.assertTrue(handle and handle.islower())        # handle normalised
+        self.assertLessEqual(len(handle), 30)
+        self.assertNotIn(handle, naming.KNOWN_USED)         # not a known mess
+        self.assertGreaterEqual(naming.score(strip)["score"], 70)
+        self.assertTrue(display.startswith(f"{strip} |"))   # keyword field used
+        self.assertLessEqual(len(display), 30)
+        self.assertIn(strip, data["brand"]["bio"])
 
 
 if __name__ == "__main__":

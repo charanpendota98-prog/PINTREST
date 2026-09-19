@@ -29,10 +29,10 @@ SPAM_WORDS = ("cheap", "free", "clickbait", "loot", "offer offer")
 NAME_IDEAS: dict[str, list[str]] = {
     # R56: the researched final answer — coined + ownable beats descriptive
     # (NestKart / NestBazaar / Aangan / Nestora / Grihika are all in use).
-    "🏆 FINAL PICK (coined, ownable)": [
-        "Gharvana | Home & Kitchen",
-        "Gharvana | Home Decor Finds",
-        "Gharvana | Kitchen & Home",
+    "🏆 FINAL PICK (coined, ownable + deals keyword)": [
+        "Gharvana | Home Deals & Finds",
+        "Gharvana | Deals & Home Finds",
+        "Gharvana | Home, Kitchen & Deals",
     ],
     "all-round (safe default)": [
         "Deal Drops | Home & Kitchen Finds",
@@ -123,14 +123,25 @@ def display_suggestions(brand: str = "") -> dict[str, list[str]]:
 
 
 def bio_for(brand: str, niches: tuple[str, ...] = TOP_NICHES) -> str:
-    """≤160-char profile description: what + who + CTA, keywords early."""
+    """≤160-char profile description: what + who + CTA, keywords early.
+
+    Built additively so the deals keyword AND the category spread fit before
+    anything is trimmed (R57: the owner posts all products, so the bio must say
+    "deals" + the categories without sounding like a random everything-store).
+    """
     b = pin_strip(brand) or "We"
-    text = (f"{b} shares easy home, kitchen & style finds under ₹999 — "
-            f"organizers, gadgets, kurtas and beauty picks. New deals daily. "
-            f"Tap the pin to shop.")
-    if len(text) > BIO_MAX:
-        text = (f"{b} shares home & kitchen finds under ₹999 + kurta and "
-                f"beauty picks. New deals daily — tap the pin to shop.")
+    parts = [
+        f"{b} shares hand-picked deals — home, kitchen, fashion & beauty finds "
+        f"under ₹999.",
+        " Organizers, gadgets & kurtas.",
+        " New drops daily.",
+        " Tap the pin to shop.",
+    ]
+    text = ""
+    for part in parts:
+        if len(text + part) > BIO_MAX:
+            break
+        text += part
     return text[:BIO_MAX]
 
 
