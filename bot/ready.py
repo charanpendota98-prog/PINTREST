@@ -49,7 +49,8 @@ def _checks(cfg, os) -> list[dict]:
     items.append(_item(
         "pinterest_app", "Pinterest app ID + secret",
         bool(cfg.pinterest_app_id and cfg.pinterest_app_secret),
-        "developers.pinterest.com/apps → create app → copy into .env "
+        "1) Business account lo 'Describe your business' → pick 'Content creator'\n"
+        "2) developers.pinterest.com/apps → create app → copy into .env "
         "(or: python -m bot setup)", minutes=4))
     items.append(_item(
         "pinterest_token", "Pinterest account connected (click ALLOW once)",

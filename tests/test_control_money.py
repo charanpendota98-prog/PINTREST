@@ -26,8 +26,15 @@ def _cfg(tmp: Path, **extra) -> Config:
     return cfg
 
 
-def _post(db, source="meesho", clicks=0, posted_at="2026-09-18T10:00:00",
+def _now_iso() -> str:
+    """Always today — a hardcoded date made the suite rot overnight (real bug)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _post(db, source="meesho", clicks=0, posted_at=None,
           status="posted"):
+    posted_at = posted_at or _now_iso()
     pid = db.add_product(source=source, url=f"u{time.time()}{clicks}",
                          affiliate_url="a", title="Kitchen Storage Organizer",
                          price="599", status=status)
@@ -279,7 +286,7 @@ class TestEarnings(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cfg = _cfg(Path(d))
             db = DB(cfg.db_path)
-            _post(db, clicks=7, posted_at="2026-09-18T10:00:00")
+            _post(db, clicks=7)
             rows = earnings.click_rows_since(db, days=30)
             self.assertTrue(rows)
             self.assertEqual(earnings.estimate(cfg, rows)["clicks"], 7)
@@ -290,7 +297,7 @@ class TestReport(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cfg = _cfg(Path(d))
             db = DB(cfg.db_path)
-            _post(db, clicks=9, posted_at="2026-09-18T10:00:00")
+            _post(db, clicks=9)
             out = "\n".join(report.lines(cfg, db, days=30))
             self.assertIn("LAST 30 DAYS", out)
             self.assertIn("pins posted: 1", out)

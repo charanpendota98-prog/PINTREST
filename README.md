@@ -64,12 +64,32 @@ python3 -m venv .venv
 # Windows:  .venv\Scripts\pip install -r requirements.txt
 ```
 
-### 2. Pinterest app (5 min)
+### 2. Pinterest account + app (5 min)
+
+**2a. Business account — "Describe your business" screen lo emi pick cheyali?**
+
+👉 **`Content creator`** pick cheyandi. (Ide correct answer — affiliate pages ki.)
+
+Enduku:
+- Affiliate account = nuvvu **content create** chestunnav (pins/reels), own
+  store catalog ammudu ledu → "Content creator" (bloggers/influencers) exact fit.
+- `Online merchant or marketplace` **website required** (adi lekapote proceed kadu)
+  and adi actual shops ki; Pinterest **Verified Merchant Program** affiliate
+  marketers ki **bandh** (official merchant guidelines) — ee route teesukunte
+  later problems.
+- `Service provider` / `Agency` / `Publisher` — mana model ki kaadu.
+- `Other` — safe fallback, kani Content creator best (analytics + creator tools).
+
+Tarvata (optional kani recommended, deploy ayyaka): business **website** =
+mana landing page URL (`link.public_base`, e.g. `https://yourdomain.com`) →
+Pinterest lo **Claim** cheyandi (Settings → Claimed accounts). Claim cheste
+**Rich Pins** + pins ki mana site attribution vasthundi (extra reach).
+
+**2b. Developer app (API access):**
 1. Go to **https://developers.pinterest.com/apps/** → *Create app*.
-2. You need a **Pinterest Business account** (free to convert personal → business in Settings).
-3. In the app: add the redirect URI exactly as: `http://localhost:8888/callback`
-4. Enable scopes: `boards:read, boards:write, pins:read, pins:write, user_accounts:read`
-5. Copy **App ID** and **App Secret**.
+2. In the app: add the redirect URI exactly as: `http://localhost:8888/callback`
+3. Enable scopes: `boards:read, boards:write, pins:read, pins:write, user_accounts:read`
+4. Copy **App ID** and **App Secret**.
 
 ### 3. Secrets — copy `.env.example` → `.env` and fill in
 ```bash

@@ -327,6 +327,10 @@ def cmd_setup(cfg) -> int:
             return ""
 
     print("STEP 1/3 — Pinterest (one time)")
+    print("   • Business account ki convert cheyyandi. 'Describe your business'")
+    print("     lo 👉 'Content creator' pick cheyandi (affiliate pages ki ide correct;")
+    print("     'Online merchant' ki website kavali + Verified Merchant program")
+    print("     affiliate marketers ki bandh)")
     print("   • developers.pinterest.com/apps → create app")
     print("   • redirect URI: http://localhost:8888/callback")
     print("   • scopes: boards:read boards:write pins:read pins:write user_accounts:read")

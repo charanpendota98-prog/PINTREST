@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bot.config import Config
@@ -111,7 +112,8 @@ def _seed_posted(eng: Engine, title="Kitchen Storage Organizer Rack",
                              price=price, status="posted")
     eng.db.add_post(product_id=pid, board_id="b", pin_id="pin1",
                     ig_post_id="media-1", status="posted",
-                    posted_at="2026-09-18T10:00:00")
+                    posted_at=datetime.now(timezone.utc).isoformat(
+                        timespec="seconds"))
     return pid
 
 
