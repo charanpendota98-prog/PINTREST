@@ -48,6 +48,8 @@ def _hex(color: str) -> tuple[int, int, int]:
 
 
 def _wrap_text(draw, text: str, font, max_width: int, max_lines: int) -> list[str]:
+    from .growth import safe_text
+    text = safe_text(text)
     words = text.split()
     lines: list[str] = []
     line = ""
@@ -157,7 +159,8 @@ class PinDesigner:
         if not price_label:
             return
         f = _font(True, 62)
-        text = f"{self.price_prefix} {price_label}".strip()
+        from .growth import safe_text
+        text = safe_text(f"{self.price_prefix} {price_label}")
         label = f"  {text}  "
         w = int(draw.textlength(label, font=f) + 36)
         h = 102

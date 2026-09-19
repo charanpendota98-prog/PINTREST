@@ -754,3 +754,38 @@ class TestBlankMediaGuard(unittest.TestCase):
                 str(img), "https://www.meesho.com/af_invite/24197020:x:1?p_id=35pwo2&ext_id=35pwo2")
             self.assertFalse(ok)
             self.assertTrue(any("blank" in i for i in issues))
+
+
+class TestSafeText(unittest.TestCase):
+    """R73 — the bundled DejaVu font has no emoji: they printed □ on reels
+    and pins, so every drawn string is filtered first."""
+
+    def test_emoji_removed_and_symbols_kept(self):
+        from bot.growth import safe_text
+        self.assertEqual(safe_text("Wait for the price 👀"), "Wait for the price")
+        self.assertEqual(safe_text("JUST ₹200 • 4% OFF"), "JUST ₹200 • 4% OFF")
+        self.assertEqual(safe_text("Shop Now ➜"), "Shop Now ➜")
+        self.assertEqual(safe_text("Worth it ⬇️  really"), "Worth it really")
+        self.assertEqual(safe_text("3 reasons to buy 🔥🛍️"), "3 reasons to buy")
+
+    def test_video_wrap_never_draws_an_emoji(self):
+        from PIL import Image, ImageDraw
+        from bot.video_maker import _font, _wrap
+        d = ImageDraw.Draw(Image.new("RGB", (720, 1280)))
+        lines = _wrap(d, "rating viral finds 🔥 until i go broke",
+                      _font(True, 40), 640, 3)
+        self.assertTrue(lines)
+        self.assertNotIn("🔥", " ".join(lines))
+
+
+class TestHookFontNotShrunkByEmoji(unittest.TestCase):
+    """R73 regression: the emoji must be stripped BEFORE the fit comparison,
+    otherwise a short hook shrinks to the floor size (tiny text)."""
+
+    def test_short_hook_with_emoji_keeps_big_font(self):
+        from PIL import Image, ImageDraw
+        from bot.video_maker import _fit_text
+        d = ImageDraw.Draw(Image.new("RGB", (720, 1280)))
+        lines, size = _fit_text(d, "Wait for the price 👀", 633, 5, start=64)
+        self.assertGreaterEqual(size, 56)
+        self.assertEqual(" ".join(lines), "Wait for the price")

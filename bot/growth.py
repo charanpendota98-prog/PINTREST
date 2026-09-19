@@ -12,6 +12,8 @@ Everything here is distilled from what top affiliate creators actually do in
 """
 from __future__ import annotations
 
+import re
+
 import random
 from datetime import datetime
 
@@ -89,6 +91,31 @@ SOURCE_HOOKS = {
         "Flipkart lo ee deal miss avvakandi 😱 ({kw})",
     ],
 }
+
+
+_SAFE_SYMBOLS = set("₹★☆➜➤✔✓•·—–…“”‘’×°")
+
+
+def safe_text(text: str) -> str:
+    """Keep only what the bundled DejaVu font can actually DRAW.
+
+    DejaVu ships no emoji, so "Wait for the price 👀" printed an empty box on
+    the reel frame and the pin (the audience sees □□). Emoji/pictographs and
+    arrows are dropped here, spaced cleaned up; ₹ ★ ➜ survive.
+    """
+    out = []
+    for ch in str(text or ""):
+        cp = ord(ch)
+        if cp in (0xFE0F, 0x200D, 0x20E3):            # variation/ZWJ/keycap
+            continue
+        if 0x1F000 <= cp <= 0x1FAFF or 0x1F1E6 <= cp <= 0x1F1FF:
+            continue                                   # emoji, pictographs, flags
+        if 0x2B00 <= cp <= 0x2BFF:
+            continue                                   # ⬇ ⬆ ⭐
+        if 0x2600 <= cp <= 0x27BF and ch not in _SAFE_SYMBOLS:
+            continue                                   # ☀ ☺ ✨ … (keep ★ ➜)
+        out.append(ch)
+    return re.sub(r"\s{2,}", " ", "".join(out)).strip()
 
 
 def hook_for(price_label: str, title: str, day: int, source: str = "") -> str:

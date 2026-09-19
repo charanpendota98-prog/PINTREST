@@ -18,6 +18,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
+from .growth import safe_text
+
 log = logging.getLogger("pindrop.video")
 
 W, H, FPS = 720, 1280, 24
@@ -38,6 +40,7 @@ def _font(bold: bool, size: int) -> ImageFont.FreeTypeFont:
 
 
 def _wrap(draw, text, font, max_w, max_lines):
+    text = safe_text(text)
     words, lines, line = text.split(), [], ""
     for w in words:
         t = f"{line} {w}".strip()
@@ -63,7 +66,7 @@ def _fit_text(draw, text: str, max_w: int, max_lines: int,
     Returns (lines, size). Never returns a truncated string: if even the
     floor size cannot hold it, the caller still gets all words wrapped.
     """
-    words = " ".join(str(text or "").split())
+    words = safe_text(" ".join(str(text or "").split()))
     size = int(start)
     while size >= floor:
         font = _font(True, size)
@@ -405,8 +408,8 @@ class ReelMaker:
                     anchor="mm")
 
         if caption and t < 0.5:
-            d.text((W / 2, H - 150), caption[:44], font=_font(True, 40),
-                   fill=(255, 255, 255), anchor="ma")
+            d.text((W / 2, H - 150), safe_text(caption)[:44],
+                   font=_font(True, 40), fill=(255, 255, 255), anchor="ma")
         d.text((W / 2, H - 74), "link in bio / tap to shop",
                font=_font(True, 30), fill=(255, 230, 120), anchor="ma")
         return img
@@ -528,6 +531,7 @@ class ReelMaker:
                    font=_font(True, 34), fill=(255, 235, 235), anchor="ma")
         # burned-in subtitle (what the voice is saying right now)
         if caption:
+            caption = safe_text(caption)
             line = caption if t < 0.45 else (f"Only {price}!" if price else caption)
             cf = _font(True, 40)
             d.text((W / 2 + 2, H - 62 + 2), line, font=cf, fill=(0, 0, 0), anchor="ma")
