@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot claim [token]            # 🔖 claim your website (Rich Pins)
   python -m bot brand ["Name | Niche"]   # 🏷️ profile name/bio/boards for reach
   python -m bot scale [target]           # 🎯 ₹ target → clicks/posts/day math
   python -m bot ready                    # 🎯 what is left for YOU to do (one time)
@@ -907,6 +908,20 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+
+def cmd_claim(cfg, rest: list[str]) -> int:
+    """🔖 Pinterest website claim — token save + exact steps."""
+    from . import claim as _claim
+    arg = " ".join(rest).strip()
+    if arg:
+        res = _claim.save(cfg, arg)
+        if not res["saved"] and res.get("error"):
+            print(f"\n❌ {res['error']}\n")
+            return 2
+    print("\n" + "\n".join(_claim.lines(cfg)) + "\n")
+    return 0
+
+
 def cmd_brand(cfg, rest: list[str]) -> int:
     """🏷️  Brand/profile SEO: pick the name that actually earns reach."""
     from . import brand as _brand
@@ -1151,6 +1166,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd == "claim":
+        return cmd_claim(cfg, rest)
     if cmd == "brand":
         return cmd_brand(cfg, rest)
     if cmd == "scale":

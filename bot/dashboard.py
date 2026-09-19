@@ -14,7 +14,7 @@ import secrets
 import time
 from pathlib import Path
 
-from flask import (Flask, jsonify, redirect, render_template_string, request,
+from flask import (Flask, Response, jsonify, redirect, render_template_string, request,
                    send_file, send_from_directory, session)
 
 from .db import DB
@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # ── Pages that MUST stay public: they are the money path (pins → landing →
 #    affiliate link). Everything else is the admin panel and is password-locked.
 PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/deals/today"}
-PUBLIC_PREFIX = ("/go/", "/subscribe/", "/media/")
+PUBLIC_PREFIX = ("/go/", "/subscribe/", "/media/", "/pinterest-")
 
 LOGIN_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -235,6 +235,30 @@ def create_app(cfg, db: DB | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
     app.config["MAX_CONTENT_LENGTH"] = 250 * 1024 * 1024  # 250MB uploads max
     db = db or DB(cfg.db_path)
+    # 🔖 Pinterest website claiming (Rich Pins): inject the verification meta
+    # tag into every public page when a token is configured. No DNS access
+    # needed — this is the "Add HTML tag" method, served by our own site.
+    from . import claim as _claim
+    _verify_token = _claim.token_of(cfg)
+    # local copies (never rebind the module constants — that leak across apps)
+    landing_html = (_claim.inject(LANDING_HTML, _verify_token)
+                    if _verify_token else LANDING_HTML)
+    deals_html = (_claim.inject(DEALS_HTML, _verify_token)
+                  if _verify_token else DEALS_HTML)
+    login_html = (_claim.inject(LOGIN_HTML, _verify_token)
+                  if _verify_token else LOGIN_HTML)
+    if _verify_token:
+        logging.getLogger("pindrop.dashboard").info(
+            "Pinterest domain verification active (token %s…)", _verify_token[:6])
+
+    @app.get("/pinterest-<token>.html")
+    def pinterest_verify_file(token: str):
+        """Serve Pinterest's HTML-file verification (public, token-checked)."""
+        if not _verify_token or token != _verify_token:
+            return Response("not found", status=404, mimetype="text/plain")
+        return Response(_claim.verify_file_content(_verify_token),
+                        mimetype="text/html")
+
     engine = Engine(cfg, db)
     media_dir = cfg.media_dir
     media_dir.mkdir(parents=True, exist_ok=True)
@@ -297,7 +321,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
             hits = [t for t in _fails.get(ip, []) if now - t < 300]
             if len(hits) >= 5:
                 return render_template_string(
-                    LOGIN_HTML, err="Too many attempts — wait 5 minutes."), 429
+                    login_html, err="Too many attempts — wait 5 minutes."), 429
             given = (request.form.get("password") or "").strip()
             if pw and hmac.compare_digest(given, pw):
                 _fails.pop(ip, None)
@@ -312,7 +336,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
             err = "Wrong password."
         if not pw:
             return redirect("/")
-        return render_template_string(LOGIN_HTML, err=err)
+        return render_template_string(login_html, err=err)
 
     @app.get("/logout")
     def _logout():
@@ -377,7 +401,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                 "buy": (f"{base}/go/{p['id']}" if bridge else p["affiliate_url"]),
             })
         return render_template_string(
-            DEALS_HTML, deals=deals,
+            deals_html, deals=deals,
             brand=cfg.get("design.brand_name", "Deal Drops"))
 
     @app.get("/go/<int:pid>")
@@ -413,7 +437,7 @@ def create_app(cfg, db: DB | None = None) -> Flask:
             page_url = f"{public}/go/{pid}"
         else:
             hero, page_url = rel, f"/go/{pid}"
-        return render_template_string(LANDING_HTML,
+        return render_template_string(landing_html,
                                       title=p["title"], price=price,
                                       raw_price=re.sub(r"[^0-9.]", "", p["price"]) or "0",
                                       disc=disc, img=hero, page_url=page_url,

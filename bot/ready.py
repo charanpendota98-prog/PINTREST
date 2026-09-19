@@ -81,6 +81,18 @@ def _checks(cfg, os) -> list[dict]:
         bool(cfg.amazon_tag), "affiliate-program.amazon.in → your tag → .env",
         minutes=2, optional=True, recommended=True))
 
+    try:
+        from . import claim as _claim
+        claimed = bool(_claim.token_of(cfg))
+    except Exception:  # noqa: BLE001
+        claimed = False
+    items.append(_item(
+        "website_claim", "Claim your Pinterest website (Rich Pins + attribution)",
+        claimed,
+        "after deploy, with a domain: Pinterest → Settings → Claimed accounts → "
+        "Claim website → copy the token → python -m bot claim <token>",
+        optional=True, recommended=True, minutes=3))
+
     items.append(_item(
         "instagram", "Instagram Business token (optional)",
         bool(os.getenv("INSTAGRAM_ACCESS_TOKEN") and os.getenv("IG_USER_ID")),

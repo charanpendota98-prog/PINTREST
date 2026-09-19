@@ -291,13 +291,23 @@ def print_how_it_works() -> None:
    - Save chesinappudu config.yaml surgical ga update (comments intact —
      yaml.safe_dump comments ni tagalestundi, adi bug ga pattukunnam).
 
-14) SAFETY (account safe, money safe)
+14) WEBSITE CLAIM / RICH PINS (R52)
+   🔖 `python -m bot claim <token>`: Pinterest 'Claim your website' ni
+   1-command ga chestundi —
+   - meta tag (<meta name="p:domain_verify">) ni landing/deals/login pages lo
+     inject chestundi (DNS avasaram ledu),
+   - `/pinterest-<token>.html` file ni PUBLIC ga serve chestundi (Pinterest
+     fetch cheyyadaniki login undadu).
+   - token config lo comment-preserving ga save (config.yaml comments safe).
+   Result: analytics + content attribution + Rich Pins = free extra reach.
+
+15) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   340 automated tests.
+   356 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

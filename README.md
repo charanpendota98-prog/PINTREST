@@ -106,6 +106,27 @@ Pinterest lo **Claim** cheyandi (Settings → Claimed accounts). Claim cheste
   Pinterest single-focus accounts ni better ga rank chestundi
 - Later change cheyyali anipisthe: Settings → Business → edit (lock kaadu)
 
+**2a-3. "Claim your website" (after deploy — Rich Pins + attribution)**
+
+Aa onboarding card lo **`Claim your website`** = Pinterest analytics +
+**attribution for your content** + **Rich Pins** ki dooram. Bot idi one-command
+ga chestundi:
+
+```bash
+python -m bot claim                 # steps + current state
+python -m bot claim <TOKEN>         # meta tag inject + file route ON
+```
+- Bot mana pages lo `<meta name="p:domain_verify" content="...">` ni inject
+  chestundi (landing, deals, login) — **DNS access avasaram ledu**.
+- File method kuda ready: `https://yourdomain.com/pinterest-<token>.html`
+  (public, no login — Pinterest fetch cheyyagaladu).
+- Pinterest lo: Settings → Claimed accounts → Claim website → 'Add HTML tag'
+  leda 'Upload HTML file' → Verify.
+
+> Note: ee card mandatory kaadu ("Share ideas"/"Showcase your brand" la) —
+> **Next** click chesi skip cheyyochu, tarvata eppudaina cheyyochu.
+> Kani deploy tarvata idi cheyyadam = free extra reach (Rich Pins).
+
 **2b. Developer app (API access):**
 1. Go to **https://developers.pinterest.com/apps/** → *Create app*.
 2. In the app: add the redirect URI exactly as: `http://localhost:8888/callback`
