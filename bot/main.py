@@ -1512,13 +1512,16 @@ def cmd_meesho(cfg, args: list[str]) -> int:
                        if k not in ("p_id", "ext_id")) if tpl else {}
         bparams = dict(_pqs(_up(built).query))
         preserved = all(bparams.get(k) == v for k, v in tparams.items())
-        fresh = built.count("ext_id=") == 1 and "ext_id=old" not in built
+        # R69: Meesho resolves the LANDING page from ext_id (/s/p/<code>), so
+        # ext_id must be the product's own code — a random one 404s.
+        ext_ok = (built.count("ext_id=") == 1 and f"ext_id={pid}" in built
+                  and f"p_id={pid}" in built)
         checks = {
             "af_invite present": "af_invite" in built,
             "your publisher id in link": bool(h["publisher"]) and h["publisher"] in built,
             "latest campaign used": bool(h["campaigns"]) and h["campaigns"][-1] in built,
             "product p_id correct": bool(pid) and f"p_id={pid}" in built,
-            "fresh ext_id per click (old id replaced)": fresh,
+            "ext_id = product code (landing rule)": ext_ok,
             f"template params preserved ({len(tparams)} checked)": preserved,
         }
         print("\n  STRUCTURAL CHECKS")
@@ -1547,6 +1550,18 @@ def cmd_meesho(cfg, args: list[str]) -> int:
             pl = lk.meesho_link_for(sample, platform=plat)
             print(f"   • {plat:10s} token={tok:22s}")
             print(f"     {pl}")
+
+    # R70: the app deep-link test — which id form does the Meesho APP accept?
+    if pid:
+        share = f"https://www.meesho.com/s/p/{pid}"
+        print("\n  APP DEEP-LINK TEST (phone lo, 30 seconds — 3 links, 1 answer):")
+        print(f"   A) bot link     : {built if built else '(none)'}")
+        print(f"   B) share link   : {share}")
+        print("      (idi Meesho app 'Share' button isthunde format — app lo"
+              "\n       product open avutundo ledo chudataniki)")
+        print(f"   C) direct page  : https://www.meesho.com/<slug>/p/{pid}")
+        print("   → Meesho APP lo ee moodu lo EVI product page open chestayi?"
+              "\n     (A/B/C ante cheppu — daaniki taggattu link format fix chesta)")
 
     print("\n  PHONE LO TEST (only your phone can confirm — server nunchi")
     print("  meesho.com reach avvadu, so idi real proof):")
