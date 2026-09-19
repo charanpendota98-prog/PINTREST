@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot onboard                  # 📋 every Pinterest screen → what to select
   python -m bot claim [token]            # 🔖 claim your website (Rich Pins)
   python -m bot brand ["Name | Niche"]   # 🏷️ profile name/bio/boards for reach
   python -m bot scale [target]           # 🎯 ₹ target → clicks/posts/day math
@@ -909,6 +910,16 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+def cmd_onboard(cfg) -> int:
+    """📋 Every Pinterest onboarding screen → what to select (skip rules too)."""
+    from . import onboard as _onboard
+    print()
+    for line in _onboard.lines(cfg):
+        print(line)
+    print()
+    return 0
+
+
 def cmd_claim(cfg, rest: list[str]) -> int:
     """🔖 Pinterest website claim — token save + exact steps."""
     from . import claim as _claim
@@ -1166,6 +1177,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd in ("onboard", "onboarding"):
+        return cmd_onboard(cfg)
     if cmd == "claim":
         return cmd_claim(cfg, rest)
     if cmd == "brand":

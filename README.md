@@ -68,6 +68,10 @@ python3 -m venv .venv
 
 **2a. Business account — "Describe your business" screen lo emi pick cheyali?**
 
+> 🔎 Full screen-by-screen sheet (ee doc chadavalasina avasaram ledu):
+> `python -m bot onboard` — every Pinterest onboarding screen + what to select,
+> including which cards are **skippable** (most of them are).
+
 👉 **`Content creator`** pick cheyandi. (Ide correct answer — affiliate pages ki.)
 
 Enduku:

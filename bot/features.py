@@ -301,13 +301,23 @@ def print_how_it_works() -> None:
    - token config lo comment-preserving ga save (config.yaml comments safe).
    Result: analytics + content attribution + Rich Pins = free extra reach.
 
-15) SAFETY (account safe, money safe)
+15) ONBOARDING CHEAT SHEET (R53) — "edi select cheyali?"
+   📋 `python -m bot onboard`: Pinterest onboarding lo prati screen ki answer
+   oke chota — Create business account → Describe your business (Content
+   creator) → A few more details (goals 3 + Brand focus Home) → shortcut cards
+   (Share ideas / Claim website / Showcase brand = **skip**) → "Create a Pin"
+   (skip; bot posts) → profile name/bio (`bot brand`) → Connected accounts →
+   Claim website (`bot claim`) → developer app.
+   Nijam: REQUIRED 2 matrame (business account + developer app); migilinavi
+   optional shortcuts — skip chesina account ki emi avvadu.
+
+16) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   356 automated tests.
+   364 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
