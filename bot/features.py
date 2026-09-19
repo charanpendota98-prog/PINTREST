@@ -360,6 +360,11 @@ def print_how_it_works() -> None:
    🛡️ Failure aithe link EH ivvadu → QA gate aa pin ni quarantine chestundi
    (untracked link eppudu post avvadu). Live proof: `python -m bot earnkaro probe`.
    ⏱️  Sandbox nunchi EarnKaro reach avvadu (network block) — proof VPS/laptop lo.
+   🛍 Meesho creds ippudu **env-first** (`.env` eh single source): publisher
+   24197020 + per-platform tokens (instagram_stories/facebook) + collection link
+   (`MEESHO_COLLECTION_LINK` → landing page 'Browse More Deals' CTA, verbatim).
+   `meesho_platform_tokens: {pinterest: instagram_stories}` — Pinterest ki Meesho
+   token ledu; publisher id money ni decide chestundi, token reporting kosam.
 
 25) CREDENTIAL INTAKE + LEAK PROOF (R65)
    🔑 `python -m bot creds [--amazon T --earnkaro P --meesho L …]`: prati
@@ -453,7 +458,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   642 automated tests.
+   650 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

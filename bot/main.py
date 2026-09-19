@@ -936,6 +936,7 @@ CRED_FLAGS = {
     "--earnkaro-token": "EARNKARO_API_TOKEN",
     "--earnkaro-api": "EARNKARO_API_TOKEN",
     "--meesho": "MEESHO_TEMPLATE_LINK",
+    "--meesho-collection": "MEESHO_COLLECTION_LINK",
     "--meesho-affid": "MEESHO_AFFID",
     "--flipkart": "FLIPKART_AFFID",
     "--cuelinks": "CUELINKS_TEMPLATE",

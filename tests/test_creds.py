@@ -307,3 +307,82 @@ class TestQaReadsTheEnvTag(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMeeshoCollectionLink(unittest.TestCase):
+    """R66b: the owner's own collection link is honoured, verbatim, from .env."""
+
+    OWNER = "https://affiliate.meesho.com/collection/MTEwNDEyMjY6Ojo6Ojpub3JtYWw="
+
+    def test_owner_link_is_accepted(self):
+        res = creds.validate_meesho_collection(self.OWNER)
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["link"], self.OWNER)
+
+    def test_earnkaro_wrapped_collection_is_refused(self):
+        res = creds.validate_meesho_collection(
+            "https://earnkaro.com/go?url=affiliate.meesho.com/collection/x")
+        self.assertFalse(res["ok"])
+
+    def test_random_url_is_refused_with_fix(self):
+        res = creds.validate_meesho_collection("https://example.com/deals")
+        self.assertFalse(res["ok"])
+        self.assertIn("affiliate.meesho.com", res["fix"])
+
+    def test_saved_into_env_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Path(tmp) / ".env"
+            env.write_text("# keep me\nMEESHO_TEMPLATE_LINK=x\n")
+            out = creds.apply_credentials([("MEESHO_COLLECTION_LINK", self.OWNER)],
+                                          path=env)
+            self.assertTrue(out["results"][0]["ok"])
+            text = env.read_text()
+            self.assertIn(f"MEESHO_COLLECTION_LINK={self.OWNER}", text)
+            self.assertIn("# keep me", text)
+
+    def test_status_board_lists_the_collection_link(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Path(tmp) / ".env"
+            creds.save_env({"MEESHO_COLLECTION_LINK": self.OWNER}, path=env)
+            text = "\n".join(creds.status_lines())
+        self.assertIn("Meesho collection", text)
+
+
+class TestMeeshoPlatformOverride(unittest.TestCase):
+    """Pinterest is the main platform and Meesho has no token for it."""
+
+    LINKS = ("https://www.meesho.com/af_invite/24197020:instagram_stories:11075346,"
+             "https://www.meesho.com/af_invite/24197020:facebook:11075421")
+
+    def _linker(self):
+        from bot.affiliate import AffiliateLinker
+
+        class Cfg:
+            amazon_tag = ""
+
+            def __init__(self, d):
+                self.d = d
+
+            def get(self, key, default=None):
+                return self.d.get(key, default)
+
+        cfg = Cfg({"affiliate.meesho_template_link": self.LINKS,
+                   "affiliate.meesho_platform_tokens": {"pinterest": "instagram_stories"}})
+        return AffiliateLinker(cfg)
+
+    def test_each_platform_gets_its_own_token(self):
+        lk = self._linker()
+        self.assertEqual(lk.meesho_source_for("instagram"), "instagram_stories")
+        self.assertEqual(lk.meesho_source_for("facebook"), "facebook")
+
+    def test_pinterest_uses_the_override(self):
+        lk = self._linker()
+        self.assertEqual(lk.meesho_source_for("pinterest"), "instagram_stories")
+        link = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "pinterest")
+        self.assertIn("24197020:instagram_stories:11075346", link)
+
+    def test_publisher_id_never_changes(self):
+        lk = self._linker()
+        for platform in ("instagram", "facebook", "pinterest", "youtube"):
+            link = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", platform)
+            self.assertIn("/af_invite/24197020:", link, platform)

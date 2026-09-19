@@ -50,7 +50,14 @@ class TestAffiliate(unittest.TestCase):
         # env tag wins over the config value inside AffiliateLinker.
         import os
         from unittest import mock
-        patcher = mock.patch.dict(os.environ, {"AMAZON_TAG": "mydeals-21"})
+        # R66b: the live .env now also carries the owner's Meesho links, which
+        # would win over cfg inside AffiliateLinker — pin those too.
+        patcher = mock.patch.dict(os.environ, {
+            "AMAZON_TAG": "mydeals-21",
+            "MEESHO_TEMPLATE_LINK": "",
+            "MEESHO_AFFID": "",
+            "MEESHO_COLLECTION_LINK": "",
+        })
         patcher.start()
         self.addCleanup(patcher.stop)
         self.l = AffiliateLinker(make_cfg())

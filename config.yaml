@@ -104,6 +104,11 @@ affiliate:
   meesho_template_link: ""   # paste your af_invite share link(s) — comma-separated.
                              # Each platform gets its own source token+campaign.
   meesho_per_platform: true  # build a platform-correct link per post (recommended)
+  # Meesho has no Pinterest token — map it to any of YOUR tokens so the
+  # Meesho report is not muddied (commission is unaffected either way:
+  # the publisher id decides where the money lands).
+  meesho_platform_tokens:
+    pinterest: instagram_stories
 
 seo:
   hashtags: true

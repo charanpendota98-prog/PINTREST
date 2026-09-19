@@ -20,7 +20,8 @@ from .earnkaro import validate_token as _validate_ekaro_token
 ENV_ORDER = (
     "PINTEREST_APP_ID", "PINTEREST_APP_SECRET", "PINTEREST_ACCESS_TOKEN",
     "PINTEREST_REFRESH_TOKEN", "AMAZON_TAG", "MEESHO_TEMPLATE_LINK",
-    "MEESHO_AFFID", "FLIPKART_AFFID", "EARNKARO_PREFIX", "EARNKARO_API_TOKEN",
+    "MEESHO_AFFID", "MEESHO_COLLECTION_LINK", "FLIPKART_AFFID",
+    "EARNKARO_PREFIX", "EARNKARO_API_TOKEN",
     "CUELINKS_TEMPLATE",
     "INSTAGRAM_TOKEN", "IG_USER_ID", "FB_PAGE_TOKEN", "FB_PAGE_ID",
 )
@@ -108,8 +109,27 @@ def validate_meesho(value: str) -> dict:
             "fix": "affiliate.meesho.com → 'Get commission link' (af_invite)."}
 
 
+def validate_meesho_collection(value: str) -> dict:
+    """The owner's own affiliate.meesho.com/collection/… 'all deals' link.
+
+    It is used verbatim as the landing-page CTA — never rewritten (R21).
+    """
+    v = str(value or "").strip().strip("'\"")
+    if not v:
+        return {"ok": False, "error": "Khali undi."}
+    if "collection" in v and "meesho" in v:
+        if "earnkaro" in v or "ekaro" in v:
+            return {"ok": False, "error": "Idi EarnKaro wrapped — Meesho direct kavali (R26)."}
+        return {"ok": True, "link": v,
+                "note": "Landing pages lo 'Browse More Deals' CTA ga vadutundi (verbatim)."}
+    return {"ok": False,
+            "error": "affiliate.meesho.com/collection/… link la kanipistaledu.",
+            "fix": "affiliate.meesho.com → 'Browse deals' → collection link copy."}
+
+
 VALIDATORS = {
     "AMAZON_TAG": validate_amazon_tag,
+    "MEESHO_COLLECTION_LINK": validate_meesho_collection,
     "EARNKARO_PREFIX": classify_earnkaro,
     "EARNKARO_API_TOKEN": validate_earnkaro_token,
     "MEESHO_TEMPLATE_LINK": validate_meesho,
@@ -229,6 +249,7 @@ def status_lines(cfg=None) -> list[str]:
     amazon = _val("AMAZON_TAG", "affiliate.amazon_tag")
     meesho = _val("MEESHO_TEMPLATE_LINK", "affiliate.meesho_template_link")
     meesho_aff = _val("MEESHO_AFFID", "affiliate.meesho_affid")
+    meesho_coll = _val("MEESHO_COLLECTION_LINK", "affiliate.meesho_collection_link")
     ekaro = _val("EARNKARO_PREFIX", "affiliate.earnkaro_prefix")
     ekaro_tok = _env("EARNKARO_API_TOKEN") or _env("EARNKARO_TOKEN")
     ekaro_who = ""
@@ -257,6 +278,8 @@ def status_lines(cfg=None) -> list[str]:
         f"   {mark(bool(meesho))} Meesho af_invite     : "
         f"{'set (DIRECT commission ✅)' if meesho else '(not set)'}"
         + (f"  [affid: {meesho_aff}]" if meesho_aff else ""),
+        f"   {mark(bool(meesho_coll))} Meesho collection    : "
+        f"{'set (landing CTA, verbatim ✅)' if meesho_coll else '(not set)'}",
         f"   {mark(bool(ekaro_tok))} EarnKaro API token  : "
         f"{ekaro_who or '(not set)'}"
         + ("   ← every store auto-converts ✅" if ekaro_tok else ""),

@@ -708,8 +708,9 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                                       disc=disc, img=hero, page_url=page_url,
                                       buy=p["affiliate_url"], pid=pid, wa=wa,
                                       wa_on=bool(cfg.get("link.whatsapp_share", False)),
-                                      more=str(cfg.get("affiliate.meesho_collection_link",
-                                                       "") or ""),
+                                      more=str(os.getenv("MEESHO_COLLECTION_LINK", "")
+                                               or cfg.get("affiliate.meesho_collection_link",
+                                                          "") or ""),
                                       brand=cfg.get("design.brand_name", "Deal Drops"),
                                       handle=_handle, pin_profile=_pin_profile,
                                       same_as=_same_as)
