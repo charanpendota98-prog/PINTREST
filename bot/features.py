@@ -18,6 +18,10 @@ FEATURES = [
      "duplicate pins; downloads are PIL-verified (an HTML error page or a "
      "1x1 pixel can never become a product photo)",
      lambda cfg: True, "always on (scraper.normalize_image_url)"),
+    ("Oracle idle-guard", "safety",
+     "Always-Free VM ni Oracle reclaim cheyyakunda CPU+memory duty cycle tho "
+     "busy ga unchutundi (PAYG aithe avasaram ledu)",
+     lambda cfg: True, "python -m bot keepalive  (VM lo optional)"),
     ("Blank-media guard", "safety",
      "a pin that rendered blank (design failure) is quarantined, never posted",
      lambda cfg: True, "always on (qa.pin_is_blank)"),
@@ -545,7 +549,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   719 automated tests.
+   724 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

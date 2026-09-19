@@ -876,6 +876,17 @@ venv + requirements → `data/`+`logs/` → `.env` checklist → `deploy.sh`
 falls back to the system ffmpeg (which the script installs), and points
 imageio-ffmpeg at it via `IMAGEIO_FFMPEG_EXE`. Reels keep rendering.
 
+**⚠️ Oracle idle-reclaim (Always Free):** OCI may RECLAIM an instance that
+looks idle for 7 days — CPU 95th percentile < 10%, network < 10%, and (A1
+shapes) memory < 10%. A mostly-waiting bot can trip that.
+Two fixes: **(a) upgrade the account to Pay-As-You-Go** — Always-Free
+resources stay free (set a $1 billing alert) and the reclaim rule does not
+apply; **(b) `python -m bot keepalive`** — a bounded duty cycle (default 13%
+of total CPU per minute + ~1 GB resident memory) keeps the instance measurably
+busy. Run it under systemd: `ExecStart=…/python -m bot keepalive`.
+`--once` does a single cycle (cron-friendly), `--duty N` / `--mem-mb N`
+tune it, `--no-mem` skips the memory block.
+
 **Security:** never open port 5000 to the internet. Reach the panel through an
 SSH tunnel — `ssh -L 5000:127.0.0.1:5000 ubuntu@<vm-ip>` → http://localhost:5000.
 Oracle's default security list already blocks it; leave it that way.

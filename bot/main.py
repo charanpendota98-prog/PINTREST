@@ -1387,6 +1387,27 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_pin_stats(cfg, rest)
     if cmd == "trends" and rest and rest[0] == "--live":
         return cmd_trends_live(cfg)
+    if cmd == "keepalive":
+        from .keepalive import DEFAULT_CYCLE, DEFAULT_MEM_MB, DEFAULT_TARGET_PCT, run_forever
+        duty = DEFAULT_TARGET_PCT
+        mem = DEFAULT_MEM_MB
+        once = "--once" in rest
+        if "--duty" in rest:
+            try:
+                duty = float(rest[rest.index("--duty") + 1])
+            except (IndexError, ValueError):
+                print("Usage: --duty 13  (percent of total CPU)")
+                return 2
+        if "--mem-mb" in rest:
+            try:
+                mem = int(rest[rest.index("--mem-mb") + 1])
+            except (IndexError, ValueError):
+                print("Usage: --mem-mb 1024")
+                return 2
+        if "--no-mem" in rest:
+            mem = 0
+        run_forever(target_pct=duty, mem_mb=mem, cycle=DEFAULT_CYCLE, once=once)
+        return 0
     if cmd in ("telegram", "tg"):
         return cmd_telegram(cfg, rest)
     if cmd == "platforms":

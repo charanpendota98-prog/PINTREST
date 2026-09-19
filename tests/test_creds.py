@@ -1035,3 +1035,46 @@ class TestTelegramChannelBroadcast(unittest.TestCase):
         n = Notifier()
         n.token, n.deals_channel = "tok", ""
         self.assertFalse(n.deal("t", "₹1", "https://l"))
+
+
+class TestOracleIdleGuard(unittest.TestCase):
+    """R76 — Oracle reclaims Always-Free instances that look idle for 7 days."""
+
+    def test_plan_hits_the_target_fraction(self):
+        from bot.keepalive import keepalive_plan
+        busy, rest = keepalive_plan(2, 13.0, 60.0)
+        self.assertAlmostEqual(busy, 15.6, places=1)      # 13% of 2 cores × 60s
+        self.assertAlmostEqual(rest, 44.4, places=1)
+        util = busy / (60.0 * 2)                          # fraction of machine
+        self.assertGreaterEqual(util, 0.10)               # above the 10% line
+
+    def test_plan_is_bounded_and_clamps_bad_input(self):
+        from bot.keepalive import keepalive_plan
+        busy, rest = keepalive_plan(1, 9000, 60)          # absurd target
+        self.assertLessEqual(busy, 30.0)                  # never hog the box
+        self.assertGreater(rest, 0)
+        busy, _ = keepalive_plan(0, 12, 5)                # bad cpu/cycle
+        self.assertGreater(busy, 0)
+
+    def test_cpu_burn_actually_uses_time(self):
+        import time
+        from bot.keepalive import cpu_burn
+        t0 = time.monotonic()
+        cpu_burn(0.25)
+        self.assertGreaterEqual(time.monotonic() - t0, 0.2)
+
+    def test_memory_hold_is_resident_and_optional(self):
+        from bot.keepalive import hold_memory
+        self.assertEqual(len(hold_memory(0)), 0)
+        buf = hold_memory(2)
+        self.assertEqual(len(buf), 2 * 1024 * 1024)
+        self.assertEqual(buf[0], 1)                       # pages really touched
+
+    def test_once_returns_after_one_cycle(self):
+        import io
+        import contextlib
+        from bot.keepalive import run_forever
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            run_forever(target_pct=1.0, mem_mb=0, cycle=10.0, once=True)
+        self.assertIn("one cycle done", out.getvalue())
