@@ -374,6 +374,17 @@ Saved handle (`brand.handle`) 4 chotla pani chestundi:
 > domain petti, appudu claim cheyyandi (`python -m bot claim`).
 
 ### 3. Secrets — copy `.env.example` → `.env` and fill in
+
+> 🔑 **Easier: `python -m bot creds --amazon <tag> --earnkaro <ekaro.in/enkr…>`**
+> — validate chesi .env lo save chestundi (comments safe, `chmod 600`), tarvata
+> status chupistundi. Thappu format isthe save cheyyadu, enduku + fix cheptundi.
+
+> ⚠️ **EarnKaro referral link (`earnkaro.com?r=…`) pani cheyyadu** — adi vere
+> vaallu EarnKaro join ayye link, product clicks ki commission raadu. Kavalsinadi
+> **deeplink prefix** (`https://ekaro.in/enkr…`) — EarnKaro dashboard lo
+> "Create affiliate link" → adi copy. Bot daaniki `?url=<product>` append
+> chestundi. Ledu ante aa store links (Flipkart/Myntra/Ajio) ki tracking ledu →
+> QA gate aa pins ni **quarantine** chestundi (leak avvadu, kani post avvavu).
 ```bash
 cp .env.example .env
 # edit .env:

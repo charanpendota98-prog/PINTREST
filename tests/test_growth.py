@@ -166,6 +166,14 @@ class TestQAGate(unittest.TestCase):
         from bot.db import DB
         from bot import qa
         cfg = load_config()
+        # R65: the repo ships a real .env now; keep these assertions about the
+        # config values deterministic by pinning the env tag.
+        import os
+        from unittest import mock
+        env = mock.patch.dict(os.environ, {"AMAZON_TAG": ""})
+        env.start()
+        self.addCleanup(env.stop)
+        cfg.raw.setdefault("affiliate", {})["amazon_tag"] = "me-21"
         with tempfile.TemporaryDirectory() as tmp:
             img = Path(tmp) / "p.jpg"
             Image.new("RGB", (900, 900), "white").save(img)

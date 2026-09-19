@@ -19,6 +19,7 @@ Usage:
   python -m bot app [--site URL]         # 📝 Pinterest app form — exact answers
   python -m bot app --where              # 🧭 app page open cheyyadam ela (click path)
   python -m bot app --pending            # ⏳ trial pending lo emi lock, emi cheyyochu
+  python -m bot creds [--amazon T --earnkaro P …]  # 🔑 validate + save credentials
   python -m bot token-check [--write-test]  # 🔐 token entha cheyyagaladu (live)
   python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
   python -m bot name --next              # 🚨 handle taken? → variants + auto-pick
@@ -925,6 +926,66 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+CRED_FLAGS = {
+    "--amazon": "AMAZON_TAG",
+    "--earnkaro": "EARNKARO_PREFIX",
+    "--meesho": "MEESHO_TEMPLATE_LINK",
+    "--meesho-affid": "MEESHO_AFFID",
+    "--flipkart": "FLIPKART_AFFID",
+    "--cuelinks": "CUELINKS_TEMPLATE",
+    "--pin-token": "PINTEREST_ACCESS_TOKEN",
+    "--pin-id": "PINTEREST_APP_ID",
+    "--pin-secret": "PINTEREST_APP_SECRET",
+}
+
+
+def cmd_creds(cfg, rest: list[str]) -> int:
+    """🔑 Validate + save credentials (.env); explain anything wrong."""
+    from . import creds as _creds
+    pairs: list[tuple[str, str]] = []
+    i = 0
+    while i < len(rest):
+        word = rest[i]
+        key = CRED_FLAGS.get(word)
+        if key and i + 1 < len(rest):
+            pairs.append((key, rest[i + 1]))
+            i += 2
+            continue
+        if word.startswith("--") and "=" in word:
+            flag, value = word.split("=", 1)
+            key = CRED_FLAGS.get(flag)
+            if key:
+                pairs.append((key, value))
+                i += 1
+                continue
+        i += 1
+
+    print()
+    if pairs:
+        res = _creds.apply_credentials(pairs)
+        for item in res["results"]:
+            if item["ok"]:
+                print(f"✅ {item['key']} saved: {item['value']}")
+                if item.get("note"):
+                    print(f"   ℹ️ {item['note']}")
+            else:
+                print(f"❌ {item['key']} NOT saved: {item['error']}")
+                if item.get("fix"):
+                    print(f"   → {item['fix']}")
+        if res["saved"]["saved"]:
+            print(f"\n   .env updated ({', '.join(res['saved']['keys'])}) — "
+                  "chmod 600 ✅")
+    # reload so the status below reflects what was just written
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except Exception:  # noqa: BLE001 — dotenv optional at import time
+        pass
+    print("\n".join(_creds.status_lines(cfg)))
+    print()
+    return 0
+
+
 def cmd_token_check(cfg, rest: list[str]) -> int:
     """🔐 What can the current Pinterest token actually do? (live proof)"""
     from . import tokencheck as _tc
@@ -1329,6 +1390,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd in ("creds", "credentials", "keys"):
+        return cmd_creds(cfg, rest)
     if cmd in ("token-check", "tokencheck", "whoami"):
         return cmd_token_check(cfg, rest)
     if cmd in ("app", "app-form", "appform"):

@@ -84,7 +84,11 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
         u = urlparse(link)
         if u.scheme not in ("http", "https"):
             issues.append(f"link scheme invalid: {u.scheme!r}")
-        tag = str(cfg.get("affiliate.amazon_tag", "")).strip()
+        # read the tag through the property: it checks .env first, then config
+        # (R65 — the owner's real tag lives in .env, so the config-only read
+        # silently skipped this revenue-leak check)
+        tag = str(getattr(cfg, "amazon_tag", "")
+                  or cfg.get("affiliate.amazon_tag", "")).strip()
         if tag and "amazon" in u.netloc and f"tag={tag}" not in link:
             issues.append("amazon link missing your affiliate tag — revenue leak!")
         # 💰 COMMISSION-LEAK GUARD: untracked link = clicks that pay nobody

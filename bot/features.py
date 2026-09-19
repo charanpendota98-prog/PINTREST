@@ -340,6 +340,17 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+25) CREDENTIAL INTAKE + LEAK PROOF (R65)
+   🔑 `python -m bot creds [--amazon T --earnkaro P --meesho L …]`: prati
+   credential ni **validate chesi** .env lo save chestundi (comments safe,
+   chmod 600). Amazon tag format check, Meesho af_invite check, and EarnKaro
+   **classification** — referral link (earnkaro.com?r=…) aithe "product clicks ki
+   commission raadu, ekaro.in deeplink prefix kavali" ani cheptundi.
+   🛡️ QA leak check bug fix: `qa.py` tag ni ippudu **.env nunchi** chaduvutundi
+   (mundu config matrame → .env lo tag unte aa check silent ga skip ayyedi).
+   Ippudu: tag leni Amazon link → "revenue leak!" · tracking leni link →
+   "COMMISSION LEAK — pin quarantined" (leak ledu, kani aa store creds add cheyyali).
+
 24) TRIAL-PENDING STATE, HONESTLY (R64)
    ⏳ `python -m bot app --pending`: 'Trial access pending' lo Pinterest app
    CONFIG ni lock chestundi (App secret + Redirect URLs grey/disabled) — owner
@@ -421,7 +432,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   552 automated tests.
+   582 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

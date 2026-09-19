@@ -45,6 +45,14 @@ class TestSourceDetect(unittest.TestCase):
 
 class TestAffiliate(unittest.TestCase):
     def setUp(self):
+        # R65: the repo now ships a real .env (owner credentials), so these tests
+        # must pin the env instead of inheriting whatever the machine has — the
+        # env tag wins over the config value inside AffiliateLinker.
+        import os
+        from unittest import mock
+        patcher = mock.patch.dict(os.environ, {"AMAZON_TAG": "mydeals-21"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.l = AffiliateLinker(make_cfg())
 
     def test_amazon_tag_added(self):
