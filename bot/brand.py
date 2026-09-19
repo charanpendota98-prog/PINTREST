@@ -207,6 +207,81 @@ def save(cfg, name: str, path: str | Path | None = None) -> dict:
     return {"saved": wrote, "strip": strip, "name": name, "bio": bio, **check}
 
 
+BLOCKED_WEBSITE_HOSTS = (
+    "t.me", "telegram.me", "telegram.dog", "wa.me", "whatsapp.com",
+    "chat.whatsapp.com", "linktr.ee", "bit.ly", "tinyurl.com", "rb.gy",
+    "cutt.ly", "shorturl.at", "is.gd", "cuelinks.com", "earnkaro.com",
+    "amzn.to", "fkrt.it",
+)
+
+
+def website_advice(url: str) -> tuple[str, str]:
+    """Pinterest profile 'Website' field — (verdict, reason).
+
+    The field is NOT decoration: it is what Pinterest lets you claim, and an
+    unclaimable link is both useless (no Rich Pins / attribution) and a spam
+    signal. So answer honestly instead of letting the owner paste anything.
+    """
+    url = (url or "").strip()
+    if not url:
+        return ("empty",
+                "Ippudu blank ga vadileyyandi. Deploy ayyaka mana landing "
+                "domain (link.public_base) pettandi — appudu claim cheyyochu "
+                "(Rich Pins + attribution free reach).")
+    if "://" in url:
+        host = url.split("://", 1)[1].split("/", 1)[0].lower()
+    else:
+        host = url.split("/", 1)[0].lower()
+    host = host.split(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    for bad in BLOCKED_WEBSITE_HOSTS:
+        if host == bad or host.endswith("." + bad):
+            return ("warn",
+                    f"'{host}' ni profile website ga pettakandi: Pinterest idi "
+                    "claim cheyyanivvadu (Rich Pins + content attribution "
+                    "pothayi) and loot-deal shortlinks ni spam pattern ga "
+                    "chustundi — reach padipothundi. Telegram channel ni bot "
+                    "broadcast/Deals-of-the-Day lo promote cheyyandi.")
+    return ("ok",
+            f"'{host}' nee own domain — deploy ayyaka Settings → Claimed "
+            "accounts → Claim website lo ide URL tho claim cheyyandi.")
+
+
+def profile_form(cfg, name: str = "") -> list[str]:
+    """Field-by-field values for Pinterest's 'Edit profile' form."""
+    display = name
+    try:
+        display = display or str(cfg.get("brand.display_name", "") or "")
+    except Exception:  # noqa: BLE001 — the form must always print
+        pass
+    display = display or "PinDrop Deals | Home & Kitchen"
+    bio = bio_for(display.split("|")[0].strip() or "PinDrop Deals")
+    try:
+        bio = str(cfg.get("brand.bio", "") or "") or bio
+    except Exception:  # noqa: BLE001
+        pass
+    site = ""
+    try:
+        site = str(cfg.get("link.public_base", "") or "")
+    except Exception:  # noqa: BLE001
+        pass
+    verdict, reason = website_advice(site)
+    mark = {"empty": "⏸ ", "warn": "⛔", "ok": "✅"}.get(verdict, "•")
+    return [
+        "📝 PINTEREST 'EDIT PROFILE' FORM — field by field:",
+        f"   Name       → {display}",
+        "                (idi KEYWORD field — search lo ide kanipistundi)",
+        f"   Username   → {pin_strip(display).lower().replace(' ', '')}"
+        "                  (@handle; Name lo handle pettakandi)",
+        f"   About      → {bio}",
+        "   Pronouns   → (blank — brand account ki avasaram ledu)",
+        f"   Website    → {site or '(blank until deploy)'}",
+        f"   {mark} {reason}",
+        "",
+    ]
+
+
 def lines(cfg, name: str = "") -> list[str]:
     """CLI output: the rules, the ideas, and ready-to-paste fields."""
     current_strip = str(cfg.get("design.brand_name", "") or "")
@@ -248,7 +323,8 @@ def lines(cfg, name: str = "") -> list[str]:
             out.append(f"   ⚠️ {w}")
         for e in check["errors"]:
             out.append(f"   ⛔ {e}")
-    out += ["", "📋 READY-TO-PASTE PROFILE FIELDS:",
+    out += [""] + profile_form(cfg, name)
+    out += ["📋 READY-TO-PASTE PROFILE FIELDS:",
             f"   Display name: {name or '(pick one above)'}",
             f"   Bio ({BIO_MAX} max): {bio_for(name or 'PinDrop Deals')}"]
     out.append("   Boards to create:")

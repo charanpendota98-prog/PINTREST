@@ -155,6 +155,17 @@ including comments, untouched.
 Also pick the **username/handle** as the plain brand (e.g. `pindropdeals`) and
 use the same handle on Instagram so the two accounts reinforce each other.
 
+> 📝 `python -m bot brand` ippudu Pinterest **"Edit profile" form ni
+> field-by-field** print chestundi — Name (keyword field), Username (@handle),
+> About (bio), Pronouns (blank), Website (**warning tho**).
+>
+> ⚠️ **Common trap:** `pindropdeals` ni **Name** field lo pettakandi (appudu
+> keyword poyindi) — adi **Username** field lo pettali.
+> ⚠️ **Website field lo `t.me` / `wa.me` / shortener links pettakandi** —
+> Pinterest vaatini claim cheyyanivvadu (Rich Pins + attribution pothayi) and
+> loot-deal links ni spam pattern ga chustundi. Deploy ayyaka mana landing
+> domain petti, appudu claim cheyyandi (`python -m bot claim`).
+
 ### 3. Secrets — copy `.env.example` → `.env` and fill in
 ```bash
 cp .env.example .env

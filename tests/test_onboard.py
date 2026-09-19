@@ -75,6 +75,13 @@ class TestOnboardSheet(unittest.TestCase):
         src = (Path(__file__).resolve().parents[1] / "bot" / "main.py").read_text()
         self.assertIn('if cmd in ("onboard", "onboarding")', src)
 
+    def test_profile_form_trap_row_present(self):
+        text = "\n".join(onboard.lines())
+        self.assertIn("Name vs Username", text)
+        self.assertIn("Username field → pindropdeals", text)
+        self.assertIn("t.me", text)          # website warning
+        self.assertIn("@handle", text)
+
     def test_reads_real_config_without_crash(self):
         repo = Path(__file__).resolve().parents[1] / "config.yaml"
         text = "\n".join(onboard.lines(load_config(repo)))

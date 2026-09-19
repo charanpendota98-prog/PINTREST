@@ -65,6 +65,18 @@ SCREENS: list[tuple[str, str, str, str]] = [
         "do it (2 min)",
     ),
     (
+        "Edit profile form: Name vs Username (common trap!)",
+        "Name field → 'PinDrop Deals | Home & Kitchen'   ·   "
+        "Username field → pindropdeals   ·   About → bot bio   ·   "
+        "Pronouns → blank   ·   Website → blank (deploy tarvata mana domain)",
+        "Name = ranked keyword field (search lo ide kanipistundi), Username = "
+        "@handle. Handle ni Name lo pettadam valla keyword poyindi — ee trap "
+        "lo chala mandi padatharu. Website field lo t.me / wa.me / shortener "
+        "link pettakandi: Pinterest claim cheyyanivvadu (Rich Pins + "
+        "attribution povu) and loot-deal links ni spam ga chustundi.",
+        "do it (2 min)",
+    ),
+    (
         "Connected accounts (Instagram / YouTube / Etsy)",
         "Instagram claim cheyyandi (bot already IG API tho post chestundi)",
         "Claimed account = ne pins meeda ne peru + analytics. "

@@ -210,8 +210,6 @@ class TestCliAndLines(unittest.TestCase):
             self.assertEqual(code, 2)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestOnboardingGuidance(unittest.TestCase):
@@ -236,3 +234,72 @@ class TestOnboardingGuidance(unittest.TestCase):
                        "Brand focus"):
             self.assertIn(needle, src)
         self.assertIn("Brand focus: Home", ready)
+
+class TestWebsiteAdvice(unittest.TestCase):
+    """R53: the Pinterest 'Website' field is claimable-or-useless, never random."""
+
+    def test_telegram_and_shorteners_are_refused(self):
+        for url in ("http://t.me/LootZoneIndia11", "https://wa.me/91999",
+                    "https://bit.ly/abc", "https://linktr.ee/me",
+                    "https://amzn.to/xyz"):
+            verdict, reason = brand.website_advice(url)
+            self.assertEqual(verdict, "warn", url)
+            self.assertTrue(reason)
+
+    def test_empty_is_empty_not_error(self):
+        self.assertEqual(brand.website_advice("")[0], "empty")
+        self.assertEqual(brand.website_advice("   ")[0], "empty")
+
+    def test_own_domain_is_ok(self):
+        for url in ("https://pindropdeals.in", "pindropdeals.in",
+                    "http://shop.example.com:8080/x"):
+            self.assertEqual(brand.website_advice(url)[0], "ok", url)
+
+    def test_subdomain_of_blocked_host_still_blocked(self):
+        self.assertEqual(brand.website_advice("https://www.t.me/x")[0], "warn")
+
+
+class TestProfileForm(unittest.TestCase):
+    def _cfg(self, **raw):
+        base = {"storage": {"db_path": "/tmp/nope.db", "media_dir": "/tmp/nope"},
+                "dashboard": {"password": "", "secret_key": "t"}}
+        base.update(raw)
+        return Config(raw=base)
+
+    def test_field_by_field_values(self):
+        text = "\n".join(brand.profile_form(
+            self._cfg(brand={"display_name": "Ghar Finds | Home & Kitchen",
+                             "bio": "Home finds under 499"},
+                      link={"public_base": ""})))
+        self.assertIn("Name       → Ghar Finds | Home & Kitchen", text)
+        self.assertIn("Username   → gharfinds", text)
+        self.assertIn("Home finds under 499", text)
+        self.assertIn("Pronouns", text)
+        self.assertIn("blank until deploy", text)
+
+    def test_telegram_website_warns_in_the_form(self):
+        text = "\n".join(brand.profile_form(
+            self._cfg(link={"public_base": "http://t.me/LootZoneIndia11"})))
+        self.assertIn("⛔", text)
+        self.assertIn("claim cheyyanivvadu", text)
+
+    def test_own_website_shows_claim_step(self):
+        text = "\n".join(brand.profile_form(
+            self._cfg(brand={"display_name": "PinDrop Deals | Home & Kitchen"},
+                      link={"public_base": "https://pindropdeals.in"})))
+        self.assertIn("✅", text)
+        self.assertIn("Claim website", text)
+
+    def test_form_never_raises_on_broken_config(self):
+        class Boom:
+            def get(self, *a, **k):
+                raise RuntimeError("bad config")
+        text = "\n".join(brand.profile_form(Boom()))
+        self.assertIn("Name", text)
+
+    def test_cli_lines_include_the_form(self):
+        out = "\n".join(brand.lines(self._cfg(), "PinDrop Deals | Home & Kitchen"))
+        self.assertIn("EDIT PROFILE", out)
+
+if __name__ == "__main__":
+    unittest.main()
