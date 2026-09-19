@@ -131,6 +131,38 @@ python -m bot claim <TOKEN>         # meta tag inject + file route ON
 > **Next** click chesi skip cheyyochu, tarvata eppudaina cheyyochu.
 > Kani deploy tarvata idi cheyyadam = free extra reach (Rich Pins).
 
+**2a-4. Pinterest "Connect app" form — field by field (EE ANSWERS PEDU)**
+
+App review forms ki **company website + privacy policy link** kavali. Bot eh
+aa pages ni serve chestundi (third-party site avasaram ledu):
+
+| Page | URL (nee domain tho) | Em untundi |
+|---|---|---|
+| About | `https://yourdomain.com/about` | Company page — brand, what we do, how we earn, contact |
+| Privacy | `https://yourdomain.com/privacy` | Data: email only if subscribe, anonymous click counts, no selling |
+| Terms | `https://yourdomain.com/terms` | Prices/stock retailer-side, affiliate disclosure, liability |
+
+Ee moodu **public** (login ledu) and domain-verify meta tag kuda veetilo
+padutundi (`python -m bot claim <token>` tarvata).
+
+Form answers (personal-use app ki — idi correct, honest route):
+
+| Field | Answer |
+|---|---|
+| App name | `Gharvanaa Deals Publisher` (company name undi, "Pinterest" ledu) |
+| Company name | `Gharvanaa` |
+| Company website | `https://yourdomain.com/about` |
+| Privacy policy | `https://yourdomain.com/privacy` |
+| App purpose | **Personal API access (single, personal use)** |
+| Who are you sharing access with? | **Only me / Myself** |
+| Use cases | Pin creation & scheduling ✅ · Publishing content on Pinterest ✅ · Getting data about your account ✅ · Reporting ✅ (migilinavi vaddu) |
+| Audience | **Businesses** (nee business ee app vaadutundi) |
+| Reads Pins/Boards data | **Yes, mine** (own pins/boards matrame) |
+
+> 🔒 **Takuva scopes = easy review + safe account.** Ad campaign / Pinner App /
+> Ecommerce / Recommendations vaddu — avi nee use case kaadu — review slow avutundi, extra questions vasthayi.
+> 🖼️ App icon: `brand/app_icon_1024.png` (house+heart+bag, Pinterest logo ledu).
+
 **2b. Developer app (API access):**
 1. Go to **https://developers.pinterest.com/apps/** → *Create app*.
 2. In the app: add the redirect URI exactly as: `http://localhost:8888/callback`

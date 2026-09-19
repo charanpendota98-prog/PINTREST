@@ -340,6 +340,15 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+20) APP-REVIEW READY PUBLIC PAGES (R60)
+   🌐 Bot eh serve chestundi: `/about` (company page), `/privacy` (privacy
+   policy), `/terms` (terms of use) — Pinterest/Meta app forms adigevi, real
+   URLs tho, dummy link ledu. Anni **public** (login ledu), domain-verify meta
+   tag kuda ivi meeda padutundi, landing/deals footers nunchi link avutundi.
+   📧 `brand.contact_email` config lo pettandi (khali unte Pinterest profile
+   contact ga chupistundi). Content honest: affiliate disclosure, "no selling
+   of data", prices retailer-side.
+
 19) BRAND COHERENCE GUARD (R59)
    ✅ `bot ready` ippudu pin strip vs NAME field ni word-boundary tho compare
    chestundi (prefix kaadu): strip `Gharvana` + name `Gharvanaa | ...` laanti
@@ -376,7 +385,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   489 automated tests.
+   500 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

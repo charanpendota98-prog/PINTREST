@@ -27,7 +27,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # ── Pages that MUST stay public: they are the money path (pins → landing →
 #    affiliate link). Everything else is the admin panel and is password-locked.
-PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/deals/today"}
+PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico",
+                "/deals/today", "/about", "/privacy", "/terms"}
 PUBLIC_PREFIX = ("/go/", "/subscribe/", "/media/", "/pinterest-")
 
 LOGIN_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -200,7 +201,11 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
   </form>
   {% if pin_profile %}<a class="more" rel="me" href="{{ pin_profile }}">📌 Follow @{{ handle }} for daily deals</a>{% endif %}
   <div class="disc">As an affiliate partner we may earn from qualifying purchases.
-  Price can change anytime — check the store for the live price.</div>
+  Price can change anytime — check the store for the live price.<br>
+  <a href="/about" style="color:#999">About</a> ·
+  <a href="/privacy" style="color:#999">Privacy</a> ·
+  <a href="/terms" style="color:#999">Terms</a> ·
+  <a href="/deals/today" style="color:#999">Today's deals</a></div>
 </div></div></body></html>"""
 
 
@@ -229,9 +234,210 @@ DEALS_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
   <a class="btn" rel="nofollow sponsored" href="{{ p.buy }}">GRAB →</a>
 </div>
 {% endfor %}
-<div class="disc">As an affiliate partner we may earn from qualifying purchases.</div>
+<div class="disc">As an affiliate partner we may earn from qualifying purchases.<br>
+<a href="/about" style="color:#999">About</a> ·
+<a href="/privacy" style="color:#999">Privacy</a> ·
+<a href="/terms" style="color:#999">Terms</a></div>
 </div></body></html>"""
 
+
+ABOUT_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About {{ brand }} — hand-picked deals</title>
+<meta name="description" content="{{ brand }} curates verified home, kitchen, fashion and beauty deals under \u20b9999 and publishes them on Pinterest.">
+<style>
+ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222;line-height:1.6}
+ .wrap{max-width:640px;margin:0 auto;background:#fff;min-height:100vh;padding:0 0 30px;
+       box-shadow:0 0 40px rgba(0,0,0,.06)}
+ header{background:#E60023;color:#fff;padding:26px 22px}
+ header h1{margin:0;font-size:26px;letter-spacing:.5px}
+ header p{margin:6px 0 0;opacity:.95;font-size:14px}
+ main{padding:22px}
+ h2{font-size:17px;margin:26px 0 8px}
+ ul{padding-left:20px;margin:8px 0}
+ li{margin:4px 0}
+ a{color:#E60023}
+ .links a{display:inline-block;background:#111;color:#fff;text-decoration:none;
+   padding:10px 16px;border-radius:10px;margin:4px 8px 4px 0;font-weight:700;font-size:14px}
+ .links a.ig{background:#C13584}
+ .disc{color:#777;font-size:12.5px;padding:16px 22px}
+ footer{border-top:1px solid #eee;padding:14px 22px;font-size:13px}
+ footer a{margin-right:14px;color:#444;text-decoration:none}
+</style></head><body><div class="wrap">
+<header><h1>{{ brand }}</h1>
+<p>Hand-picked home, kitchen, fashion &amp; beauty deals under \u20b9999</p></header>
+<main>
+<p>Welcome to <strong>{{ brand }}</strong>. We find useful products from Indian
+marketplaces, check the current price, and publish them as easy-to-browse pins on
+Pinterest — organisers, kitchen gadgets, kurtas, skincare, kids' picks and
+festive finds.</p>
+
+<h2>What we do</h2>
+<ul>
+ <li>Curate deals daily and publish them on Pinterest (and Instagram).</li>
+ <li>Link every pin to the retailer's product page — no reselling, no stock.</li>
+ <li>Show the price we saw at the time of publishing; retailers can change it.</li>
+</ul>
+
+<h2>How we earn</h2>
+<p>Some links are affiliate links. If you buy through them, we may earn a small
+commission from the retailer — <strong>at no extra cost to you</strong>. It never
+changes the price you pay.</p>
+
+<h2>Follow the deals</h2>
+<div class="links">
+{% if pin_profile %}<a rel="me" href="{{ pin_profile }}">Pinterest</a>{% endif %}
+{% if ig_profile %}<a class="ig" rel="me" href="{{ ig_profile }}">Instagram</a>{% endif %}
+<a href="/deals/today">Today's deals</a>
+</div>
+
+<h2>Contact</h2>
+<p>{% if contact_email %}Email: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}Reach us on Pinterest{% if pin_profile %} (<a rel="me" href="{{ pin_profile }}">@{{ handle }}</a>){% endif %} — we reply to messages there.{% endif %}</p>
+
+<h2>Disclosure</h2>
+<p>As an affiliate partner we may earn from qualifying purchases. Prices and
+availability are shown as seen at publishing time and can change on the
+retailer's site.</p>
+</main>
+<footer><a href="/deals/today">Deals</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+<div class="disc">Last updated: {{ updated }}</div>
+</div></body></html>"""
+
+
+PRIVACY_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy — {{ brand }}</title>
+<meta name="description" content="How {{ brand }} handles data: email only if you subscribe to deal alerts, anonymous click counts, no selling of data.">
+<style>
+ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222;line-height:1.65}
+ .wrap{max-width:640px;margin:0 auto;background:#fff;min-height:100vh;padding:0 0 30px;
+       box-shadow:0 0 40px rgba(0,0,0,.06)}
+ header{background:#111;color:#fff;padding:26px 22px}
+ header h1{margin:0;font-size:23px}
+ header p{margin:6px 0 0;opacity:.85;font-size:13.5px}
+ main{padding:22px}
+ h2{font-size:16.5px;margin:24px 0 6px}
+ ul{padding-left:20px;margin:6px 0}
+ li{margin:4px 0}
+ a{color:#E60023}
+ footer{border-top:1px solid #eee;padding:14px 22px;font-size:13px}
+ footer a{margin-right:14px;color:#444;text-decoration:none}
+</style></head><body><div class="wrap">
+<header><h1>Privacy policy</h1><p>{{ brand }} — effective {{ updated }}</p></header>
+<main>
+<h2>Who we are</h2>
+<p>{{ brand }} publishes curated product deals on Pinterest{% if pin_profile %}
+(<a rel="me" href="{{ pin_profile }}">@{{ handle }}</a>){% endif %} and links to
+retailer product pages.{% if contact_email %} Contact:
+<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
+
+<h2>What we collect</h2>
+<ul>
+ <li><strong>Email address — only if you choose to subscribe</strong> to Deal
+ Alerts on our landing pages. Nothing else is required to browse.</li>
+ <li><strong>Anonymous click counts</strong> (page opened, outbound click) used
+ to measure which deals are useful. We do not store names, profiles or IP-linked
+ histories on our pages.</li>
+</ul>
+
+<h2>What we do not collect</h2>
+<ul>
+ <li>No payment or card details — purchases happen on the retailer's site.</li>
+ <li>No passwords, no private messages, no address book access.</li>
+ <li>No selling or renting of data to anyone, ever.</li>
+</ul>
+
+<h2>Cookies</h2>
+<p>Our public pages set no advertising or tracking cookies. A session cookie is
+used only for the private owner dashboard login. Retailers you visit after
+clicking a deal set their own cookies under their own policies.</p>
+
+<h2>Affiliate links</h2>
+<p>Some outbound links are affiliate links: if you buy, we may earn a commission
+from the retailer at no extra cost to you. This never changes your price.</p>
+
+<h2>Your choices</h2>
+<ul>
+ <li>Unsubscribe from Deal Alerts at any time — reply to any email or contact us.</li>
+ <li>Ask us what we hold and request deletion; we remove it within 7 days.</li>
+</ul>
+
+<h2>Children</h2>
+<p>Our pages are not directed to children under 13.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes we update the date above.</p>
+</main>
+<footer><a href="/deals/today">Deals</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+</div></body></html>"""
+
+TERMS_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms of use — {{ brand }}</title>
+<meta name="description" content="Terms for using {{ brand }} pages: we curate deals and link to retailers; purchases happen on the retailer's site.">
+<style>
+ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222;line-height:1.65}
+ .wrap{max-width:640px;margin:0 auto;background:#fff;min-height:100vh;padding:0 0 30px;
+       box-shadow:0 0 40px rgba(0,0,0,.06)}
+ header{background:#E60023;color:#fff;padding:26px 22px}
+ header h1{margin:0;font-size:23px}
+ header p{margin:6px 0 0;opacity:.9;font-size:13.5px}
+ main{padding:22px}
+ h2{font-size:16.5px;margin:24px 0 6px}
+ ul{padding-left:20px;margin:6px 0}
+ li{margin:4px 0}
+ a{color:#E60023}
+ footer{border-top:1px solid #eee;padding:14px 22px;font-size:13px}
+ footer a{margin-right:14px;color:#444;text-decoration:none}
+</style></head><body><div class="wrap">
+<header><h1>Terms of use</h1><p>{{ brand }} — effective {{ updated }}</p></header>
+<main>
+<h2>What this site is</h2>
+<p>{{ brand }} publishes curated product deals on Pinterest{% if pin_profile %}
+(<a rel="me" href="{{ pin_profile }}">@{{ handle }}</a>){% endif %} and links to
+third-party retailer product pages. We are an independent curation page — we do
+not sell products, hold stock, or process payments.</p>
+
+<h2>Prices and availability</h2>
+<ul>
+ <li>Prices, discounts and stock are shown as seen at publishing time.</li>
+ <li>Retailers can change prices at any time — the price on the retailer's page
+ at checkout is the one that applies.</li>
+ <li>We cannot guarantee availability, delivery, warranty or returns. Those are
+ handled entirely by the retailer under their own terms.</li>
+</ul>
+
+<h2>Affiliate links</h2>
+<p>Some outbound links are affiliate links. If you buy through them we may earn a
+commission from the retailer — <strong>at no extra cost to you</strong>. This
+never changes the price you pay and never influences which deals we publish.</p>
+
+<h2>Third-party content</h2>
+<p>Product names, images and trademarks belong to their respective owners and are
+used for identification only. We are not affiliated with, endorsed by, or
+sponsored by the brands or marketplaces we link to.</p>
+
+<h2>Acceptable use</h2>
+<ul>
+ <li>Use the site for personal, lawful shopping research.</li>
+ <li>Do not scrape, resell or misrepresent our content as your own.</li>
+ <li>Authorised APIs (for example Pinterest's API) are used only with the account
+ owner's own credentials.</li>
+</ul>
+
+<h2>Liability</h2>
+<p>The site is provided "as is". To the extent permitted by law we are not liable
+for purchases made on third-party sites, or for losses arising from price or
+stock changes.</p>
+
+<h2>Changes</h2>
+<p>We may update these terms; the effective date above changes when we do.</p>
+
+<h2>Contact</h2>
+<p>{% if contact_email %}<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}Reach us on Pinterest{% if pin_profile %} (<a rel="me" href="{{ pin_profile }}">@{{ handle }}</a>){% endif %}.{% endif %}</p>
+</main>
+<footer><a href="/deals/today">Deals</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+</div></body></html>"""
 
 def create_app(cfg, db: DB | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
@@ -249,6 +455,13 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                   if _verify_token else DEALS_HTML)
     login_html = (_claim.inject(LOGIN_HTML, _verify_token)
                   if _verify_token else LOGIN_HTML)
+    deals_html = _claim.inject(deals_html, _verify_token) if _verify_token else deals_html
+    about_html = (_claim.inject(ABOUT_HTML, _verify_token)
+                  if _verify_token else ABOUT_HTML)
+    privacy_html = (_claim.inject(PRIVACY_HTML, _verify_token)
+                    if _verify_token else PRIVACY_HTML)
+    terms_html = (_claim.inject(TERMS_HTML, _verify_token)
+                  if _verify_token else TERMS_HTML)
     if _verify_token:
         logging.getLogger("pindrop.dashboard").info(
             "Pinterest domain verification active (token %s…)", _verify_token[:6])
@@ -412,6 +625,49 @@ def create_app(cfg, db: DB | None = None) -> Flask:
         return render_template_string(
             deals_html, deals=deals,
             brand=cfg.get("design.brand_name", "Deal Drops"))
+
+    def _company_ctx() -> dict:
+        """Shared context for the two public company pages."""
+        import datetime as _dt
+        profile = ""
+        handle2 = ""
+        try:
+            handle2 = str(cfg.get("brand.handle", "") or "").lstrip("@")
+        except Exception:  # noqa: BLE001
+            handle2 = ""
+        if handle2:
+            profile = f"https://www.pinterest.com/{handle2}/"
+        email = ""
+        try:
+            email = str(cfg.get("brand.contact_email", "") or "").strip()
+        except Exception:  # noqa: BLE001
+            email = ""
+        return {"brand": cfg.get("design.brand_name", "Gharvanaa"),
+                "handle": handle2,
+                "pin_profile": profile,
+                "ig_profile": (f"https://www.instagram.com/{handle2}/"
+                               if handle2 else ""),
+                "contact_email": email,
+                "updated": _dt.date.today().strftime("%d %b %Y")}
+
+    @app.get("/about")
+    def about():
+        """Public company page — the URL app-review forms ask for."""
+        from flask import render_template_string
+        return render_template_string(about_html,
+                                      **(_company_ctx() | {"same_as": _same_as}))
+
+    @app.get("/privacy")
+    def privacy():
+        """Public privacy policy — required by Pinterest/Meta app review."""
+        from flask import render_template_string
+        return render_template_string(privacy_html, **_company_ctx())
+
+    @app.get("/terms")
+    def terms():
+        """Public terms page — app-review forms ask for this too."""
+        from flask import render_template_string
+        return render_template_string(terms_html, **_company_ctx())
 
     @app.get("/go/<int:pid>")
     def go(pid: int):

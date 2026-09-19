@@ -176,4 +176,5 @@ brand:
   display_name: "Gharvanaa | Home Deals & Finds"
   bio: "Gharvanaa shares hand-picked deals — home, kitchen, fashion & beauty finds under ₹999. Organizers, gadgets & kurtas. New drops daily. Tap the pin to shop."
   handle: gharvanaa
+  contact_email: ""        # optional — /about & /privacy pages lo kanipistundi (khali unte Pinterest profile contact ga vaadutundi)
 
