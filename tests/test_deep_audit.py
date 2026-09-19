@@ -887,3 +887,107 @@ class TestCorrectPhotos(unittest.TestCase):
 
 def resp_(r):
     return r
+
+
+class TestSmallVMMode(unittest.TestCase):
+    """R77 — Oracle's free AMD micro has 1 GB RAM: the bot must survive it.
+
+    A reel render (PIL + ffmpeg) can trip the OOM killer mid-post, so the
+    engine checks headroom and a daily reel budget BEFORE rendering; running
+    out of money costs a video pin, never the whole run.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = _cfg(self.tmp.name, video={"auto_reel": True})
+        Path(self.cfg.media_dir).mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _engine(self, cfg=None):
+        from bot.engine import Engine
+        return Engine(cfg or self.cfg)
+
+    def test_meminfo_reads_reasonable_numbers(self):
+        from bot import sysres
+        total = sysres.mem_total_mb()
+        self.assertGreater(total, 0)          # any Linux box reports this
+        self.assertGreaterEqual(sysres.mem_available_mb(), 0)
+        self.assertIn("memory:", sysres.describe())
+
+    def test_no_swap_means_no_render_when_ram_is_thin(self):
+        from unittest import mock
+        from bot import sysres
+        with mock.patch.object(sysres, "mem_total_mb", return_value=1000), \
+             mock.patch.object(sysres, "mem_available_mb", return_value=120), \
+             mock.patch.object(sysres, "swap_total_mb", return_value=0):
+            ok, why = sysres.can_render_video(350)
+        self.assertFalse(ok)
+        self.assertIn("swap", why)            # tells you exactly how to fix it
+
+    def test_swap_makes_render_possible_again(self):
+        from unittest import mock
+        from bot import sysres
+        with mock.patch.object(sysres, "mem_total_mb", return_value=1000), \
+             mock.patch.object(sysres, "mem_available_mb", return_value=120), \
+             mock.patch.object(sysres, "swap_total_mb", return_value=2048):
+            ok, why = sysres.can_render_video(350)
+        self.assertTrue(ok)
+        self.assertIn("swap", why)
+
+    def test_unknown_memory_fails_open(self):
+        from unittest import mock
+        from bot import sysres
+        with mock.patch.object(sysres, "mem_total_mb", return_value=0):
+            ok, _ = sysres.can_render_video()
+        self.assertTrue(ok)                   # never block posts on missing info
+
+    def test_low_memory_detection_threshold(self):
+        from unittest import mock
+        from bot import sysres
+        with mock.patch.object(sysres, "mem_total_mb", return_value=1000):
+            self.assertTrue(sysres.is_low_memory())
+        with mock.patch.object(sysres, "mem_total_mb", return_value=12000):
+            self.assertFalse(sysres.is_low_memory())
+
+    def test_reel_budget_defaults_to_two_on_a_small_vm(self):
+        from unittest import mock
+        from bot import sysres
+        eng = self._engine()
+        with mock.patch.object(sysres, "is_low_memory", return_value=True):
+            allowed = [eng._reel_budget_ok() for _ in range(1)]
+        self.assertTrue(allowed[0])
+        # with the budget already spent today → blocked
+        pid = eng.db.add_product(url="https://x/p/1", title="t", source="meesho",
+                                 video_path="/tmp/x.mp4",
+                                 created_at=__import__("datetime").datetime.now(
+                                     eng.tz).isoformat(timespec="seconds"))
+        with mock.patch.object(sysres, "is_low_memory", return_value=True):
+            pid2 = eng.db.add_product(url="https://x/p/2", title="t2", source="meesho",
+                                      video_path="/tmp/y.mp4",
+                                      created_at=__import__("datetime").datetime.now(
+                                          eng.tz).isoformat(timespec="seconds"))
+            self.assertFalse(eng._reel_budget_ok())
+        self.assertTrue(pid and pid2)
+
+    def test_reel_budget_unlimited_on_big_machine(self):
+        from unittest import mock
+        from bot import sysres
+        eng = self._engine()
+        for i in range(5):
+            eng.db.add_product(url=f"https://x/p/{i}", title="t", source="meesho",
+                               video_path="/tmp/x.mp4",
+                               created_at=__import__("datetime").datetime.now(
+                                   eng.tz).isoformat(timespec="seconds"))
+        with mock.patch.object(sysres, "is_low_memory", return_value=False):
+            self.assertTrue(eng._reel_budget_ok())
+
+    def test_configured_cap_is_honoured(self):
+        eng = self._engine(_cfg(self.tmp.name, video={"max_reels_per_day": 1}))
+        self.assertTrue(eng._reel_budget_ok())
+        eng.db.add_product(url="https://x/p/1", title="t", source="meesho",
+                           video_path="/tmp/x.mp4",
+                           created_at=__import__("datetime").datetime.now(
+                               eng.tz).isoformat(timespec="seconds"))
+        self.assertFalse(eng._reel_budget_ok())

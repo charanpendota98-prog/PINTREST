@@ -898,6 +898,25 @@ busy. Run it under systemd: `ExecStart=…/python -m bot keepalive`.
 `--once` does a single cycle (cron-friendly), `--duty N` / `--mem-mb N`
 tune it, `--no-mem` skips the memory block.
 
+#### 🐜 1 GB micro VM mode (VM.Standard.E2.1.Micro) — works, here is the tuning
+
+The AMD micro shape (1 OCPU burstable / **1 GB RAM**) is enough for the whole
+bot, with three settings that keep it out of trouble:
+
+| Setting | 1 GB micro | Why |
+|---|---|---|
+| swap | **auto** — `vm_bootstrap.sh` creates a 2 GB `/swapfile` | a reel render (PIL + ffmpeg) would otherwise trip the OOM killer |
+| `video.max_reels_per_day` | **2** (set it explicitly) | reels are the only heavy job; missing one never blocks the pin |
+| `posting.pins_per_day` | **6** | burstable CPU: fewer, better posts beat a thrashed box |
+
+The bot also checks memory **at render time** (`bot/sysres.py`): if free RAM
+is under ~350 MB and there is no swap, the reel is skipped with a clear log
+line and the image pin still goes out. `bot doctor` prints the RAM/swap line
+and, on a small VM, the exact swap command when it is missing.
+Retry `VM.Standard.A1.Flex` (2 OCPU / 12 GB, same free allowance) later —
+"Out of host capacity" is common in Hyderabad/Mumbai and often clears;
+resizing is Edit → Resize on the instance.
+
 **Security:** never open port 5000 to the internet. Reach the panel through an
 SSH tunnel — `ssh -L 5000:127.0.0.1:5000 ubuntu@<vm-ip>` → http://localhost:5000.
 Oracle's default security list already blocks it; leave it that way.

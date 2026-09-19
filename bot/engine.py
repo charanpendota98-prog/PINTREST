@@ -278,7 +278,26 @@ class Engine:
                 video_path = uv
                 self.db.log("INFO", f"🎬 Using YOUR uploaded video: {Path(uv).name}")
         # …otherwise AUTO-GENERATE a viral reel from the photos (the 2026 trick)
+        # 1 GB micro VMs: a render can trip the OOM killer and kill the
+        # scheduler mid-post, so we check headroom (and the daily reel cap)
+        # BEFORE spending it. Skipping costs a video pin; crashing costs a run.
+        reel_allowed = False
         if not video_path and self.cfg.get("video.auto_reel", True):
+            from . import sysres
+            ok, why = sysres.can_render_video(
+                int(self.cfg.get_int("video.render_need_mb", 350)))
+            if not ok:
+                self.db.log("WARN", f"🎬 Reel skip — {why}")
+                reel_allowed = False
+            else:
+                reel_allowed = self._reel_budget_ok()
+                if reel_allowed:
+                    self.db.log("INFO", f"🎬 Reel render: {why}")
+                else:
+                    self.db.log("INFO", "🎬 Reel skip — daily reel budget "
+                                        "spent (image pin still posts)")
+
+        if not video_path and reel_allowed and self.cfg.get("video.auto_reel", True):
             try:
                 from . import voiceover as vo
                 hook = hook_for(label, prod.title, datetime.now(self.tz).day,
@@ -737,6 +756,35 @@ class Engine:
         threading.Thread(target=_loop, name="telegram-control",
                          daemon=True).start()
         self.db.log("INFO", "🤖 Telegram control bot live (phone commands on)")
+
+    def _reel_budget_ok(self) -> bool:
+        """Daily reel cap — on a 1 GB micro the default is 2, not 8.
+
+        Config: `video.max_reels_per_day` (0/absent = auto: 2 when RAM is
+        small, otherwise unlimited). Counted from today's posts.
+        """
+        try:
+            from . import sysres
+            cap = int(self.cfg.get_int("video.max_reels_per_day", 0) or 0)
+            if cap <= 0:
+                cap = 2 if sysres.is_low_memory() else 0
+            if cap <= 0:
+                return True                     # unlimited (big machine)
+            today = datetime.now(self.tz).date().isoformat()
+            made = 0
+            for row in self.db.all_products(limit=200):
+                vp = str(row.get("video_path") or "")
+                if not vp:
+                    continue
+                ts = str(row.get("created_at") or "")
+                if ts[:10] == today:
+                    made += 1
+            if made >= cap:
+                return False
+            return True
+        except Exception as exc:  # noqa: BLE001 — a guard must never block posts
+            self.db.log("WARN", f"reel budget check failed: {exc}")
+            return True
 
     def _record_surface(self, product_id, platform: str, ref: str = "",
                         error: str = "") -> None:

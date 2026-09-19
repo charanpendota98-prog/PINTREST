@@ -421,6 +421,16 @@ def cmd_doctor(cfg) -> int:
         ck("Dependencies installed", False, f"pip install -r requirements.txt ({e})")
     ck("Fonts (pin text)", Path("/usr/share/fonts/truetype/dejavu").exists()
        or shutil.which("fc-list") is not None)
+    from . import sysres
+    _total = sysres.mem_total_mb()
+    if _total and _total < 1500:
+        _swap = sysres.swap_total_mb()
+        ck(f"RAM {_total} MB + swap {_swap} MB (small VM)", _swap >= 1024,
+           "sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && "
+           "sudo mkswap /swapfile && sudo swapon /swapfile  "
+           "(idle-reclaim guard: sudo ./deploy.sh --keepalive)")
+    else:
+        ck(sysres.describe(), True)
     ck(".env file", (Path(__file__).parent.parent / ".env").exists(),
        "python -m bot setup")
     ck("Pinterest App ID/Secret", bool(cfg.pinterest_app_id and cfg.pinterest_app_secret),

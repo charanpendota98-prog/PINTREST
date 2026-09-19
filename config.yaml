@@ -49,6 +49,9 @@ reshare:
   max_shares: 3            # never spam: max total posts per product
 
 video:
+  # daily reel cap. 0/absent = auto (2 on a 1 GB VM, unlimited
+  # on a bigger one). Skipping a reel never blocks the pin.
+  max_reels_per_day: 0
   auto_reel: true          # no product video on the page? auto-generate a
                            # viral 6s reel from the photos (hook → zoom → CTA)
   lang: en-IN              # voiceover: en-IN | hi-IN | te-IN (free neural TTS)
