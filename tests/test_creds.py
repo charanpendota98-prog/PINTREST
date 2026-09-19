@@ -440,3 +440,101 @@ class TestMeeshoPlatformOverride(unittest.TestCase):
         for platform in ("instagram", "facebook", "pinterest", "youtube"):
             link = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", platform)
             self.assertIn("/af_invite/24197020:", link, platform)
+
+
+class TestMeeshoLinkCorrectness(unittest.TestCase):
+    """R68: deep-probe findings — never build a product-less link, and survive
+    HTML-escaped pastes (`&amp;` is how browsers/WhatsApp deliver links)."""
+
+    PRODUCT = "https://www.meesho.com/women-kurta/p/1k1b6"
+    TEMPLATE = ("https://www.meesho.com/af_invite/"
+                "24197020:instagram_stories:11174107"
+                "?p_id=82595628&ext_id=1d6b70&utm_source=instagram_stories")
+
+    def _linker(self, template=None):
+        import os
+        from unittest import mock
+        from bot.affiliate import AffiliateLinker
+
+        class Cfg:
+            amazon_tag = ""
+
+            def __init__(self, d):
+                self.d = d
+
+            def get(self, key, default=None):
+                return self.d.get(key, default)
+
+        env = mock.patch.dict(os.environ, {"MEESHO_TEMPLATE_LINK": template or ""})
+        env.start()
+        self.addCleanup(env.stop)
+        return AffiliateLinker(Cfg({"affiliate.meesho_template_link": template or ""}))
+
+    def test_no_product_id_never_builds_an_af_invite_link(self):
+        lk = self._linker(self.TEMPLATE)
+        for bad in ("https://www.meesho.com/search?q=kurta",
+                    "https://www.meesho.com/",
+                    "https://www.meesho.com/women-kurta/p/"):
+            self.assertEqual(lk.meesho_link_for(bad, "instagram"), "", bad)
+
+    def test_real_product_url_still_builds_with_pid(self):
+        lk = self._linker(self.TEMPLATE)
+        out = lk.meesho_link_for(self.PRODUCT, "instagram")
+        self.assertIn("p_id=1k1b6", out)
+        self.assertIn("24197020:instagram_stories:11174107", out)
+
+    def test_html_escaped_link_is_normalised_not_shredded(self):
+        escaped = self.TEMPLATE.replace("&", "&amp;")
+        lk = self._linker(escaped)
+        links = lk.meesho_template_links
+        self.assertEqual(len(links), 1, links)          # one link, not three
+        self.assertNotIn("&amp;", links[0])
+        self.assertEqual(len(lk.meesho_template_links), 1)
+        built = lk.meesho_link_for(self.PRODUCT, "instagram")
+        self.assertIn("p_id=1k1b6", built)
+        self.assertNotIn("amp;", built)
+
+    def test_qa_gate_quarantines_a_pid_less_af_invite_link(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from unittest import mock
+        from bot.config import load_config
+        from bot.db import DB
+        from bot import qa
+
+        with mock.patch.dict("os.environ" and __import__("os").environ,
+                             {"AMAZON_TAG": ""}, clear=False):
+            cfg = load_config()
+            tmp = tempfile.TemporaryDirectory()
+            self.addCleanup(tmp.cleanup)
+            db = DB(f"{tmp.name}/t.db")
+            img = Path(tmp.name) / "p.jpg"
+            Image.new("RGB", (800, 1200), "white").save(img)
+            prod = {"id": 1, "source": "meesho",
+                    "title": "Floral Printed Kurta Set for Women"}
+            seo_t = "Floral Printed Kurta Set for Women | best deal 2026"
+            seo_d = ("Floral printed kurta set for women — soft rayon, all sizes. "
+                     "Grab this offer today from Meesho! #ad")
+            ok, issues = qa.qa_pin(
+                cfg, db, prod, seo_t, seo_d, str(img),
+                "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"
+                "?ext_id=abc123&utm_source=instagram_stories")
+            self.assertFalse(ok)
+            self.assertTrue(any("p_id" in i for i in issues), issues)
+
+            ok2, issues2 = qa.qa_pin(
+                cfg, db, prod, seo_t, seo_d, str(img),
+                "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"
+                "?p_id=1k1b6&ext_id=abc123&utm_source=instagram_stories")
+            self.assertFalse(any("p_id" in i for i in issues2), issues2)
+
+
+class TestMeeshoPasteHygiene(unittest.TestCase):
+    def test_html_escaped_paste_is_cleaned_before_saving(self):
+        escaped = ("https://www.meesho.com/af_invite/24197020:facebook:11173912"
+                   "?p_id=82595628&amp;ext_id=1d6b70&amp;utm_source=facebook")
+        res = creds.validate_meesho(escaped)
+        self.assertTrue(res["ok"])
+        self.assertNotIn("&amp;", res["link"])
+        self.assertIn("&ext_id=1d6b70", res["link"])

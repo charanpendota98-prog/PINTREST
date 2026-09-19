@@ -104,10 +104,18 @@ class AffiliateLinker:
 
     @property
     def meesho_template_links(self) -> list[str]:
-        """Every share link the owner has pasted (comma/newline separated)."""
+        """Every share link the owner has pasted (comma/newline separated).
+
+        R68: links arrive HTML-escaped (`&amp;`) when copied from a browser,
+        WhatsApp or a screenshot. `&amp;` contains a `;`, so splitting on `;`
+        used to shred ONE link into three broken pieces. Normalise the entity
+        first, and never split on `;`.
+        """
         raw = (os.getenv("MEESHO_TEMPLATE_LINK", "") or
                self.cfg.get("affiliate.meesho_template_link", "") or "").strip()
-        return [p.strip() for p in re.split(r"[,\n;]+", raw) if p.strip()]
+        raw = (raw.replace("&amp;", "&").replace("&#38;", "&")
+                  .replace("\u0026", "&").replace("&quot;", ""))
+        return [p.strip() for p in re.split(r"[,\n\r]+", raw) if p.strip()]
 
     @property
     def meesho_ids(self) -> tuple[str, str, list[str]]:
@@ -242,6 +250,14 @@ class AffiliateLinker:
                 break
         if not template:
             template = self.meesho_template_links[-1] if self.meesho_template_links else ""
+        if not pid:
+            # R68: NO product id = the click lands on a generic Meesho page.
+            # An af_invite with no p_id is monetized-but-worthless, and the
+            # leak gate cannot see the difference — so never build one.
+            log.warning("MEESHO LINK: no product id (p_id) in '%s' — af_invite "
+                        "link ni build cheyyaledu (generic page ki vellipoyedi).",
+                        url[:90])
+            return ""
         m = re.search(r"(https?://[^?\s]*af_invite/[^?\s]+)", template)
         if m:
             base = m.group(1)

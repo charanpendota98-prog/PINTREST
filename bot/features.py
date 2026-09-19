@@ -370,6 +370,18 @@ def print_how_it_works() -> None:
    🆕 Campaign rotation: token okkatiki multiple campaigns isthe bot **newest**
    daanni vadutundi (ex: instagram_product_tag 11173806 → 11173869), paathavi
    history lo gurtu pettukuntundi.
+   🔬 `python scripts/meesho_audit.py` — PROOF tool: prati surface ni malli
+   build chesi publisher/token/campaign/p_id/ext_id/utm eh component check
+   chestundi + URL shapes + edge cases + QA gate. Sandbox/network ledu, run
+   everywhere.
+   🐛 R68 deep-probe lo pattukunna rendu nijamaina bugs (fix ayyayi):
+   (1) p_id leni Meesho URL (search/category/truncated) kuda af_invite link
+   build ayyedi → click generic page ki velli commission miss, kani leak gate
+   kanipettaledu. Ippudu: p_id lekapote link EH build avvadu + QA gate
+   "p_id ledu" ani pin ni QUARANTINE chestundi.
+   (2) Browser/WhatsApp nunchi paste ayye `&amp;` links `;` meeda split ayyi
+   moodu moodu ga tuntaravutunnayi. Ippudu HTML entities normalize ayyi (., \n
+   matrame separators) okkate link ga untundi.
 
 25) CREDENTIAL INTAKE + LEAK PROOF (R65)
    🔑 `python -m bot creds [--amazon T --earnkaro P --meesho L …]`: prati
@@ -463,7 +475,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   654 automated tests.
+   659 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

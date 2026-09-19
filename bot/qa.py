@@ -96,6 +96,11 @@ def qa_pin(cfg, db, product: dict, seo_title: str, seo_text: str,
         if not AffiliateLinker(cfg).is_monetized(link, product.get("source", "")):
             issues.append("COMMISSION LEAK: link carries no affiliate tracking — "
                           "add your affiliate IDs (.env) — pin quarantined")
+        # R68: a Meesho af_invite link WITHOUT p_id looks monetized but drops
+        # the visitor on a generic page — a lost click the leak gate cannot see
+        if "af_invite" in link and "p_id=" not in link:
+            issues.append("Meesho link has no product id (p_id) — click generic "
+                          "page ki veltundi, commission miss — pin quarantined")
 
     # ---- title
     t = (seo_title or "").strip()

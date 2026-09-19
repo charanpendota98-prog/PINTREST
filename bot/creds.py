@@ -93,8 +93,14 @@ def validate_earnkaro_token(value: str) -> dict:
 
 
 def validate_meesho(value: str) -> dict:
-    """Meesho must be the owner's own af_invite (direct commission)."""
+    """Meesho must be the owner's own af_invite (direct commission).
+
+    R68: links pasted from a browser/WhatsApp arrive HTML-escaped
+    (`&amp;`) — normalise before storing so the .env value is a real URL.
+    """
     v = str(value or "").strip().strip("'\"")
+    v = (v.replace("&amp;", "&").replace("&#38;", "&")
+          .replace("\u0026", "&").replace("&quot;", ""))
     if not v:
         return {"ok": False, "error": "Khali undi."}
     if "af_invite" in v or "affid=" in v or "meesho.com" in v:
