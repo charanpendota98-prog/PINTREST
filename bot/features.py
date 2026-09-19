@@ -21,7 +21,7 @@ FEATURES = [
     ("Oracle idle-guard", "safety",
      "Always-Free VM ni Oracle reclaim cheyyakunda CPU+memory duty cycle tho "
      "busy ga unchutundi (PAYG aithe avasaram ledu)",
-     lambda cfg: True, "python -m bot keepalive  (VM lo optional)"),
+     lambda cfg: True, "sudo ./deploy.sh --keepalive  (3rd service)")),
     ("Blank-media guard", "safety",
      "a pin that rendered blank (design failure) is quarantined, never posted",
      lambda cfg: True, "always on (qa.pin_is_blank)"),
@@ -549,7 +549,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   724 automated tests.
+   728 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

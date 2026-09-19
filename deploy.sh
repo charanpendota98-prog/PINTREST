@@ -16,6 +16,14 @@ echo "→ venv + dependencies"
 echo "→ sanity checks"
 .venv/bin/python -m bot doctor || true
 
+# Oracle Always-Free instances are RECLAIMED when they look idle for 7 days
+# (CPU 95th percentile < 10%). `sudo ./deploy.sh --keepalive` installs a third
+# service that keeps the box measurably busy. Not needed on a PAYG account.
+KEEPALIVE=""
+for a in "$@"; do
+  [ "$a" = "--keepalive" ] && KEEPALIVE="1"
+done
+
 install_services() {
   echo "→ installing systemd services (auto-start on boot, auto-restart)"
   # Never run the bot as root: use the human who called sudo (fallback: root).
@@ -75,9 +83,37 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+  if [ -n "$KEEPALIVE" ]; then
+    cat > /etc/systemd/system/pindrop-keepalive.service <<EOF
+[Unit]
+Description=PinDrop Pro — Oracle idle-reclaim guard (CPU duty cycle)
+After=network-online.target
+
+[Service]
+Type=simple
+User=$RUN_USER
+Group=$RUN_GROUP
+WorkingDirectory=$HERE
+ExecStart=$HERE/.venv/bin/python -m bot keepalive
+Restart=always
+RestartSec=20
+Nice=10
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+
   systemctl daemon-reload
   systemctl enable --now pindrop.service
   systemctl enable --now pindrop-dashboard.service
+  if [ -n "$KEEPALIVE" ]; then
+    systemctl enable --now pindrop-keepalive.service
+    echo "🛡 idle-guard ON (pindrop-keepalive) — Oracle reclaim rule padadu"
+  fi
   echo
   echo "✅ BOTH services live (running as user: $RUN_USER):"
   echo "   systemctl status pindrop             # scheduler"

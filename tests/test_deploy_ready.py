@@ -443,3 +443,41 @@ def _pin_like(path, size=(1000, 1500)):
     d.rectangle((80, size[1] - 320, size[0] - 80, size[1] - 160),
                 fill=(200, 30, 60))
     im.save(path)
+
+
+class TestLowRamVMDeploy(unittest.TestCase):
+    """R76 — Oracle free VMs: E2.1.Micro has 1 GB RAM and is reclaimable.
+
+    The deploy path must therefore (a) create swap before rendering videos and
+    (b) offer the keepalive service, otherwise a "successful" install dies on
+    the first reel or the instance is stopped by Oracle.
+    """
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def _text(self, rel):
+        return (self.ROOT / rel).read_text()
+
+    def test_bootstrap_creates_swap_on_low_ram(self):
+        t = self._text("scripts/vm_bootstrap.sh")
+        self.assertIn("setup_swap", t)
+        self.assertIn("/swapfile", t)
+        self.assertIn("swappiness", t)
+        self.assertIn("fstab", t)          # swap survives a reboot
+
+    def test_bootstrap_tolerates_offline_apt(self):
+        t = self._text("scripts/vm_bootstrap.sh")
+        self.assertIn("apt update fail", t)      # best-effort, not set -e abort
+
+    def test_deploy_offers_keepalive_service(self):
+        t = self._text("deploy.sh")
+        self.assertIn("--keepalive", t)
+        self.assertIn("pindrop-keepalive.service", t)
+        self.assertIn("-m bot keepalive", t)
+
+    def test_e2_micro_shape_numbers_still_work(self):
+        """1 GB RAM / 1 OCPU profile: still above Oracle's 10% CPU line."""
+        from bot.keepalive import keepalive_plan
+        busy, rest = keepalive_plan(1, 13.0, 60.0)      # E2.1.Micro = 1 OCPU
+        self.assertGreaterEqual(busy / 60.0, 0.10)
+        self.assertLess(rest, 60.0)

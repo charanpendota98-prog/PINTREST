@@ -35,9 +35,34 @@ fi
 say "Machine: $(uname -m) · $( (. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME") || echo 'unknown OS')"
 TOTAL_MB="$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || echo 0)"
 if [ "${TOTAL_MB:-0}" -gt 0 ] && [ "$TOTAL_MB" -lt 900 ]; then
-  warn "RAM ${TOTAL_MB}MB — bot run avutundi kani reel render slow ga untundi."
-  warn "Oracle lo ARM Ampere (24GB) instance better: video 10× fast."
+  warn "RAM ${TOTAL_MB}MB (E2.1.Micro class) — swap ＋ settings tho pani chestundi."
+  warn "Better: Oracle A1.Flex (Ampere) 2 OCPU/12GB — Always Free, reels 10× fast."
+  warn "Idle-reclaim guard kuda pettandi: sudo ./deploy.sh --keepalive"
 fi
+
+# ------------------------------------------------------ 0b. swap (low RAM)
+# Oracle's free micro shape has 1 GB RAM. Rendering a 720×1280 reel (PIL +
+# ffmpeg) can spike past that, and the kernel OOM-killer would kill the
+# scheduler mid-post. A swap file makes the small box boring but reliable.
+setup_swap() {
+  local total_mb="$1"
+  if [ "${total_mb:-0}" -ge 3500 ]; then return 0; fi
+  if swapon --show 2>/dev/null | grep -q .; then ok "swap already active"; return 0; fi
+  say "RAM ${total_mb}MB → 2 GB swap file create chestunnanu (reels safe)"
+  if ! $SUDO fallocate -l 2G /swapfile 2>/dev/null; then
+    $SUDO dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none || {
+      warn "swap file create fail — memory low ga undi, reels slow avvachu"; return 0; }
+  fi
+  $SUDO chmod 600 /swapfile
+  $SUDO mkswap /swapfile >/dev/null
+  $SUDO swapon /swapfile || { warn "swapon fail — continue"; return 0; }
+  grep -q '^/swapfile' /etc/fstab || \
+    echo '/swapfile none swap sw 0 0' | $SUDO tee -a /etc/fstab >/dev/null
+  echo 'vm.swappiness=20' | $SUDO tee /etc/sysctl.d/99-pindrop-swap.conf >/dev/null || true
+  $SUDO sysctl -q vm.swappiness=20 2>/dev/null || true
+  ok "swap ready: $(free -m 2>/dev/null | awk '/Swap:/{print $2" MB"}')"
+}
+if [ "${TOTAL_MB:-0}" -gt 0 ]; then setup_swap "$TOTAL_MB"; fi
 
 # ------------------------------------------------------- 1. system packages
 SUDO=""
@@ -153,5 +178,9 @@ cat <<'DONE'
 
   4) Logs:
        tail -f logs/guardian.log   |   sudo journalctl -u pindrop -f
+
+  5) 🛡 Oracle free-tier idle-guard (reclaim rule — CPU <10% for 7 days):
+       sudo ./deploy.sh --keepalive     # 3rd systemd service, keeps box busy
+     (Pay-As-You-Go account aithe idi avasaram ledu.)
 ──────────────────────────────────────────────────────────────────────
 DONE
