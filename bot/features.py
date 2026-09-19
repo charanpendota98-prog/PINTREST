@@ -340,6 +340,14 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+24) TRIAL-PENDING STATE, HONESTLY (R64)
+   ⏳ `python -m bot app --pending`: 'Trial access pending' lo Pinterest app
+   CONFIG ni lock chestundi (App secret + Redirect URLs grey/disabled) — owner
+   tappu kaadu ani cheppi, ippude cheyyagaligedi list chestundi (Generate token →
+   .env → token-check → deploy/pages), tarvata unlock steps order tho
+   (secret unlock → redirect URI → auth-url → app --upgrade).
+   `bot app --where` kuda aa grey field note tho untundi — malli confuse avvadu.
+
 23) TOKEN CAPABILITY PROOF + CONSOLE NAVIGATION (R63)
    🧭 `python -m bot app --where`: dev console malli open cheyyadam click-path
    (My apps → Manage → Configure → Redirect URLs → Generate token), app ID tho
@@ -413,7 +421,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   544 automated tests.
+   552 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

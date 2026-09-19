@@ -269,6 +269,53 @@ class TestTrialToken(unittest.TestCase):
         self.assertIn("PINTEREST_ACCESS_TOKEN", env)
         self.assertIn("Trial", env)
 
+class TestPendingState(unittest.TestCase):
+    """R64: a greyed-out field is Pinterest's lock, not the owner's mistake."""
+
+    def test_says_what_is_locked_and_what_is_not(self):
+        text = "\n".join(appform.pending_lines(_cfg(Path("/tmp"))))
+        self.assertIn("App secret", text)
+        self.assertIn("Redirect URLs", text)
+        self.assertIn("cheyyaledu", text)           # it is not their mistake
+        self.assertIn("Generate token", text)        # what they CAN do now
+
+    def test_lists_the_immediate_work_that_is_not_blocked(self):
+        text = "\n".join(appform.pending_lines(_cfg(Path("/tmp"))))
+        for needle in ("PINTEREST_ACCESS_TOKEN", "token-check", "Amazon tag",
+                       "deploy"):
+            self.assertIn(needle, text, needle)
+
+    def test_unlock_steps_are_in_order(self):
+        text = "\n".join(appform.pending_lines(_cfg(Path("/tmp"))))
+        self.assertIn("auth-url", text)
+        self.assertIn("app --upgrade", text)
+        self.assertLess(text.index("auth-url"), text.index("--upgrade"))
+
+    def test_order_does_not_block_the_workflow(self):
+        text = "\n".join(appform.pending_lines(_cfg(Path("/tmp"))))
+        self.assertIn("Order mukhyam kaadu", text)
+
+    def test_where_helper_explains_the_greyed_field(self):
+        text = "\n".join(appform.where_lines(_cfg(Path("/tmp"))))
+        self.assertIn("GREY", text)
+        self.assertIn("app --pending", text)
+
+    def test_cli_pending_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = _cfg(Path(d))
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(cmd_app(cfg, ["--pending"]), 0)
+            self.assertIn("TRIAL ACCESS PENDING", buf.getvalue())
+
+    def test_sheet_mentions_the_pending_state(self):
+        text = "\n".join(appform.lines(_cfg(Path("/tmp"))))
+        self.assertIn("Trial", text)
+
+    def test_help_lists_pending(self):
+        src = (Path(__file__).resolve().parents[1] / "bot" / "main.py").read_text()
+        self.assertIn("python -m bot app --pending", src)
+
 
 if __name__ == "__main__":
     unittest.main()

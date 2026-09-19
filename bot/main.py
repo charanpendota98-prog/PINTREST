@@ -18,6 +18,7 @@ Usage:
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
   python -m bot app [--site URL]         # 📝 Pinterest app form — exact answers
   python -m bot app --where              # 🧭 app page open cheyyadam ela (click path)
+  python -m bot app --pending            # ⏳ trial pending lo emi lock, emi cheyyochu
   python -m bot token-check [--write-test]  # 🔐 token entha cheyyagaladu (live)
   python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
   python -m bot name --next              # 🚨 handle taken? → variants + auto-pick
@@ -944,6 +945,11 @@ def cmd_app(cfg, rest: list[str]) -> int:
             site = rest[i + 1]
         elif word.startswith("--site="):
             site = word.split("=", 1)[1]
+    if any(w in ("--pending", "pending") for w in rest):
+        print()
+        print("\n".join(_appform.pending_lines(cfg)))
+        print()
+        return 0
     if any(w in ("--where", "-w", "where") for w in rest):
         print()
         print("\n".join(_appform.where_lines(cfg)))

@@ -187,6 +187,11 @@ App approve ayyaka ee 4 steps (order lo):
 | 3 | **OAuth** (permanent) | app secret unlock ayyaka: `python -m bot auth-url` → code → `python -m bot auth --code <CODE>` |
 | 4 | **Standard access request** | app page → **Upgrade** → `python -m bot app --upgrade` answers copy-paste |
 
+> 🔒 **'Trial access pending' lo Redirect URLs field grey/disabled ga untundi**
+> (App secret kuda lock). Adi Pinterest lock — tappu kaadu. Ippudu cheyyalsinadi:
+> `Generate Access Tokens` → `.env` → `python -m bot token-check`. Full detail:
+> `python -m bot app --pending`.
+>
 > ⚠️ **Trial = public pins kaadu.** Pinterest access table lo unde: Trial mode lo
 > "Writing standard Pins → **visible only to the user who creates them**"
 > (1000 req/day). Ante pins create avutayi kani **evariki kanipistavi kaavu** →

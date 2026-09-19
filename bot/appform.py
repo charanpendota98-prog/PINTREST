@@ -117,6 +117,8 @@ def lines(cfg=None) -> list[str]:
         "",
         "─" * 70,
         "🧭 App page malli open cheyyadam: python -m bot app --where",
+        "⏳ 'Trial access pending' lo Redirect URLs + App secret LOCK lo untayi",
+        "   (grey field — tappu kaadu). Emi cheyyocho: python -m bot app --pending",
         "",
         "SUBMIT TARVATA: redirect URI + scopes → app secret unlock → OAuth.",
         "⏭️  TARVATA KAAVALSINADI: public pins ki **Standard access request** —",
@@ -176,6 +178,9 @@ def where_lines(cfg=None) -> list[str]:
         "   ▸ **Redirect URLs**  →  input box lo pedu:",
         "        http://localhost:8888/callback",
         "     → **Enter** kottu (leda 'Add' click) → URL chip ga kanipinchali ✅",
+        "     ⚠️ 'Trial access pending' lo ee field GREY/disabled ga untundi —",
+        "        adi Pinterest lock, tappu kaadu. Approval tarvata add cheyyi",
+        "        (OAuth ki appudu eh kavali). Details: python -m bot app --pending",
         "",
         "   ▸ **Generate Access Tokens** (same tab, kindaki) →",
         "        Environment: Production Limited → **Generate token**",
@@ -193,6 +198,36 @@ def where_lines(cfg=None) -> list[str]:
         "",
         "💡 Tab close aithe parvaledu — paiki unna URL bookmark chesuko:",
         f"   {direct}",
+    ]
+
+
+def pending_lines(cfg=None) -> list[str]:
+    """What the app page allows while 'Trial access pending' (and why)."""
+    return [
+        "═" * 70,
+        "⏳ 'TRIAL ACCESS PENDING' — emi lock lo untundi, emi ippude cheyyochu",
+        "═" * 70,
+        "   Pinterest ee state lo app CONFIG ni lock chestundi (nuvvu tappu",
+        "   cheyyaledu):",
+        "     🔒 App secret key      → 'Unavailable while trial access pending'",
+        "     🔒 Redirect URLs field → grey/disabled, Add button kuda disable",
+        "",
+        "   ✅ Ippude cheyyagaligedi (lock ledu):",
+        "     • **Generate Access Tokens** → 'Production Limited' → Generate token",
+        "       (read-only token: pins:read, boards:read, user_accounts:read)",
+        "     • Aa token ni .env lo:  PINTEREST_ACCESS_TOKEN='...'",
+        "     • Proof:  python -m bot token-check",
+        "     • .env lo migilinavi: Amazon tag, Meesho af_invite, IG/FB tokens",
+        "     • VPS deploy + domain + /about /privacy pages",
+        "",
+        "   ⏭️ Approval email vachaka (eppudu):",
+        "     • App secret unlock → Redirect URL kuda add cheyyochu:",
+        "         http://localhost:8888/callback",
+        "     • Appudu: python -m bot auth-url  →  python -m bot auth --code <CODE>",
+        "     • Tarvata: python -m bot app --upgrade  (public pins ki standard)",
+        "",
+        "   💡 Order mukhyam kaadu: OAuth ki redirect URI appudu kavali — ippudu",
+        "      add avvakapoyina workflow aagadu. Trial token tho ippude test cheyyi.",
     ]
 
 
