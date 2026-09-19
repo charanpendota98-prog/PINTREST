@@ -1386,6 +1386,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_pin_stats(cfg, rest)
     if cmd == "trends" and rest and rest[0] == "--live":
         return cmd_trends_live(cfg)
+    if cmd in ("telegram", "tg"):
+        return cmd_telegram(cfg, rest)
     if cmd == "platforms":
         return cmd_platforms(cfg)
     if cmd in ("yt-auth", "yt-auth-url"):
@@ -1610,6 +1612,43 @@ def cmd_yt_auth(cfg, args: list[str]) -> int:
     return 0
 
 
+def cmd_telegram(cfg, rest: list[str]) -> int:
+    """🤖 Two-way Telegram control — run the bot from your phone.
+
+    `python -m bot telegram`          → listen (long polling)
+    `python -m bot telegram --once`   → answer pending messages once
+    `python -m bot telegram --test`   → prove the token + owner chat work
+    """
+    from .db import DB
+    from .notify import Notifier
+    from .tgcontrol import TelegramControl
+    db = DB(cfg.get("storage.db_path", "data/bot.db"))
+    ctl = TelegramControl(cfg, db=db)
+    if not ctl.notify.token:
+        print("\n⚠️  TELEGRAM_TOKEN ledu .env lo — control bot off.\n"
+              "   1) Telegram lo @BotFather → /newbot → token copy\n"
+              "   2) nee bot ki message pampandi, tarvata GET\n"
+              "      https://api.telegram.org/bot<TOKEN>/getUpdates\n"
+              "      → 'chat':{'id':…} → TELEGRAM_CHAT_ID\n"
+              "   3) (optional) deals channel: TELEGRAM_DEALS_CHANNEL=@yourchannel")
+        return 1
+    if "--test" in rest:
+        ok = ctl.notify.send_to(ctl.owner, "✅ Gharvanaa control bot test — "
+                                           "ivi nijam ga nee phone ki vachinaya?")
+        print("✅ test message pampanu" if ok else
+              "❌ pampalekapoyam (TELEGRAM_CHAT_ID / token check cheyyandi)")
+        return 0 if ok else 1
+    if "--once" in rest or "--poll" in rest:
+        n = ctl.poll_once(timeout=1)
+        print(f"→ {n} command(s) answered")
+        return 0
+    if "--status" in rest:
+        print(ctl.reply("/status"))
+        return 0
+    ctl.serve()
+    return 0
+
+
 def cmd_platforms(cfg) -> int:
     """Show every surface the bot posts to + how the link is built for it."""
     from .affiliate import AffiliateLinker
@@ -1620,7 +1659,14 @@ def cmd_platforms(cfg) -> int:
     ig, fb, yt = InstagramAPI(cfg), FacebookAPI(cfg), YouTubeAPI(cfg)
     order = cfg.get("posting.platform_order",
                     ["instagram", "facebook", "youtube", "pinterest"])
-    print("\n📡 WHERE THE BOT POSTS — platform · status · Meesho source token\n" + "-" * 66)
+    counts: dict[str, int] = {}
+    try:
+        from .db import DB as _DB
+        counts = _DB(cfg.get("storage.db_path", "data/bot.db")).surface_counts()
+    except Exception:  # noqa: BLE001 — counts are a bonus
+        counts = {}
+    print("\n📡 WHERE THE BOT POSTS — platform · status · posts · Meesho source token\n"
+          + "-" * 78)
     rows = []
     for plat in order + ["pinterest"]:
         if plat in [r[0] for r in rows]:
@@ -1643,8 +1689,9 @@ def cmd_platforms(cfg) -> int:
         rows.append((plat, ok, detail))
     for plat, ok, detail in rows:
         tok = lk.meesho_source_for(plat) if lk.meesho_template_map() else "(no template)"
+        n_posts = int(counts.get(plat, 0))
         print(f"  {'✅' if ok else '⚪'} {plat:10s} {detail}")
-        print(f"     ↳ Meesho token: {tok}")
+        print(f"     ↳ Meesho token: {tok}   ·   posted: {n_posts}")
     print("-" * 66)
     print("  ✅ = configured & live   ⚪ = add creds to switch on")
     print("  Telegram deals channel: "

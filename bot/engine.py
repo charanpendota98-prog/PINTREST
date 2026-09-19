@@ -504,9 +504,16 @@ class Engine:
             self.db.log("INFO", f"Posted pin {pin.get('id')} — {product['title'][:50]}")
             self.notify.posted(product["title"], str(pin.get("id")), product["source"])
             # broadcast to public Telegram deals channel (top-India trick)
-            self.notify.deal(product["title"],
-                             price_label(product["price"], product["currency"]),
-                             link, product.get("image_url", ""))
+            sent = self.notify.deal(
+                product["title"],
+                price_label(product["price"], product["currency"]),
+                link, product.get("image_url", ""),
+                discount=int(product.get("discount") or 0),
+                rating=float(product.get("rating") or 0),
+                reviews=int(product.get("reviews") or 0),
+                source=str(product.get("source") or ""))
+            if sent:
+                self._record_surface(product["id"], "telegram")
             # platforms that come AFTER pinterest in the configured order
             for plat in order:
                 if plat in done or plat == "pinterest":
@@ -586,6 +593,7 @@ class Engine:
                 self.db.log("WARN", "Instagram: no public media available, skipped")
                 return
             self.db.update_post(post_id, ig_post_id=media_id)
+            self._record_surface(product["id"], "instagram", str(media_id or ""))
             self.db.log("INFO", f"Instagram post {media_id} — {product['title'][:40]}")
             # auto direct link: bio website becomes THIS deal
             bio_link = (f"{str(self.cfg.get('link.public_base','') or '').rstrip('/')}/go/{product['id']}"
@@ -603,6 +611,7 @@ class Engine:
                     self.db.log("WARN", f"Instagram story skipped: {exc}")
         except InstagramError as exc:
             self.db.update_post(post_id, ig_error=str(exc)[:400])
+            self._record_surface(product["id"], "instagram", "", str(exc))
             self.db.log("WARN", f"Instagram cross-post failed: {exc}")
 
     def _post_youtube(self, product: dict) -> None:
@@ -649,6 +658,7 @@ class Engine:
                                         for t in script["hashtags"]] +
                                        ["deals", "india", "shopping"])
             self.db.log("INFO", f"YouTube Short uploaded: {vid}")
+            self._record_surface(product["id"], "youtube", str(vid or ""))
             # pinned comment = +10-15% conversion (research) — best effort
             pinned = f"{script['pinned_comment']}\n{link}"
             if vid and yt.comment_on_video(vid, pinned):
@@ -702,6 +712,45 @@ class Engine:
             tpl = "🔥 {title} — only {price}! Link in bio!"
         return tpl.format(title=p["title"][:60], price=label)
 
+    def _start_telegram_control(self) -> None:
+        """Run the two-way control listener inside the scheduler.
+
+        Zero extra processes: if TELEGRAM_TOKEN is configured, the owner can
+        drive the machine from his phone while the scheduler keeps posting.
+        No token → silently skipped (feature stays off).
+        """
+        import os
+        import threading
+        if not os.getenv("TELEGRAM_TOKEN", "").strip():
+            return
+        if getattr(self, "_tg_started", False):
+            return
+        self._tg_started = True
+
+        def _loop() -> None:  # pragma: no cover - background thread
+            try:
+                from .tgcontrol import TelegramControl
+                TelegramControl(self.cfg, db=self.db, engine=self).serve()
+            except Exception as exc:  # noqa: BLE001 — never kill the poster
+                self.db.log("WARN", f"telegram control stopped: {exc}")
+
+        threading.Thread(target=_loop, name="telegram-control",
+                         daemon=True).start()
+        self.db.log("INFO", "🤖 Telegram control bot live (phone commands on)")
+
+    def _record_surface(self, product_id, platform: str, ref: str = "",
+                        error: str = "") -> None:
+        """One row per cross-posted surface → real per-platform counts."""
+        try:
+            self.db.add_post(
+                product_id=int(product_id), platform=str(platform),
+                pin_id=str(ref or ""), status="failed" if error else "posted",
+                error=str(error)[:400],
+                posted_at="" if error else datetime.now(self.tz).isoformat(
+                    timespec="seconds"))
+        except Exception as exc:  # noqa: BLE001 — bookkeeping never blocks
+            self.db.log("WARN", f"surface record failed ({platform}): {exc}")
+
     def _post_facebook(self, product: dict) -> None:
         """Cross-post to your Facebook Page (official Graph API, best-effort)."""
         if not (self.fb.enabled and self.fb.configured):
@@ -724,8 +773,10 @@ class Engine:
             else:
                 fid = self.fb.post_photo(product.get("image_url", ""), caption)
             self.db.log("INFO", f"Facebook post {fid} — {product['title'][:40]}")
+            self._record_surface(product["id"], "facebook", str(fid or ""))
         except FacebookError as exc:
             self.db.log("WARN", f"Facebook cross-post failed: {exc}")
+            self._record_surface(product["id"], "facebook", "", str(exc))
 
     def post_next(self, tries: int = 3) -> dict | None:
         """Post the next queued product. Returns the pin dict or None.
@@ -1182,6 +1233,7 @@ class Engine:
         print(f"\n🤖 Scheduler running 24×7 — {per_day} pins/day in "
               f"{'peak traffic windows' if peak else f'{start_h}:00-{end_h}:00'} IST. Ctrl+C to stop.\n")
 
+        self._start_telegram_control()
         while True:
             now = datetime.now(self.tz)
             # top-0.1% freshness trick: rotate proven winners as new pins daily

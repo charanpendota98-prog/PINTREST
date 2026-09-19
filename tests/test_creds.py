@@ -703,3 +703,203 @@ class TestMeeshoAttribution(unittest.TestCase):
             "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107"
             "?p_id=21cuip&ext_id=21cuip", timeout=1)
         self.assertIn("attributed", out)
+
+
+class TestTelegramControl(unittest.TestCase):
+    """R74 — phone nunchi machine ni control cheyyadam (two-way Telegram)."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        from bot.config import Config
+        from bot.db import DB
+        self.cfg = Config(raw={
+            "storage": {"db_path": f"{self.tmp.name}/t.db", "media_dir": f"{self.tmp.name}/m"},
+            "affiliate": {"amazon_tag": "x-21", "meesho_affid": "24197020"}})
+        self.db = DB(self.cfg.get("storage.db_path"))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _ctl(self):
+        from bot.tgcontrol import TelegramControl
+        return TelegramControl(self.cfg, db=self.db)
+
+    def test_parse_command(self):
+        from bot.tgcontrol import parse_command
+        self.assertEqual(parse_command("/link https://x y"), ("link", ["https://x", "y"]))
+        self.assertEqual(parse_command("/Deals@GharvanaaBot 3"), ("deals", ["3"]))
+        self.assertEqual(parse_command("hello"), ("hello", []))
+        self.assertEqual(parse_command(""), ("", []))
+
+    def test_help_and_unknown(self):
+        ctl = self._ctl()
+        self.assertIn("/status", ctl.reply("/help"))
+        self.assertIn("Teliyani command", ctl.reply("/nonsense"))
+
+    def test_status_reports_queue_and_pauses(self):
+        self.db.add_product(url="https://x/p/1", title="t", source="meesho")
+        out = self._ctl().reply("/status")
+        self.assertIn("queue 1", out)
+        self.assertIn("running", out)
+
+    def test_pause_and_resume_from_phone(self):
+        ctl = self._ctl()
+        self.assertIn("Paused", ctl.reply("/pause 2"))
+        from bot import control
+        self.assertTrue(control.is_paused(self.db).get("paused"))
+        self.assertIn("resumed", ctl.reply("/resume").lower())
+        self.assertFalse(control.is_paused(self.db).get("paused"))
+
+    def test_post_requires_a_url(self):
+        self.assertIn("Usage", self._ctl().reply("/post"))
+        self.assertIn("http", self._ctl().reply("/post notaurl"))
+
+    def test_deals_lists_posted_products_with_links(self):
+        pid = self.db.add_product(url="https://www.meesho.com/kurti/p/35pwo2",
+                                  title="Black Kurti", source="meesho",
+                                  affiliate_url="https://www.meesho.com/af_invite/x")
+        self.db.update_product(pid, status="posted")
+        out = self._ctl().reply("/deals 3")
+        self.assertIn("Black Kurti", out)
+        self.assertIn("af_invite", out)
+
+    def test_link_command_builds_surface_links(self):
+        import os
+        from bot.config import load_config
+        old = os.environ.get("MEESHO_TEMPLATE_LINK")
+        os.environ["MEESHO_TEMPLATE_LINK"] = (
+            "https://www.meesho.com/af_invite/24197020:instagram_stories:11174107,"
+            "https://www.meesho.com/af_invite/24197020:facebook:11173912")
+        try:
+            from bot.tgcontrol import TelegramControl
+            ctl = TelegramControl(load_config(), db=self.db)
+            out = ctl.reply("/link https://www.meesho.com/kurti-rayon/p/35pwo2")
+            self.assertIn("ext_id=35pwo2", out)
+        finally:
+            if old is None:
+                os.environ.pop("MEESHO_TEMPLATE_LINK", None)
+            else:
+                os.environ["MEESHO_TEMPLATE_LINK"] = old
+
+    def test_surfaces_lists_five(self):
+        out = self._ctl().reply("/surfaces")
+        for name in ("Pinterest", "Instagram", "Facebook", "YouTube", "Telegram"):
+            self.assertIn(name, out)
+
+    def test_only_owner_chat_is_obeyed(self):
+        import os
+        from unittest import mock
+        from bot.config import Config
+        cfg = Config(raw={"storage": {"db_path": f"{self.tmp.name}/t2.db"}})
+        with mock.patch.dict(os.environ, {"TELEGRAM_CHAT_ID": "999",
+                                          "TELEGRAM_TOKEN": "tok"}):
+            from bot.tgcontrol import TelegramControl
+            ctl = TelegramControl(cfg, db=self.db)
+            self.assertEqual(ctl.owner, "999")
+            updates = {"ok": True, "result": [
+                {"update_id": 5, "message": {"chat": {"id": 111}, "text": "/status"}},
+                {"update_id": 6, "message": {"chat": {"id": 999}, "text": "/help"}},
+            ]}
+            class _Resp:
+                status_code = 200
+                def json(self):
+                    return updates
+            ctl.notify.token = "tok"
+            with mock.patch("requests.get", return_value=_Resp()), \
+                 mock.patch.object(ctl.notify, "send_to", return_value=True) as sent:
+                n = ctl.poll_once(timeout=1)
+            self.assertEqual(n, 1)                       # only the owner's
+            self.assertEqual(sent.call_args.args[0], "999")
+
+
+class TestPerSurfaceRecords(unittest.TestCase):
+    """R74 — every surface a product was posted to is recorded."""
+
+    def test_surface_counts(self):
+        import tempfile
+        from bot.db import DB
+        with tempfile.TemporaryDirectory() as tmp:
+            db = DB(f"{tmp}/t.db")
+            pid = db.add_product(url="https://x/p/1", title="t", source="meesho")
+            db.add_post(product_id=pid, status="posted", platform="instagram",
+                        posted_at="2026-09-19T10:00:00")
+            db.add_post(product_id=pid, status="posted", platform="telegram",
+                        posted_at="2026-09-19T10:00:01")
+            db.add_post(product_id=pid, status="posted")          # pinterest default
+            counts = db.surface_counts()
+            self.assertEqual(counts["instagram"], 1)
+            self.assertEqual(counts["telegram"], 1)
+            self.assertEqual(counts["pinterest"], 1)
+
+    def test_deal_card_carries_real_numbers(self):
+        from bot.notify import Notifier
+        n = Notifier()
+        n.token, n.deals_channel = "tok", "@ch"
+        calls = {}
+
+        class _Resp:
+            status_code = 200
+        def fake_post(url, data=None, timeout=None, **kw):
+            calls.update(data or {})
+            return _Resp()
+        import bot.notify as mod
+        orig = mod.requests.post
+        mod.requests.post = fake_post
+        try:
+            ok = n.deal("Black Kurti", "₹200", "https://l", "https://img",
+                        discount=40, rating=4.0, reviews=136104, source="meesho")
+        finally:
+            mod.requests.post = orig
+        self.assertTrue(ok)
+        cap = calls.get("caption", "")
+        self.assertIn("40% OFF", cap)
+        self.assertIn("4.0★", cap)
+        self.assertIn("1.36L ratings", cap)
+        self.assertIn("Meesho", cap)
+
+    def test_deal_returns_false_when_not_configured(self):
+        from bot.notify import Notifier
+        self.assertFalse(Notifier().deal("t", "₹1", "https://l"))
+
+
+class TestTelegramControlAutostart(unittest.TestCase):
+    """R74 — no extra process: the scheduler starts the control listener."""
+
+    def test_no_token_means_no_thread(self):
+        import os
+        from unittest import mock
+        import tempfile
+        from bot.config import Config
+        from bot.db import DB
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(raw={"storage": {"db_path": f"{tmp}/t.db",
+                                          "media_dir": f"{tmp}/m"}})
+            cfg.raw.setdefault("storage", {})
+            import pathlib
+            pathlib.Path(cfg.media_dir).mkdir(parents=True, exist_ok=True)
+            eng = Engine(cfg)
+            with mock.patch.dict(os.environ, {"TELEGRAM_TOKEN": ""}):
+                eng._start_telegram_control()
+            self.assertFalse(getattr(eng, "_tg_started", False))
+
+    def test_token_starts_one_thread_only(self):
+        import os
+        from unittest import mock
+        import tempfile
+        from bot.config import Config
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(raw={"storage": {"db_path": f"{tmp}/t.db",
+                                          "media_dir": f"{tmp}/m"}})
+            import pathlib
+            pathlib.Path(cfg.media_dir).mkdir(parents=True, exist_ok=True)
+            eng = Engine(cfg)
+            with mock.patch.dict(os.environ, {"TELEGRAM_TOKEN": "tok",
+                                              "TELEGRAM_CHAT_ID": "1"}), \
+                 mock.patch("bot.tgcontrol.TelegramControl.serve",
+                            return_value=None):
+                eng._start_telegram_control()
+                eng._start_telegram_control()          # second call = no-op
+            self.assertTrue(eng._tg_started)

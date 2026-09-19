@@ -97,6 +97,15 @@ FEATURES = [
      "instagram_stories / facebook token+campaign chosen per surface",
      lambda cfg: bool(cfg.get("affiliate.meesho_template_link")),
      "paste your af_invite link(s) in MEESHO_TEMPLATE_LINK"),
+    ("Telegram CONTROL bot (two-way)", "reach",
+     "phone nunchi machine ni control: /status /deals /link <url> /post <url> "
+     "/surfaces /pause /resume — owner chat matrame (scheduler lo auto-start)",
+     lambda cfg: bool(__import__("os").getenv("TELEGRAM_TOKEN", "").strip()),
+     "TELEGRAM_TOKEN + TELEGRAM_CHAT_ID in .env → python -m bot telegram"),
+    ("Per-surface posting records", "money",
+     "prati platform ki enni posts vellayo DB lo record — `bot platforms` lo "
+     "real counts (pinterest/instagram/facebook/youtube/telegram)",
+     lambda cfg: True, "always on"),
     ("Telegram deals channel", "reach",
      "every deal broadcast to your public Telegram channel",
      lambda cfg: bool(os.getenv("TELEGRAM_DEALS_CHANNEL", "")),
@@ -535,7 +544,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   695 automated tests.
+   709 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

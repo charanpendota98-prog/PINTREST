@@ -102,6 +102,9 @@ MIGRATIONS = [
     # trending signals scraped off the product page (★ average + count)
     "ALTER TABLE products ADD COLUMN rating REAL NOT NULL DEFAULT 0",
     "ALTER TABLE products ADD COLUMN reviews INTEGER NOT NULL DEFAULT 0",
+    # which surface a post row belongs to (pinterest/instagram/facebook/
+    # youtube/telegram) → `bot platforms` shows real per-surface counts
+    "ALTER TABLE posts ADD COLUMN platform TEXT NOT NULL DEFAULT 'pinterest'",
 ]
 
 
@@ -296,6 +299,17 @@ class DB:
                 f"INSERT INTO posts({cols}) VALUES({marks})", list(fields.values())
             )
             return int(cur.lastrowid)
+
+    def surface_counts(self) -> dict[str, int]:
+        """Posts per surface — one command answers 'anni chusthunnava?'."""
+        try:
+            with self._conn() as c:
+                rows = c.execute(
+                    "SELECT platform, COUNT(*) n FROM posts WHERE status='posted' "
+                    "GROUP BY platform").fetchall()
+            return {(r["platform"] or "pinterest"): int(r["n"]) for r in rows}
+        except Exception:  # noqa: BLE001 — reporting must never explode
+            return {}
 
     def update_post(self, post_id: int, **fields: Any) -> None:
         if not fields:
