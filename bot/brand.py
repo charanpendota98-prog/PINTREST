@@ -27,8 +27,14 @@ SPAM_WORDS = ("cheap", "free", "clickbait", "loot", "offer offer")
 
 # keyword-forward names, grouped by the niches the bot actually hunts
 NAME_IDEAS: dict[str, list[str]] = {
+    # R56: the researched final answer — coined + ownable beats descriptive
+    # (NestKart / NestBazaar / Aangan / Nestora / Grihika are all in use).
+    "🏆 FINAL PICK (coined, ownable)": [
+        "Gharvana | Home & Kitchen",
+        "Gharvana | Home Decor Finds",
+        "Gharvana | Kitchen & Home",
+    ],
     "all-round (safe default)": [
-        "PinDrop Deals | Home & Kitchen",
         "Deal Drops | Home & Kitchen Finds",
         "Smart Finds India | Kitchen",
     ],
@@ -333,6 +339,8 @@ def lines(cfg, name: str = "") -> list[str]:
         for e in check["errors"]:
             out.append(f"   ⛔ {e}")
     out += [""] + profile_form(cfg, name)
+    out.append('   🏷️  Naming engine: python -m bot name "<Brand>" [--live] — '
+               "score + collision memory + live check")
     out += ["📋 READY-TO-PASTE PROFILE FIELDS:",
             f"   Display name: {name or '(pick one above)'}",
             f"   Bio ({BIO_MAX} max): {bio_for(name or 'PinDrop Deals')}"]
@@ -340,6 +348,6 @@ def lines(cfg, name: str = "") -> list[str]:
     for b in board_plan()[:6]:
         out.append(f"     • {b['title']} ({len(b['title'])} chars)")
     out += ["",
-            "⚙️  Save your choice:  python -m bot brand \"PinDrop Deals | Home & Kitchen Finds\"",
+            "⚙️  Save your choice:  python -m bot brand \"Gharvana | Home & Kitchen\"",
             "   (writes the pin strip + display name into config.yaml)"]
     return out

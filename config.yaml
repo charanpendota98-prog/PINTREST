@@ -90,7 +90,7 @@ design:
   width: 1000
   height: 1500             # Pinterest's ideal 2:3 vertical ratio
   accent_color: "#E60023"
-  brand_name: PinDrop Deals  # your page/brand strip on every pin ("" = off)
+  brand_name: Gharvana  # your page/brand strip on every pin ("" = off)
   cta_text: "Shop Now ➜"
 
 affiliate:
@@ -173,7 +173,7 @@ dashboard:
 timezone: Asia/Kolkata
 
 brand:
-  handle: pindropdeals_home
-  display_name: "PinDrop Deals | Home & Kitchen"
-  bio: "PinDrop Deals shares easy home, kitchen & style finds under ₹999 — organizers, gadgets, kurtas and beauty picks. New deals daily. Tap the pin to shop."
+  display_name: "Gharvana | Home & Kitchen"
+  bio: "Gharvana shares easy home, kitchen & style finds under ₹999 — organizers, gadgets, kurtas and beauty picks. New deals daily. Tap the pin to shop."
+  handle: gharvana
 

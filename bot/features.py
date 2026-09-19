@@ -329,13 +329,24 @@ def print_how_it_works() -> None:
    **Website field warning** — t.me / wa.me / shortener link unte refuse
    chestundi (claim cheyyaleru → Rich Pins + attribution povu, spam signal).
 
-16) SAFETY (account safe, money safe)
+16) BRAND NAMING ENGINE (R56) — "final ga okati cheddam"
+   🏷️ `python -m bot name "<Brand>" [--live]`: oka peru ni 100-point scale lo
+   score chestundi (brevity · pronounceability · spam-coding · numbers · home
+   root · distinctiveness) + **collision memory** (research chesina taken
+   names: NestKart, NestBazaar, Nestora, Aangan, Grihika) + `--live` tho
+   Pinterest/Instagram handle probe + domain probe (.com/.in).
+   🎯 Final brand: **Gharvana** (ghar + nirvana = "home bliss") —
+   Name field `Gharvana | Home & Kitchen`, handle `@gharvana`.
+   Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
+   = ownable brand + full keyword reach.
+
+17) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   434 automated tests.
+   459 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

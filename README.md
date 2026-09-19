@@ -193,13 +193,44 @@ Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 > leda `pindrop_deals` vaadandi. `python -m bot handle <name>` cleaner variants
 > ni cheptundi.
 
-**Chosen handle = `pindropdeals_home`** (saved in `config.yaml` as
-`brand.handle`). Adi ippudu 3 chotla pani chestundi:
+### 🏆 FINAL BRAND (R56): **Gharvana** — `@gharvana`
+
+| Field | Value |
+|---|---|
+| **Name** (ranked keyword field) | `Gharvana | Home & Kitchen` |
+| **Username / handle** | `gharvana` (same on Pinterest + Instagram) |
+| **Pin strip** (artwork) | `Gharvana` |
+| **About** | `Gharvana shares easy home, kitchen & style finds under ₹999 — organizers, gadgets, kurtas and beauty picks. New deals daily. Tap the pin to shop.` |
+
+**Enduku "deals" vadilesamu** (research tho, opinion kaadu):
+- `NestKart` → nestkart.in live store, same categories
+- `NestBazaar` → `pinterest.com/nestbazaar1` — **active home & kitchen
+  affiliate account, exact same model**
+- `Aangan` → aanganofindia.com · `Nestora` → nestorahome.us / nestora.pk ·
+  `Grihika` → girikaflair.com
+- Descriptive names anni crowded → **coined name = ownable**, and keywords
+  belong in the NAME field (adi ranked), not in the handle (URL matrame).
+
+**Gharvana = Ghar + Nirvana** ("home bliss") — 8 letters, 3 syllables, spam-coding
+ledu (loot/free/cheap ledu), numbers ledu.
+
+```bash
+python -m bot name "Gharvana" --live   # score + live handle/domain check
+python -m bot name                     # current brand decision sheet
+```
+
+Brand marchali ante (rendu commands, config comments safe):
+`python -m bot brand "Brand | Home & Kitchen"` + `python -m bot handle <name>`
+
+### Handle wiring
+
+Saved handle (`brand.handle`) 4 chotla pani chestundi:
 1. landing page JSON-LD lo `sameAs` (Pinterest + Instagram profile URLs) —
    Google/social entity linking;
-2. landing page lo "📌 Follow @pindropdeals_home" link — visitors ni followers
-   ga marchutundi (free reach);
-3. `bot onboard` / `bot brand` lo ide handle kanipistundi (paste cheyyadaniki).
+2. landing page lo "📌 Follow @gharvana" link — visitors ni followers ga
+   marchutundi (free reach);
+3. `bot onboard` / `bot brand` lo ide handle kanipistundi (paste cheyyadaniki);
+4. `bot ready` profile item auto-detect (handle+name+bio+strip unte done).
 
 > 💡 **Name field unique kaadu** — `PinDrop Deals | Home & Kitchen` pettachu
 > (adi keyword/ranking field). Handle lo keywords stuff cheyyakandi (adi URL

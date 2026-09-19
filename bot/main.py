@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
   python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
   python -m bot handle check [names]     # 🔎 live: which handles are free?
   python -m bot onboard                  # 📋 every Pinterest screen → what to select
@@ -912,6 +913,23 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+def cmd_name(cfg, rest: list[str]) -> int:
+    """🏷️ Brand naming: score a name + live-verify handle/domain."""
+    from . import naming as _naming
+    words = [w for w in rest if not w.startswith("-")]
+    live = any(w in ("--live", "-l", "live", "check") for w in rest)
+    name = " ".join(words).strip()
+    print()
+    if name:
+        print("\n".join(_naming.report(name, cfg, live=live)))
+    else:
+        current = str(cfg.get("brand.display_name", "") or "")
+        current = current.split("|")[0].strip() or "PinDrop Deals"
+        print("\n".join(_naming.report(current, cfg, live=live)))
+    print()
+    return 0
+
+
 def cmd_handle(cfg, rest: list[str]) -> int:
     """🔗 Pinterest/IG handle: rules, ranked fallbacks, save the choice."""
     from . import handles as _handles
@@ -1220,6 +1238,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd in ("name", "naming", "brand-name"):
+        return cmd_name(cfg, rest)
     if cmd in ("handle", "handles"):
         return cmd_handle(cfg, rest)
     if cmd in ("onboard", "onboarding"):
