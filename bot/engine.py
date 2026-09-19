@@ -86,7 +86,7 @@ class Engine:
         self.cfg = cfg
         self.db = db or DB(cfg.db_path)
         self.scraper = Scraper(cfg)
-        self.linker = AffiliateLinker(cfg)
+        self.linker = AffiliateLinker.from_cfg(cfg)
         self.designer = PinDesigner(cfg)
         self.reel = ReelMaker(cfg)
         self.api = PinterestAPI(cfg)

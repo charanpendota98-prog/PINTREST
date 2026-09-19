@@ -380,11 +380,19 @@ Saved handle (`brand.handle`) 4 chotla pani chestundi:
 > status chupistundi. Thappu format isthe save cheyyadu, enduku + fix cheptundi.
 
 > ⚠️ **EarnKaro referral link (`earnkaro.com?r=…`) pani cheyyadu** — adi vere
-> vaallu EarnKaro join ayye link, product clicks ki commission raadu. Kavalsinadi
-> **deeplink prefix** (`https://ekaro.in/enkr…`) — EarnKaro dashboard lo
-> "Create affiliate link" → adi copy. Bot daaniki `?url=<product>` append
-> chestundi. Ledu ante aa store links (Flipkart/Myntra/Ajio) ki tracking ledu →
-> QA gate aa pins ni **quarantine** chestundi (leak avvadu, kani post avvavu).
+> vaallu EarnKaro join ayye link, product clicks ki commission raadu.
+>
+> 🏷 **Best: EarnKaro API token** — `python -m bot earnkaro capture` (browser
+> login → token auto-save), leda `python -m bot creds --earnkaro-token '<jwt>'`.
+> Appudu bot prati product URL ni **nee own profit link** ki convert chestundi —
+> `webapi.earnkaro.com/api/affiliate/link-converter` (EarnKaro site/app vaade API),
+> commission nee EarnKaro account ki **direct** (reseller / middleman ledu).
+> Live proof: `python -m bot earnkaro probe` · cache: `data/earnkaro_links.json`
+> (product okkasari convert aithe malli call ledu — API down aina post avutundi).
+>
+> ℹ️ Deeplink **prefix** (`ekaro.in/enkr…` + `?url=<product>`) legacy fallback —
+> API token unte daanavasaram ledu. Tracking ledu ante aa store pins QA gate
+> **quarantine** chestundi (leak avvadu, kani post avvavu).
 ```bash
 cp .env.example .env
 # edit .env:
@@ -411,7 +419,8 @@ affiliate:
   amazon_tag: "yourtag-21"
   meesho_affid: "MEESH123"          # Meesho affiliate program id
   flipkart_affid: ""                # or let it wrap via EarnKaro/Cuelinks
-  earnkaro_prefix: "https://ekaro.in/enkr2024xxxxx"   # EarnKaro personal link
+  earnkaro_api_token: "eyJhbGciOi…"  # ⭐ `python -m bot earnkaro capture`
+  earnkaro_prefix: ""               # legacy fallback only (no API token)
   cuelinks_template: "https://...cuelinks...?url={url}"
 ```
 Priority: Amazon tag → Meesho affid → Flipkart affid → EarnKaro → Cuelinks → generic.

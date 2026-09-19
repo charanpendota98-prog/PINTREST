@@ -19,7 +19,11 @@ Usage:
   python -m bot app [--site URL]         # 📝 Pinterest app form — exact answers
   python -m bot app --where              # 🧭 app page open cheyyadam ela (click path)
   python -m bot app --pending            # ⏳ trial pending lo emi lock, emi cheyyochu
-  python -m bot creds [--amazon T --earnkaro P …]  # 🔑 validate + save credentials
+  python -m bot creds [--amazon T --earnkaro-token JWT …]  # 🔑 validate + save creds
+  python -m bot earnkaro                 # 🏷  EarnKaro API: status (every store)
+  python -m bot earnkaro probe           # 🔎 live proof: token → API → link
+  python -m bot earnkaro capture         # 🌐 browser login → token auto-save
+  python -m bot earnkaro convert <url>   # 💸 convert one product URL right now
   python -m bot token-check [--write-test]  # 🔐 token entha cheyyagaladu (live)
   python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
   python -m bot name --next              # 🚨 handle taken? → variants + auto-pick
@@ -275,7 +279,7 @@ def cmd_add_csv(cfg, path: str) -> int:
                     from .scraper import detect_source
                     import time
                     src = detect_source(url)
-                    linker = AffiliateLinker(cfg)
+                    linker = AffiliateLinker.from_cfg(cfg)
                     aff_url, network = linker.convert(url, src)
                     prod = type("P", (), {"image_url": image_url, "title": title,
                                           "price": price, "currency": "INR"})()
@@ -929,6 +933,8 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 CRED_FLAGS = {
     "--amazon": "AMAZON_TAG",
     "--earnkaro": "EARNKARO_PREFIX",
+    "--earnkaro-token": "EARNKARO_API_TOKEN",
+    "--earnkaro-api": "EARNKARO_API_TOKEN",
     "--meesho": "MEESHO_TEMPLATE_LINK",
     "--meesho-affid": "MEESHO_AFFID",
     "--flipkart": "FLIPKART_AFFID",
@@ -965,7 +971,8 @@ def cmd_creds(cfg, rest: list[str]) -> int:
         res = _creds.apply_credentials(pairs)
         for item in res["results"]:
             if item["ok"]:
-                print(f"✅ {item['key']} saved: {item['value']}")
+                print(f"✅ {item['key']} saved: "
+                      f"{_creds.mask(item['key'], item['value'])}")
                 if item.get("note"):
                     print(f"   ℹ️ {item['note']}")
             else:
@@ -1392,6 +1399,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd in ("creds", "credentials", "keys"):
         return cmd_creds(cfg, rest)
+    if cmd in ("earnkaro", "ekaro", "profit-link", "profitlink"):
+        from .earnkaro import cli as _ekaro_cli
+        return _ekaro_cli(cfg, rest)
     if cmd in ("token-check", "tokencheck", "whoami"):
         return cmd_token_check(cfg, rest)
     if cmd in ("app", "app-form", "appform"):

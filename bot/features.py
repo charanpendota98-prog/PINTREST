@@ -100,6 +100,12 @@ FEATURES = [
     ("IG ManyChat-grade auto-DM", "engagement", "keyword DMs → product + buy link",
      lambda cfg: bool(os.getenv("INSTAGRAM_ACCESS_TOKEN", "")),
      "instagram_manage_messages scope; instagram.auto_dm"),
+    ("EarnKaro auto-convert API", "money",
+     "ANY product URL → your own ekaro.in profit link (direct commission)",
+     lambda cfg: bool(os.getenv("EARNKARO_API_TOKEN", "") or
+                      os.getenv("EARNKARO_TOKEN", "") or
+                      cfg.get("affiliate.earnkaro_api_token", "")),
+     "python -m bot earnkaro capture  (or creds --earnkaro-token)"),
     ("Meesho DIRECT af_invite", "money", "bot builds links with your IDs",
      lambda cfg: bool(os.getenv("MEESHO_TEMPLATE_LINK", "") or
                       cfg.get("affiliate.meesho_template_link", "")),
@@ -340,6 +346,21 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+26) EARNKARO API — PRATI STORE, NEE OWN LINK (R66)
+   🏷  Owner EarnKaro session token icchadu → bot ippudu **EarnKaro web API**
+   (`webapi.earnkaro.com/api/affiliate/link-converter`) tho prati product URL ni
+   real profit link ga convert chestundi — Flipkart/Myntra/Ajio/Nykaa/Croma…
+   anni **direct**, commission nee OWN EarnKaro account ki (middleman ledu).
+   ⛔ `ekaro-api.affiliaters.in` laanti reseller APIs refuse — avi third party.
+   🔁 Token ela teesukovali: `python -m bot earnkaro capture` (browser login →
+   token auto-capture, .env ki save) leda DevTools manual path.
+   🧠 Cache (`data/earnkaro_links.json`): product okkasari convert aithe malli
+   API call ledu — API down aina publish jarugutundi. Request/response shape
+   marithe bot next shape try chesi pani chesina daanni gurtu pettukuntundi.
+   🛡️ Failure aithe link EH ivvadu → QA gate aa pin ni quarantine chestundi
+   (untracked link eppudu post avvadu). Live proof: `python -m bot earnkaro probe`.
+   ⏱️  Sandbox nunchi EarnKaro reach avvadu (network block) — proof VPS/laptop lo.
+
 25) CREDENTIAL INTAKE + LEAK PROOF (R65)
    🔑 `python -m bot creds [--amazon T --earnkaro P --meesho L …]`: prati
    credential ni **validate chesi** .env lo save chestundi (comments safe,
@@ -432,11 +453,12 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   582 automated tests.
+   642 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
-   EarnKaro, IG token, FB token. 5-10 nimushalu, oka saari.
+   EarnKaro API token (`python -m bot earnkaro capture`), IG token, FB token.
+   5-10 nimushalu, oka saari.
    Tarvata: sudo ./deploy.sh → 24x7 automatic.
    Deploy ready aa? → python -m bot deploy-check   (✅/❌ checklist)
    Panel password → python -m bot dashboard-pass

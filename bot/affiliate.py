@@ -5,7 +5,8 @@ Converts any product URL into YOUR monetized link:
   amazon.*   -> adds/replaces your Amazon Associates ?tag=
   meesho     -> appends your Meesho affid / campaign params
   flipkart   -> Flipkart affiliate param, or wrapped via EarnKaro/Cuelinks
-  other      -> wrapped via EarnKaro > Cuelinks > generic template
+  other      -> wrapped via EarnKaro (API token = real profit link) >
+                Cuelinks > generic template
 
 Priority: amazon > meesho > flipkart > configured default_wrapper.
 """
@@ -27,8 +28,21 @@ FLIPKART_PID_RE = re.compile(r"pid=([A-Z0-9]+)")
 
 
 class AffiliateLinker:
-    def __init__(self, cfg):
+    def __init__(self, cfg, converter=None):
         self.cfg = cfg
+        # `converter(url) -> monetized_url | None` — the EarnKaro API call.
+        # Injected only at publishing call sites (see from_cfg) so that tests
+        # and read-only checks never touch the network.
+        self._converter = converter
+
+    @classmethod
+    def from_cfg(cls, cfg):
+        """Linker with the live EarnKaro converter attached (when usable)."""
+        try:
+            from .earnkaro import build_converter
+            return cls(cfg, converter=build_converter(cfg))
+        except Exception:  # noqa: BLE001 — never let money-wiring break a run
+            return cls(cfg)
 
     # ------------------------------------------------------------- config
     @property
@@ -49,6 +63,12 @@ class AffiliateLinker:
     def earnkaro_prefix(self) -> str:
         return (os.getenv("EARNKARO_PREFIX", "") or
                 self.cfg.get("affiliate.earnkaro_prefix", "") or "").strip()
+
+    @property
+    def earnkaro_api_token(self) -> str:
+        return (os.getenv("EARNKARO_API_TOKEN", "") or
+                os.getenv("EARNKARO_TOKEN", "") or
+                self.cfg.get("affiliate.earnkaro_api_token", "") or "").strip()
 
     @property
     def cuelinks_template(self) -> str:
@@ -292,6 +312,19 @@ class AffiliateLinker:
         return self._wrap(url, skip_source="flipkart")
 
     def _wrap_earnkaro(self, url: str) -> str:
+        """Monetize via the EarnKaro API, else the (legacy) static prefix.
+
+        The API hands back a REAL per-product profit link for the owner's own
+        account; the prefix convention can only ever guess. Order: API → prefix.
+        """
+        if self._converter is not None:
+            try:
+                got = self._converter(url)
+            except Exception as e:  # noqa: BLE001 — network hiccup != crash
+                log.warning("earnkaro conversion failed: %s", e)
+                got = None
+            if got:
+                return got
         if not self.earnkaro_prefix:
             return ""
         sep = "&" if "?" in self.earnkaro_prefix else "?"

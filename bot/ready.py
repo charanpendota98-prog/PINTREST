@@ -69,6 +69,8 @@ def _checks(cfg, os) -> list[dict]:
          "python -m bot auth --code <CODE>"), minutes=3))
 
     money_any = bool(cfg.amazon_tag or cfg.get("affiliate.meesho_affid")
+                     or cfg.get("affiliate.earnkaro_api_token")
+                     or os.getenv("EARNKARO_API_TOKEN")
                      or cfg.get("affiliate.earnkaro_prefix")
                      or cfg.get("affiliate.cuelinks_template")
                      or cfg.get("affiliate.meesho_template_link"))
@@ -84,6 +86,14 @@ def _checks(cfg, os) -> list[dict]:
         "affiliate.meesho.com → create ONE af_invite link → "
         ".env MEESHO_TEMPLATE_LINK (used verbatim, never rewritten)",
         minutes=3, optional=True, recommended=True))
+    items.append(_item(
+        "earnkaro_api", "EarnKaro API token (every other store auto-converts)",
+        bool(os.getenv("EARNKARO_API_TOKEN", "") or os.getenv("EARNKARO_TOKEN", "")
+             or cfg.get("affiliate.earnkaro_api_token", "")),
+        "python -m bot earnkaro capture  (browser login → token auto-save)\n"
+        "   leda DevTools → webapi.earnkaro.com → Authorization → "
+        "python -m bot creds --earnkaro-token '<jwt>'",
+        minutes=2, optional=True, recommended=True))
     items.append(_item(
         "amazon_tag", "Amazon Associates tag (for Amazon pins)",
         bool(cfg.amazon_tag), "affiliate-program.amazon.in → your tag → .env",

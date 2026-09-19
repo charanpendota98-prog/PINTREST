@@ -15,10 +15,13 @@ import os
 import re
 from pathlib import Path
 
+from .earnkaro import validate_token as _validate_ekaro_token
+
 ENV_ORDER = (
     "PINTEREST_APP_ID", "PINTEREST_APP_SECRET", "PINTEREST_ACCESS_TOKEN",
     "PINTEREST_REFRESH_TOKEN", "AMAZON_TAG", "MEESHO_TEMPLATE_LINK",
-    "MEESHO_AFFID", "FLIPKART_AFFID", "EARNKARO_PREFIX", "CUELINKS_TEMPLATE",
+    "MEESHO_AFFID", "FLIPKART_AFFID", "EARNKARO_PREFIX", "EARNKARO_API_TOKEN",
+    "CUELINKS_TEMPLATE",
     "INSTAGRAM_TOKEN", "IG_USER_ID", "FB_PAGE_TOKEN", "FB_PAGE_ID",
 )
 
@@ -77,6 +80,17 @@ def classify_earnkaro(value: str) -> dict:
                    "prefix copy cheyyandi."}
 
 
+def validate_earnkaro_token(value: str) -> dict:
+    """EarnKaro API JWT (payload {_id, earnkaro, iat}) — shape checked offline.
+
+    This is the token the EarnKaro site/app sends to
+    webapi.earnkaro.com/api/affiliate/link-converter. With it the bot converts
+    ANY product URL into the owner's own profit link, so commission lands in
+    HIS EarnKaro account (never a reseller/middleman).
+    """
+    return _validate_ekaro_token(value)
+
+
 def validate_meesho(value: str) -> dict:
     """Meesho must be the owner's own af_invite (direct commission)."""
     v = str(value or "").strip().strip("'\"")
@@ -97,6 +111,7 @@ def validate_meesho(value: str) -> dict:
 VALIDATORS = {
     "AMAZON_TAG": validate_amazon_tag,
     "EARNKARO_PREFIX": classify_earnkaro,
+    "EARNKARO_API_TOKEN": validate_earnkaro_token,
     "MEESHO_TEMPLATE_LINK": validate_meesho,
     "MEESHO_AFFID": lambda v: ({"ok": bool(str(v).strip()), "tag": str(v).strip()}
                                if str(v).strip() else {"ok": False, "error": "khali"}),
@@ -110,6 +125,18 @@ VALIDATORS = {
 PASSTHROUGH = ("PINTEREST_ACCESS_TOKEN", "PINTEREST_REFRESH_TOKEN",
                "PINTEREST_APP_ID", "PINTEREST_APP_SECRET", "INSTAGRAM_TOKEN",
                "IG_USER_ID", "FB_PAGE_TOKEN", "FB_PAGE_ID")
+
+
+SECRETISH = ("TOKEN", "SECRET", "PASSWORD", "API_KEY")
+
+
+def mask(key: str, value: str) -> str:
+    """Never echo a raw secret back to a terminal, log or screenshot."""
+    v = str(value or "")
+    k = str(key or "").upper()
+    if any(tag in k for tag in SECRETISH) and len(v) > 12:
+        return f"{v[:10]}\u2026({len(v)} chars)"
+    return v
 
 
 def env_path() -> Path:
@@ -165,8 +192,8 @@ def apply_credentials(pairs: list[tuple[str, str]], path: str | Path | None = No
             continue
         check = validator(value) if validator else {"ok": True}
         if check.get("ok"):
-            stored = check.get("tag") or check.get("prefix") or \
-                check.get("link") or value
+            stored = (check.get("value") or check.get("tag") or
+                      check.get("prefix") or check.get("link") or value)
             accepted[key] = str(stored)
             results.append({"key": key, "ok": True, "value": str(stored),
                             "note": check.get("note") or check.get("warn", "")})
@@ -203,6 +230,16 @@ def status_lines(cfg=None) -> list[str]:
     meesho = _val("MEESHO_TEMPLATE_LINK", "affiliate.meesho_template_link")
     meesho_aff = _val("MEESHO_AFFID", "affiliate.meesho_affid")
     ekaro = _val("EARNKARO_PREFIX", "affiliate.earnkaro_prefix")
+    ekaro_tok = _env("EARNKARO_API_TOKEN") or _env("EARNKARO_TOKEN")
+    ekaro_who = ""
+    if ekaro_tok:
+        try:
+            from .earnkaro import decode_token as _dec
+            info = _dec(ekaro_tok)
+            ekaro_who = (f"id {info.get('earnkaro')} · {info.get('age_days')}d "
+                         f"old" if info.get("ok") else "shape doubtful")
+        except Exception:  # noqa: BLE001
+            ekaro_who = "set"
     pin_id = _val("PINTEREST_APP_ID")
     pin_tok = _env("PINTEREST_ACCESS_TOKEN") or _env("PINTEREST_REFRESH_TOKEN")
 
@@ -220,8 +257,11 @@ def status_lines(cfg=None) -> list[str]:
         f"   {mark(bool(meesho))} Meesho af_invite     : "
         f"{'set (DIRECT commission ✅)' if meesho else '(not set)'}"
         + (f"  [affid: {meesho_aff}]" if meesho_aff else ""),
+        f"   {mark(bool(ekaro_tok))} EarnKaro API token  : "
+        f"{ekaro_who or '(not set)'}"
+        + ("   ← every store auto-converts ✅" if ekaro_tok else ""),
         f"   {mark(bool(ekaro))} EarnKaro deeplink    : "
-        f"{ekaro or '(not set)'}",
+        f"{ekaro or '(legacy prefix, not needed with the API)'}",
         "",
     ]
     if not meesho:
@@ -234,13 +274,20 @@ def status_lines(cfg=None) -> list[str]:
     if amazon:
         out.append(f"   • Amazon pins: tag '{amazon}' tho direct Associates "
                    "commission (EarnKaro avasaram ledu).")
-    if ekaro:
-        out.append("   • Vere stores (Flipkart/Myntra/Ajio…): EarnKaro deeplink "
-                   "tho wrap.")
+    if ekaro_tok:
+        out.append("   • Flipkart/Myntra/Ajio/Nykaa… prati product URL ni EarnKaro "
+                   "API nee OWN profit link ki convert chestundi (direct).")
+        out.append("     Live proof: python -m bot earnkaro probe")
+    elif ekaro:
+        out.append("   • Vere stores: legacy deeplink prefix tho wrap "
+                   "(best: `python -m bot earnkaro capture` → API token).")
+    else:
+        out.append("   • Flipkart/Myntra/Ajio ki tracking ledu → ee round lo "
+                   "`python -m bot earnkaro capture` cheyyandi.")
     out += [
         "",
         "   Save cheyyadam:  python -m bot creds --amazon <tag> "
-        "--earnkaro <ekaro.in/enkr…>",
+        "--earnkaro-token <jwt>",
         "   Validate cheyyadam: python -m bot creds   (ee status eh)",
     ]
     return out
