@@ -90,7 +90,7 @@ design:
   width: 1000
   height: 1500             # Pinterest's ideal 2:3 vertical ratio
   accent_color: "#E60023"
-  brand_name: "Deal Drops" # your page/brand strip on every pin ("" = off)
+  brand_name: Ghar Finds  # your page/brand strip on every pin ("" = off)
   cta_text: "Shop Now ➜"
 
 affiliate:
@@ -171,3 +171,7 @@ dashboard:
   secret_key: ""
 
 timezone: Asia/Kolkata
+
+brand:
+  display_name: "Ghar Finds | Home & Kitchen"
+  bio: "Ghar Finds shares easy home, kitchen & style finds under ₹999 — organizers, gadgets, kurtas and beauty picks. New deals daily. Tap the pin to shop."

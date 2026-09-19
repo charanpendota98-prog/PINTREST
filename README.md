@@ -91,6 +91,24 @@ Pinterest lo **Claim** cheyandi (Settings → Claimed accounts). Claim cheste
 3. Enable scopes: `boards:read, boards:write, pins:read, pins:write, user_accounts:read`
 4. Copy **App ID** and **App Secret**.
 
+### 2c. Brand name + profile SEO (one command)
+
+Pinterest is a search engine, so the **display name is a ranked field**. The
+2026 format that works: `Brand | Primary Niche Keyword`, ideally ≤30 chars so it
+never truncates on mobile. The **pin strip** is different — it is printed on
+every pin artwork and must stay SHORT (2-4 words).
+
+```bash
+python -m bot brand                              # rules + name ideas + bio + boards
+python -m bot brand "PinDrop Deals | Home & Kitchen"   # save your choice
+```
+Saving writes both roles into `config.yaml` (`design.brand_name` = short strip,
+`brand.display_name` + `brand.bio` = profile copy) and leaves every other line,
+including comments, untouched.
+
+Also pick the **username/handle** as the plain brand (e.g. `pindropdeals`) and
+use the same handle on Instagram so the two accounts reinforce each other.
+
 ### 3. Secrets — copy `.env.example` → `.env` and fill in
 ```bash
 cp .env.example .env

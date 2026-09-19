@@ -99,6 +99,11 @@ DEFAULTS: dict[str, Any] = {
         "page_id": "",             # or FACEBOOK_PAGE_ID in .env
         "mode": "photo",           # photo | link (landing page)
     },
+    "brand": {
+        # 🏷️ Pinterest profile SEO (python -m bot brand writes these)
+        "display_name": "",     # "PinDrop Deals | Home & Kitchen Finds"
+        "bio": "",              # <=160 chars, keywords early + CTA
+    },
     "instagram": {
         "enabled": False,          # set true once token is ready
         "ig_user_id": "",          # or IG_USER_ID in .env

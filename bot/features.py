@@ -281,13 +281,23 @@ def print_how_it_works() -> None:
    🏪 STORE MIX: queue lo okate store 70%+ unte radar hunt vere store
      products prefer chestundi (payout + platform risk taggadaniki).
 
-13) SAFETY (account safe, money safe)
+13) BRAND / PROFILE SEO (R50) — reach ki name eppudu
+   🏷️ `python -m bot brand ["Name | Niche"]`:
+   - Pinterest display name = ranked field → 'Brand | Niche Keyword'
+     (≤30 chars mobile-ok, ≤40 truncation-safe) — validate chestundi.
+   - Pin strip (design.brand_name) = visual → SHORT brand only (2-4 words).
+   - Ready-to-paste bio (≤160 chars, keywords early + CTA) + keyword-rich
+     board titles (≤50 chars, 15-20 pins each) + 2026 strongest niches list.
+   - Save chesinappudu config.yaml surgical ga update (comments intact —
+     yaml.safe_dump comments ni tagalestundi, adi bug ga pattukunnam).
+
+14) SAFETY (account safe, money safe)
    Pin-by-Pin QA gate (media/link/title/desc/duplicate/#ad) — API call ki
    mundhe, dummy-product guard (demo data live account ki NEVER post),
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   319 automated tests.
+   338 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

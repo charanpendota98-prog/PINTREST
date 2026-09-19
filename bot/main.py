@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot brand ["Name | Niche"]   # 🏷️ profile name/bio/boards for reach
   python -m bot scale [target]           # 🎯 ₹ target → clicks/posts/day math
   python -m bot ready                    # 🎯 what is left for YOU to do (one time)
   python -m bot pause [reason]           # ⏸ stop posting (kill switch)
@@ -902,6 +903,27 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+
+def cmd_brand(cfg, rest: list[str]) -> int:
+    """🏷️  Brand/profile SEO: pick the name that actually earns reach."""
+    from . import brand as _brand
+    name = " ".join(rest).strip()
+    if name:
+        res = _brand.save(cfg, name)
+        print()
+        for line in _brand.lines(cfg, name):
+            print(line)
+        print()
+        if res.get("saved"):
+            print(f"✅ Saved — pin strip «{res['strip']}», display name "
+                  f"«{res['name']}» (config.yaml)")
+        else:
+            print("❌ Not saved — fix the errors above and try again")
+        return 0 if res.get("saved") else 2
+    print("\n" + "\n".join(_brand.lines(cfg)) + "\n")
+    return 0
+
+
 def cmd_scale(cfg, rest: list[str]) -> int:
     """🎯 Revenue target → honest clicks/posts/day math + what to do."""
     from . import scale
@@ -1126,6 +1148,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd == "brand":
+        return cmd_brand(cfg, rest)
     if cmd == "scale":
         return cmd_scale(cfg, rest)
     if cmd == "ready":
