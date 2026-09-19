@@ -340,6 +340,14 @@ def print_how_it_works() -> None:
    Lekka: descriptive names anni crowded; coined name + NAME field lo keywords
    = ownable brand + full keyword reach.
 
+21) APP-FORM ANSWER SHEET (R61)
+   📝 `python -m bot app [--site URL]`: Pinterest 'Connect app' form lo prati
+   field ki exact answer print (app name, company, purpose free-text, developer
+   purpose = personal API access, use cases 2, audience Businesses, reads =
+   'Yes, mine'), + submit-tarvata redirect URI + minimal scopes.
+   `--site https://yourdomain.com` → `link.public_base` save (comment-preserving)
+   and /about + /privacy real URLs tho chupistundi (placeholders levu).
+
 20) APP-REVIEW READY PUBLIC PAGES (R60)
    🌐 Bot eh serve chestundi: `/about` (company page), `/privacy` (privacy
    policy), `/terms` (terms of use) — Pinterest/Meta app forms adigevi, real
@@ -385,7 +393,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   500 automated tests.
+   517 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

@@ -145,6 +145,15 @@ aa pages ni serve chestundi (third-party site avasaram ledu):
 Ee moodu **public** (login ledu) and domain-verify meta tag kuda veetilo
 padutundi (`python -m bot claim <token>` tarvata).
 
+```bash
+python -m bot app                      # form ki exact answers (copy-paste)
+python -m bot app --site https://yourdomain.com   # URLs ni real ga set cheyyi
+```
+`--site` ee URL ni `link.public_base` lo save chestundi (comments safe) — app
+form lo `/about` + `/privacy` links automatic ga correct ga vasthayi. Ippudu set
+cheyyakapote sheet lo `http://<VPS-IP>:5000/about` la placeholders chupistundi
+(and "submit cheyyaku mundu set cheyyi" ani warn chestundi).
+
 Form answers (personal-use app ki — idi correct, honest route):
 
 | Field | Answer |

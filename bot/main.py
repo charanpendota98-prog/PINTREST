@@ -16,6 +16,7 @@ Usage:
   python -m bot radar                    # 🧭 most useful products (0-100 score)
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
+  python -m bot app [--site URL]         # 📝 Pinterest app form — exact answers
   python -m bot name ["Brand | Niche"]   # 🏷️ score a brand name (+ --live verify)
   python -m bot name --next              # 🚨 handle taken? → variants + auto-pick
   python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
@@ -914,6 +915,28 @@ def cmd_keywords(cfg, seeds: list[str]) -> int:
 
 
 
+def cmd_app(cfg, rest: list[str]) -> int:
+    """📝 Pinterest 'Connect app' form — exact answers (+ --site to save URL)."""
+    from . import appform as _appform
+    rest = list(rest)
+    site = ""
+    for i, word in enumerate(rest):
+        if word == "--site" and i + 1 < len(rest):
+            site = rest[i + 1]
+        elif word.startswith("--site="):
+            site = word.split("=", 1)[1]
+    print()
+    if site:
+        res = _appform.save_site(cfg, site)
+        if res.get("saved"):
+            print(f"✅ Site saved: {res['url']}  (link.public_base)")
+        else:
+            print(f"❌ {res.get('error', 'save failed')}")
+    print("\n".join(_appform.lines(cfg)))
+    print()
+    return 0
+
+
 def cmd_name(cfg, rest: list[str]) -> int:
     """🏷️ Brand naming: score a name + live-verify handle/domain."""
     from . import naming as _naming
@@ -1271,6 +1294,8 @@ def main(argv: list[str] | None = None) -> int:
         from .features import print_report
         print_report(cfg)
         return 0
+    if cmd in ("app", "app-form", "appform"):
+        return cmd_app(cfg, rest)
     if cmd in ("name", "naming", "brand-name"):
         return cmd_name(cfg, rest)
     if cmd in ("handle", "handles"):

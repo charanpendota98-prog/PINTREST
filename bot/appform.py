@@ -1,0 +1,151 @@
+"""R61: the exact answers for Pinterest's "Connect app" form.
+
+The form asks for a company website and a privacy policy URL, and the bot
+already serves both (`/about`, `/privacy`, `/terms`). This module turns that into
+one printable answer sheet — plus `--site <url>` to save the public base URL so
+the sheet stops showing placeholders.
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+APP_NAME = "Gharvanaa Deals Publisher"
+COMPANY = "Gharvanaa"
+ICON = "brand/app_icon_1024.png"
+
+PURPOSE_TEXT = (
+    "Internal publishing tool for our own Pinterest business account. It uses "
+    "the Pinterest API only on that single account to: create boards, publish "
+    "our own curated product pins on a schedule, and read our own pins and "
+    "boards to avoid duplicates and report performance. It does not access "
+    "other users' data, does not run ads, and is not offered to third parties."
+)
+
+USE_CASES = (
+    "Pin creation & scheduling  (posting our own pins, scheduled daily)",
+    "Reporting  (reading our own pins/boards to avoid duplicates + stats)",
+)
+
+REDIRECT_URI = "http://localhost:8888/callback"
+SCOPES = "pins:read, pins:write, boards:read, boards:write, user_accounts:read"
+
+
+def site_of(cfg) -> str:
+    """Configured public site, without a trailing slash."""
+    try:
+        return str(cfg.get("link.public_base", "") or "").strip().rstrip("/")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def urls(cfg) -> tuple[str, str]:
+    """(company website URL, privacy policy URL)."""
+    base = site_of(cfg)
+    if base:
+        return f"{base}/about", f"{base}/privacy"
+    return ("http://<VPS-IP>:5000/about", "http://<VPS-IP>:5000/privacy")
+
+
+def save_site(cfg, url: str, path: str | Path | None = None) -> dict:
+    """Persist `link.public_base` (comment-preserving), validating the shape."""
+    url = str(url or "").strip().rstrip("/")
+    if not re.match(r"^https?://[^\s/]+$", url):
+        return {"saved": False,
+                "error": "URL 'https://yourdomain.com' la undali (http/https)."}
+    from . import claim as _claim
+    cfg.raw.setdefault("link", {})["public_base"] = url
+    source = getattr(cfg, "source_path", None)
+    target = (Path(path) if path
+              else Path(source) if source
+              else Path(__file__).resolve().parent.parent / "config.yaml")
+    try:
+        target.write_text(_claim._patch_scalar(
+            target.read_text(), "link", "public_base", url))
+        import yaml
+        yaml.safe_load(target.read_text())
+        wrote = True
+    except Exception:  # noqa: BLE001 — saving must never crash the CLI
+        wrote = False
+    return {"saved": wrote, "url": url}
+
+
+def lines(cfg=None) -> list[str]:
+    """The whole form, field by field, in the order the page shows it."""
+    try:
+        site_url, privacy_url = urls(cfg)
+    except Exception:  # noqa: BLE001
+        site_url, privacy_url = ("http://<VPS-IP>:5000/about",
+                                 "http://<VPS-IP>:5000/privacy")
+    brand = COMPANY
+    try:
+        brand = str(cfg.get("design.brand_name", "") or "") or COMPANY
+    except Exception:  # noqa: BLE001
+        pass
+    live = bool(site_of(cfg)) if cfg is not None else False
+
+    out = [
+        "═" * 70,
+        "📝 PINTEREST 'CONNECT APP' FORM — exact answers (copy-paste)",
+        "═" * 70,
+        f"   App icon (upload)          : {ICON}  (1024x1024, no Pinterest logo)",
+        f"   App name                   : {brand} Deals Publisher",
+        f"   Company name               : {brand}",
+        f"   Company website or App link: {site_url}",
+        f"   Link to Privacy policy     : {privacy_url}",
+        "",
+        "   App purpose (free text — paste as-is):",
+    ]
+    for line in _wrap(PURPOSE_TEXT, 64):
+        out.append(f"      {line}")
+    out += [
+        "",
+        "   Developer purpose          : ● Personal API access (single, personal use)",
+        "   Who are you sharing with?  : Only me / Myself",
+        "",
+        "   Use cases (select these only):",
+    ]
+    for case in USE_CASES:
+        out.append(f"      ☑ {case}")
+    out += [
+        "   Audience                   : ☑ Businesses   (migilinavi vaddu)",
+        "   Reads Pins and/or Boards   : ● Yes, mine     (ippudu 'No' unte maarchu!)",
+        "   reCAPTCHA                  : ☑ I'm not a robot",
+        "",
+        "   ❌ Kandi select cheyyakandi: Ad campaign management · Pinner App ·",
+        "      Ecommerce · Recommendations & experimentation · MCP/AI connector",
+        "",
+        "─" * 70,
+        "SUBMIT TARVATA (redirect URI + scopes screen):",
+        f"   Redirect URI: {REDIRECT_URI}",
+        f"   Scopes      : {SCOPES}",
+        "   → App ID + App Secret copy → .env  (python -m bot setup adi adigutundi)",
+        "",
+    ]
+    if not live:
+        out += [
+            "⚠️  Paiki URLs lo <VPS-IP> placeholders unnayi — form submit cheyyaku",
+            "    mundu nee real URL pettu:",
+            "      python -m bot app --site https://yourdomain.com",
+            "      (leda VPS IP tho: python -m bot app --site http://1.2.3.4:5000)",
+            "    VPS IP teliyali ante (VPS lo):  curl -s ifconfig.me",
+        ]
+    else:
+        out += [
+            f"✅ Site set: {site_of(cfg)}",
+            f"   Check: curl -s -o /dev/null -w '%{{http_code}}\\n' {site_url}",
+        ]
+    return out
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    words, cur, lines = text.split(), "", []
+    for w in words:
+        if len(cur) + len(w) + 1 > width and cur:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return lines
