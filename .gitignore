@@ -12,3 +12,6 @@ data/
 # OS junk
 .DS_Store
 logs/
+
+# scratch: demo photos pulled for one-off renders (never shipped)
+image-search/
