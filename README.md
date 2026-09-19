@@ -715,9 +715,10 @@ bot builds, for ANY scraped product:
 
 | Surface | Token used | Why |
 |---|---|---|
-| Instagram | `instagram_stories` (yours) | matches where the click came from |
+| Instagram (feed / product tag) | `instagram_product_tag` (yours) | the feed link surface Meesho made for product tagging |
+| Instagram Story | `instagram_stories` (yours) | story link sticker surface |
 | Facebook | `facebook` (yours) | clean Meesho report |
-| YouTube | `youtube` if you created one, else newest | Meesho offers "YouTube Shorts/videos" |
+| YouTube Shorts/videos | `youtube_long_form` (yours) | Meesho's YouTube surface |
 | Pinterest | override in `affiliate.meesho_platform_tokens` | Meesho has no Pinterest option — map it to any token (commission is unaffected; publisher id decides the money) |
 
 Verify in one command: `python -m bot meesho "https://www.meesho.com/<product>"` →

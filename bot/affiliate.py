@@ -166,11 +166,18 @@ class AffiliateLinker:
     # (Meesho's "Get commission link" screen lets you pick Instagram Story,
     #  Facebook Post, etc — each comes with its OWN token + campaign id.)
     PLATFORM_TOKENS = {
+        # "Get commission link" lo Meesho isthe token per surface. Feed posts
+        # (the bot's main IG surface) use the PRODUCT-TAG token, stories keep
+        # their own token, YouTube uses the long-form token.
         "pinterest": ("pinterest", "pinterest_stories", "pinterest_ideas"),
-        "instagram": ("instagram_stories", "instagram", "instagram_reels",
-                      "instagram_feed", "instagram_story"),
+        "instagram": ("instagram_product_tag", "instagram_product",
+                      "instagram_feed", "instagram", "instagram_reels",
+                      "instagram_stories", "instagram_story"),
+        "instagram_stories": ("instagram_stories", "instagram_story"),
+        "instagram_product_tag": ("instagram_product_tag", "instagram_product"),
         "facebook": ("facebook", "facebook_post", "facebook_stories"),
-        "youtube": ("youtube", "youtube_shorts"),
+        "youtube": ("youtube_long_form", "youtube_shorts", "youtube_videos",
+                    "youtube"),
     }
 
     def meesho_template_map(self) -> dict[str, str]:

@@ -1541,7 +1541,8 @@ def cmd_meesho(cfg, args: list[str]) -> int:
     # per-platform view: which token+campaign each surface will publish
     if lk.meesho_template_map():
         print("\n  PER-PLATFORM LINKS (each platform uses its own token):")
-        for plat in ("instagram", "facebook", "youtube", "pinterest"):
+        for plat in ("instagram", "instagram_stories", "facebook",
+                     "youtube", "pinterest"):
             tok = lk.meesho_source_for(plat)
             pl = lk.meesho_link_for(sample, platform=plat)
             print(f"   • {plat:10s} token={tok:22s}")

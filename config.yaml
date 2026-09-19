@@ -108,7 +108,10 @@ affiliate:
   # Meesho report is not muddied (commission is unaffected either way:
   # the publisher id decides where the money lands).
   meesho_platform_tokens:
-    pinterest: instagram_stories
+    pinterest: instagram_stories          # Meesho has no Pinterest surface
+    instagram: instagram_product_tag      # feed/carousel/reel/bio/DM link
+    instagram_stories: instagram_stories  # story surface link
+    youtube: youtube_long_form            # Shorts/videos token
 
 seo:
   hashtags: true

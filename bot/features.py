@@ -363,8 +363,13 @@ def print_how_it_works() -> None:
    🛍 Meesho creds ippudu **env-first** (`.env` eh single source): publisher
    24197020 + per-platform tokens (instagram_stories/facebook) + collection link
    (`MEESHO_COLLECTION_LINK` → landing page 'Browse More Deals' CTA, verbatim).
-   `meesho_platform_tokens: {pinterest: instagram_stories}` — Pinterest ki Meesho
-   token ledu; publisher id money ni decide chestundi, token reporting kosam.
+   `meesho_platform_tokens` — prati surface ki daani OWN token (R67): Instagram
+   feed → `instagram_product_tag`, stories → `instagram_stories`, FB → `facebook`,
+   YouTube → `youtube_long_form`, Pinterest → `instagram_stories` (Meesho ki
+   Pinterest token ledu; publisher id money ni decide chestundi).
+   🆕 Campaign rotation: token okkatiki multiple campaigns isthe bot **newest**
+   daanni vadutundi (ex: instagram_product_tag 11173806 → 11173869), paathavi
+   history lo gurtu pettukuntundi.
 
 25) CREDENTIAL INTAKE + LEAK PROOF (R65)
    🔑 `python -m bot creds [--amazon T --earnkaro P --meesho L …]`: prati
@@ -458,7 +463,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   650 automated tests.
+   654 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

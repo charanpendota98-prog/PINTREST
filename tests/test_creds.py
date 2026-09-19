@@ -349,10 +349,20 @@ class TestMeeshoCollectionLink(unittest.TestCase):
 
 
 class TestMeeshoPlatformOverride(unittest.TestCase):
-    """Pinterest is the main platform and Meesho has no token for it."""
+    """R67: each Meesho surface has its OWN token; Pinterest has none."""
 
+    # owner's real links (R34/R38 recovering campaigns + R67 fresh ones)
     LINKS = ("https://www.meesho.com/af_invite/24197020:instagram_stories:11075346,"
-             "https://www.meesho.com/af_invite/24197020:facebook:11075421")
+             "https://www.meesho.com/af_invite/24197020:facebook:11075421,"
+             "https://www.meesho.com/af_invite/"
+             "24197020:instagram_product_tag:11173806?p_id=1&ext_id=a,"
+             "https://www.meesho.com/af_invite/"
+             "24197020:instagram_product_tag:11173869?p_id=1&ext_id=a,"
+             "https://www.meesho.com/af_invite/24197020:facebook:11173912,"
+             "https://www.meesho.com/af_invite/"
+             "24197020:youtube_long_form:11173971,"
+             "https://www.meesho.com/af_invite/"
+             "24197020:instagram_stories:11174107")
 
     def _linker(self):
         from bot.affiliate import AffiliateLinker
@@ -367,19 +377,63 @@ class TestMeeshoPlatformOverride(unittest.TestCase):
                 return self.d.get(key, default)
 
         cfg = Cfg({"affiliate.meesho_template_link": self.LINKS,
-                   "affiliate.meesho_platform_tokens": {"pinterest": "instagram_stories"}})
+                   "affiliate.meesho_platform_tokens": {
+                       "pinterest": "instagram_stories",
+                       "instagram": "instagram_product_tag",
+                       "instagram_stories": "instagram_stories",
+                       "youtube": "youtube_long_form"}})
         return AffiliateLinker(cfg)
 
     def test_each_platform_gets_its_own_token(self):
         lk = self._linker()
-        self.assertEqual(lk.meesho_source_for("instagram"), "instagram_stories")
+        self.assertEqual(lk.meesho_source_for("instagram"), "instagram_product_tag")
+        self.assertEqual(lk.meesho_source_for("instagram_stories"), "instagram_stories")
         self.assertEqual(lk.meesho_source_for("facebook"), "facebook")
+        self.assertEqual(lk.meesho_source_for("youtube"), "youtube_long_form")
+
+    def test_newest_campaign_per_token_wins(self):
+        lk = self._linker()
+        ig = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "instagram")
+        self.assertIn(":instagram_product_tag:11173869", ig)   # not 11173806
+        fb = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "facebook")
+        self.assertIn(":facebook:11173912", fb)                # not 11075421
+        st = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "instagram_stories")
+        self.assertIn(":instagram_stories:11174107", st)       # not 11075346
+
+    def test_youtube_uses_the_long_form_token(self):
+        lk = self._linker()
+        link = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "youtube")
+        self.assertIn("24197020:youtube_long_form:11173971", link)
+        self.assertIn("utm_source=youtube_long_form", link)
 
     def test_pinterest_uses_the_override(self):
         lk = self._linker()
         self.assertEqual(lk.meesho_source_for("pinterest"), "instagram_stories")
         link = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "pinterest")
-        self.assertIn("24197020:instagram_stories:11075346", link)
+        self.assertIn("24197020:instagram_stories:11174107", link)
+
+    def test_unknown_surface_still_lands_on_the_owner_account(self):
+        lk = self._linker()
+        link = lk.meesho_link_for("https://www.meesho.com/x/p/1k1b6", "telegram")
+        self.assertIn("/af_invite/24197020:", link)
+
+    def test_stories_token_present_without_override(self):
+        # even if the override map is empty, 'instagram' must not steal the
+        # story surface's own token name when asked for it explicitly
+        from bot.affiliate import AffiliateLinker
+
+        class Cfg:
+            amazon_tag = ""
+
+            def __init__(self, d):
+                self.d = d
+
+            def get(self, key, default=None):
+                return self.d.get(key, default)
+
+        lk = AffiliateLinker(Cfg({"affiliate.meesho_template_link": self.LINKS}))
+        self.assertEqual(lk.meesho_source_for("instagram_stories"), "instagram_stories")
+        self.assertEqual(lk.meesho_source_for("youtube"), "youtube_long_form")
 
     def test_publisher_id_never_changes(self):
         lk = self._linker()
