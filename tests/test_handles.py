@@ -354,5 +354,124 @@ class TestVerdict(unittest.TestCase):
         self.assertNotIn("Numbers ledu", text)
 
 
+class TestProfileWiring(unittest.TestCase):
+    """The chosen handle must show up everywhere, and vanish when unset."""
+
+    def _cfg(self, tmp: Path, **raw):
+        base = {"storage": {"db_path": f"{tmp}/t.db", "media_dir": f"{tmp}/m"},
+                "dashboard": {"password": "", "secret_key": "t"}}
+        base.update(raw)
+        cfg = Config(raw=base)
+        (tmp / "m").mkdir(parents=True, exist_ok=True)
+        return cfg
+
+    def test_onboard_shows_the_saved_handle(self):
+        from bot import onboard
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._cfg(Path(d), brand={"handle": "pindropdeals_home",
+                                            "display_name": "PinDrop Deals | Home"},
+                            design={"brand_name": "PinDrop Deals"})
+            text = "\n".join(onboard.lines(cfg))
+            self.assertIn("@pindropdeals_home", text)
+            self.assertIn("saved", text)
+
+    def test_onboard_suggests_commands_when_handle_unset(self):
+        from bot import onboard
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._cfg(Path(d), design={"brand_name": "PinDrop Deals"})
+            text = "\n".join(onboard.lines(cfg))
+            self.assertIn("python -m bot handle", text)
+            self.assertNotIn("saved ✅", text)
+
+    def test_ready_marks_profile_done_only_when_all_fields_set(self):
+        from bot import ready
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+
+            def item(cfg):
+                return {i["key"]: i for i in ready.checks(cfg)}["profile"]
+
+            full = self._cfg(tmp, brand={"handle": "pindropdeals_home",
+                                         "display_name": "PinDrop Deals | Home",
+                                         "bio": "bio"},
+                             design={"brand_name": "PinDrop Deals"})
+            self.assertTrue(item(full)["done"])
+            self.assertIn("pindropdeals_home", item(full)["how"])
+
+            no_handle = self._cfg(tmp, brand={"display_name": "PinDrop Deals | Home",
+                                              "bio": "bio"},
+                                  design={"brand_name": "PinDrop Deals"})
+            self.assertFalse(item(no_handle)["done"])
+            self.assertIn("python -m bot handle", item(no_handle)["how"])
+
+    def test_ready_profile_item_never_raises_on_broken_config(self):
+        from bot import ready
+
+        class Boom:
+            def get(self, *a, **k):
+                raise RuntimeError("bad config")
+
+        keys = [i["key"] for i in ready.checks(Boom())]
+        self.assertEqual(keys, ["config"])      # graceful single "fix config"
+        summary = ready.summary(Boom())
+        self.assertFalse(summary["ready"])      # never claims ready, never raises
+
+
+class TestLandingProfileLinks(unittest.TestCase):
+    def _client(self, tmp: Path, handle: str = ""):
+        from bot.db import DB
+        from bot.dashboard import create_app
+        raw = {"storage": {"db_path": f"{tmp}/t.db", "media_dir": f"{tmp}/m"},
+               "dashboard": {"password": "", "secret_key": "t"}}
+        if handle:
+            raw["brand"] = {"handle": handle}
+        cfg = Config(raw=raw)
+        (tmp / "m").mkdir(parents=True, exist_ok=True)
+        db = DB(cfg.db_path)
+        pid = db.add_product(source="meesho", url="https://m/x/p/1k1b6",
+                             affiliate_url="https://m/x?affid",
+                             title="Kitchen Storage Organizer Rack",
+                             price="399", status="posted")
+        return create_app(cfg, db).test_client(), pid
+
+    def test_sameas_and_follow_link_present(self):
+        import json
+        import re
+        with tempfile.TemporaryDirectory() as d:
+            client, pid = self._client(Path(d), "pindropdeals_home")
+            html = client.get(f"/go/{pid}").data.decode()
+            block = re.search(r'<script type="application/ld\+json">(.*?)</script>',
+                              html, re.S)
+            data = json.loads(block.group(1))          # must stay valid JSON-LD
+            self.assertIn("https://www.pinterest.com/pindropdeals_home/",
+                          data["sameAs"])
+            self.assertIn("https://www.instagram.com/pindropdeals_home/",
+                          data["sameAs"])
+            self.assertIn("Follow @pindropdeals_home", html)
+            self.assertIn('rel="me"', html)
+
+    def test_no_handle_means_no_profile_links(self):
+        import json
+        import re
+        with tempfile.TemporaryDirectory() as d:
+            client, pid = self._client(Path(d))
+            html = client.get(f"/go/{pid}").data.decode()
+            block = re.search(r'<script type="application/ld\+json">(.*?)</script>',
+                              html, re.S)
+            self.assertEqual(json.loads(block.group(1))["sameAs"], [])
+            self.assertNotIn("Follow @", html)
+
+    def test_handle_with_at_prefix_is_normalised(self):
+        import json
+        import re
+        with tempfile.TemporaryDirectory() as d:
+            client, pid = self._client(Path(d), "@PinDropDeals_Home")
+            html = client.get(f"/go/{pid}").data.decode()
+            block = re.search(r'<script type="application/ld\+json">(.*?)</script>',
+                              html, re.S)
+            same = json.loads(block.group(1))["sameAs"]
+            self.assertIn("https://www.pinterest.com/PinDropDeals_Home/", same)
+
+
 if __name__ == "__main__":
     unittest.main()

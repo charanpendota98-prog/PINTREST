@@ -147,7 +147,8 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Product","name":"{{ title }}",
  "offers":{"@type":"Offer","price":"{{ raw_price }}","priceCurrency":"INR",
- "availability":"https://schema.org/InStock"}}
+ "availability":"https://schema.org/InStock"},
+ "sameAs":{{ same_as|safe }}}
 </script>
 <style>
  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#faf7f2;color:#222}
@@ -197,6 +198,7 @@ LANDING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
     <button style="width:100%;margin-top:8px;padding:12px;border:none;border-radius:10px;
       background:#222;color:#fff;font-weight:700;font-size:15px">🔔 Send Me Daily Deals</button>
   </form>
+  {% if pin_profile %}<a class="more" rel="me" href="{{ pin_profile }}">📌 Follow @{{ handle }} for daily deals</a>{% endif %}
   <div class="disc">As an affiliate partner we may earn from qualifying purchases.
   Price can change anytime — check the store for the live price.</div>
 </div></div></body></html>"""
@@ -250,6 +252,13 @@ def create_app(cfg, db: DB | None = None) -> Flask:
     if _verify_token:
         logging.getLogger("pindrop.dashboard").info(
             "Pinterest domain verification active (token %s…)", _verify_token[:6])
+    # 👥 Brand handle → profile links on the landing page: Google/social entity
+    # linking (sameAs) + a follow link that turns landing traffic into followers.
+    import json as _json
+    _handle = str(cfg.get("brand.handle", "") or "").strip().lstrip("@")
+    _pin_profile = f"https://www.pinterest.com/{_handle}/" if _handle else ""
+    _ig_profile = f"https://www.instagram.com/{_handle}/" if _handle else ""
+    _same_as = _json.dumps([u for u in (_pin_profile, _ig_profile) if u])
 
     @app.get("/pinterest-<token>.html")
     def pinterest_verify_file(token: str):
@@ -445,7 +454,9 @@ def create_app(cfg, db: DB | None = None) -> Flask:
                                       wa_on=bool(cfg.get("link.whatsapp_share", False)),
                                       more=str(cfg.get("affiliate.meesho_collection_link",
                                                        "") or ""),
-                                      brand=cfg.get("design.brand_name", "Deal Drops"))
+                                      brand=cfg.get("design.brand_name", "Deal Drops"),
+                                      handle=_handle, pin_profile=_pin_profile,
+                                      same_as=_same_as)
 
     @app.post("/subscribe/<int:pid>")
     def subscribe(pid: int):

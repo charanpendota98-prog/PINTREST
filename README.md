@@ -193,6 +193,14 @@ Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 > leda `pindrop_deals` vaadandi. `python -m bot handle <name>` cleaner variants
 > ni cheptundi.
 
+**Chosen handle = `pindropdeals_home`** (saved in `config.yaml` as
+`brand.handle`). Adi ippudu 3 chotla pani chestundi:
+1. landing page JSON-LD lo `sameAs` (Pinterest + Instagram profile URLs) —
+   Google/social entity linking;
+2. landing page lo "📌 Follow @pindropdeals_home" link — visitors ni followers
+   ga marchutundi (free reach);
+3. `bot onboard` / `bot brand` lo ide handle kanipistundi (paste cheyyadaniki).
+
 > 💡 **Name field unique kaadu** — `PinDrop Deals | Home & Kitchen` pettachu
 > (adi keyword/ranking field). Handle lo keywords stuff cheyyakandi (adi URL
 > matrame, ranking ki peddaga use ledu).

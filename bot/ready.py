@@ -81,12 +81,27 @@ def _checks(cfg, os) -> list[dict]:
         bool(cfg.amazon_tag), "affiliate-program.amazon.in → your tag → .env",
         minutes=2, optional=True, recommended=True))
 
+    profile_bits = {}
+    try:
+        profile_bits = {
+            "handle": str(cfg.get("brand.handle", "") or "").lstrip("@"),
+            "display": str(cfg.get("brand.display_name", "") or ""),
+            "bio": str(cfg.get("brand.bio", "") or ""),
+            "strip": str(cfg.get("design.brand_name", "") or ""),
+        }
+    except Exception:  # noqa: BLE001
+        profile_bits = {}
+    profile_done = all(profile_bits.get(k) for k in
+                       ("handle", "display", "bio", "strip"))
     items.append(_item(
         "profile", "Pinterest profile fields (name/bio/handle)",
-        False,
-        "python -m bot onboard  (screen-by-screen) · python -m bot brand "
-        "(form values) · python -m bot handle  (username taken? ranked "
-        "fallbacks + python -m bot handle check)",
+        profile_done,
+        ("set in config ✅ — Pinterest lo ide values paste cheyyandi: "
+         f"Name '{profile_bits.get('display', '')}' · @{profile_bits.get('handle', '')}'"
+         if profile_done else
+         "python -m bot onboard  (screen-by-screen) · python -m bot brand "
+         "(form values) · python -m bot handle  (username taken? ranked "
+         "fallbacks + python -m bot handle check)"),
         optional=True, recommended=True, minutes=4))
 
     try:

@@ -125,6 +125,7 @@ def lines(cfg=None) -> list[str]:
     brand = "PinDrop Deals | Home & Kitchen"
     bio = ""
     site = ""
+    handle = ""
     if cfg is not None:
         try:
             brand = cfg.get("design.brand_name", brand)
@@ -133,6 +134,7 @@ def lines(cfg=None) -> list[str]:
                 brand = display
             bio = cfg.get("brand.bio", "") or ""
             site = cfg.get("link.public_base", "") or ""
+            handle = str(cfg.get("brand.handle", "") or "").lstrip("@")
         except Exception:  # noqa: BLE001 — sheet must always print
             pass
 
@@ -140,7 +142,10 @@ def lines(cfg=None) -> list[str]:
         "═" * 66,
         "📋 PINTEREST ONBOARDING — SCREEN BY SCREEN (nuvvu em select cheyyali)",
         "═" * 66,
-        f"Suggested profile: {brand}   (@pindropdeals)",
+        f"Suggested profile: {brand}   "
+        + (f"(@{handle} — saved ✅)" if handle
+           else "(@handle: python -m bot handle  →  pindrop_deals / "
+                "pindropdeals_home)"),
     ]
     if bio:
         out.append(f"Bio (paste as-is): {bio}")

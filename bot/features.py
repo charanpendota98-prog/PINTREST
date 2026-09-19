@@ -310,6 +310,11 @@ def print_how_it_works() -> None:
    Claim website (`bot claim`) → developer app.
    Nijam: REQUIRED 2 matrame (business account + developer app); migilinavi
    optional shortcuts — skip chesina account ki emi avvadu.
+   👥 Saved handle (`brand.handle`) ippudu nijamga use avutundi: landing page
+   JSON-LD lo `sameAs` (Pinterest + Instagram profile URLs = Google/social
+   entity linking) + "📌 Follow @handle" link (landing traffic → followers).
+   `bot onboard` saved handle ni chupistundi; `bot ready` profile item ni
+   auto-detect chestundi (handle+name+bio+strip unte done).
    🔧 Handle polish: `pindrop_deals_` la trailing/leading underscore legal eh,
    kani generated/bot account la kanipistundi → bot cleaner variants chupistundi
    (`pindrop_deals`, `pindropdeals`) + ladder lo `pindropdeals_home` (intentional
@@ -330,7 +335,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   427 automated tests.
+   434 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
