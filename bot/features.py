@@ -310,7 +310,11 @@ def print_how_it_works() -> None:
    Claim website (`bot claim`) → developer app.
    Nijam: REQUIRED 2 matrame (business account + developer app); migilinavi
    optional shortcuts — skip chesina account ki emi avvadu.
-   🔎 `python -m bot handle check`: live availability probe — Pinterest +
+   🔧 Handle polish: `pindrop_deals_` la trailing/leading underscore legal eh,
+   kani generated/bot account la kanipistundi → bot cleaner variants chupistundi
+   (`pindrop_deals`, `pindropdeals`) + ladder lo `pindropdeals_home` (intentional
+   separator) 2nd place lo undi.
+   🔎 `python -m bot handle check [names]`: live availability probe — Pinterest +
    Instagram rendu chotla free unna handle ni eh cheptundi (`free_both` /
    taken / unknown; 429-403 ni 'unknown' ani cheptundi, abaddham cheppadu).
    🔗 `python -m bot handle`: handle taken aithe ranked fallbacks (closest to
@@ -326,7 +330,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   414 automated tests.
+   427 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,

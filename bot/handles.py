@@ -54,9 +54,12 @@ def validate_handle(handle: str) -> dict:
             if word in h:
                 warnings.append(f"'{word}' unte Pinterest impersonation ani "
                                 "reject/limit cheyyochu — avoid.")
-        if "__" in h or h.endswith("_"):
-            warnings.append("Double underscore / last lo underscore = auto-"
-                            "generated la kanipistundi, spam signal.")
+        rough = polish(h)
+        if "__" in h or h.endswith("_") or h.startswith("_"):
+            fix = " / ".join(rough[:3]) if rough else "clean word handle"
+            warnings.append("Underscore double ga leda start/end lo undi — "
+                            "Pinterest allow chestundi kani generated/bot "
+                            f"account la kanipistundi. Better: {fix}")
         if len(h) > 20:
             notes.append("20+ chars: type cheyyadaniki kashtam, kani valid.")
         if h.endswith(("1", "2", "3", "01", "007")):
@@ -67,6 +70,40 @@ def validate_handle(handle: str) -> dict:
                          "ga kanipistundi.")
     return {"ok": not errors, "errors": errors, "warnings": warnings,
             "notes": notes, "handle": h}
+
+
+def polish(handle: str) -> list[str]:
+    """Cleaned variants of a handle whose separators look auto-generated.
+
+    A trailing/leading underscore is technically legal (Pinterest allows
+    letters/numbers/underscore), so this is a QUALITY fix, not a rule fix: the
+    goal is a handle that looks deliberate when a human reads the profile URL.
+    """
+    h = clean_handle(handle)
+    if not h:
+        return []
+    if "__" not in h and not h.startswith("_") and not h.endswith("_"):
+        return []                      # already clean — nothing to polish
+    cands: list[str] = []
+    stripped = h.strip("_")
+    if stripped:
+        cands.append(stripped)
+    collapsed = re.sub(r"_+", "_", h).strip("_")
+    if collapsed:
+        cands.append(collapsed)
+    # keep the words but separate them once: pindrop_deals_ → pindrop_deals
+    if "_" in h:
+        parts = [w for w in h.split("_") if w]
+        if len(parts) > 1:
+            cands.append("_".join(parts))
+            cands.append("".join(parts))
+    out: list[str] = []
+    for c in cands:
+        if c == h or c in out:
+            continue
+        if validate_handle(c)["ok"]:
+            out.append(c)
+    return out
 
 
 def handle_ideas(brand: str = "PinDrop Deals",
@@ -82,6 +119,9 @@ def handle_ideas(brand: str = "PinDrop Deals",
     ladder: list[tuple[str, str]] = [
         (underscore, "Closest to the brand — underscore exactly the space "
                      "(`PinDrop Deals` → `pindrop_deals`). Cleanest fallback."),
+        (base + "_" + niche_word,
+         f"Niche keyword, intentional separator: brand + '{niche_word}' — "
+         "clean ga chaduvutundi, generated la kanipistaledu."),
         (base + niche_word, f"Niche keyword add: search/suggest lo brand + "
                             f"'{niche_word}' kalisi kanipistundi."),
         (base + "india", "Market keyword: India audience ki direct ga signal "
@@ -171,7 +211,7 @@ def save_handle(cfg, handle: str, path: str | Path | None = None) -> dict:
         wrote = True
     except Exception:  # noqa: BLE001 — saving must never crash the CLI
         wrote = False
-    return {"saved": wrote, **check}
+    return {"saved": wrote, "polish": polish(check["handle"]), **check}
 
 
 
@@ -246,8 +286,12 @@ def check_lines(candidates: list[str], timeout: float = 8.0,
                "taken": "❌ taken",
                "partial": "⚠️ half-known",
                "unknown": "❔ could not check"}.get(res["verdict"], "❔")
-        detail = (res["pinterest"]["detail"] + " / " +
-                  res["instagram"]["detail"])
+        if res["verdict"] == "invalid":
+            out.append(f"   {'⛔ too short':<17} {(h or '(empty)'):<22} "
+                       "(min 3 chars)")
+            continue
+        detail = (res["pinterest"].get("detail", "?") + " / " +
+                  res["instagram"].get("detail", "?"))
         out.append(f"   {tag:<17} {h:<22} ({detail})")
         if res["verdict"] == "free_both" and not picked:
             picked = h
@@ -293,6 +337,11 @@ def verdict(handle: str, cfg=None) -> list[str]:
     if len(h) <= 18:
         out.append(f"   ✅ Short enough ({len(h)} chars) — chat lo/typing lo "
                    "easy.")
+    rough = ""
+    if h != clean_handle(handle).strip("_") or "__" in h:
+        rough = " / ".join(polish(h)[:3])
+    if rough:
+        out.append(f"   🔧 Cleaner variants (generated la undadu): {rough}")
     out.append(f"   ✅ Instagram ki kuda ide vaadachu ({HANDLE_MIN}-"
                f"{HANDLE_MAX} chars, letters/numbers/underscore — IG allow "
                "chestundi) → rendu platforms oke handle tho brand consistent.")

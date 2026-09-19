@@ -187,6 +187,12 @@ python -m bot handle pindrop_deals   # save the one you picked
 Antha `pindrop*` taken aa? Fresh family: `dealdropsindia`, `homedealsdrop`,
 `smartfindsindia`, `gharfinds`, `dealfindsindia`.
 
+> 🔧 **Trailing/leading underscore avoid cheyyandi** (`pindrop_deals_` la):
+> Pinterest allow chestundi, kani generated/bot account la kanipistundi.
+> Intentionally separate cheddam anukunte `pindropdeals_home` (brand + niche)
+> leda `pindrop_deals` vaadandi. `python -m bot handle <name>` cleaner variants
+> ni cheptundi.
+
 > 💡 **Name field unique kaadu** — `PinDrop Deals | Home & Kitchen` pettachu
 > (adi keyword/ranking field). Handle lo keywords stuff cheyyakandi (adi URL
 > matrame, ranking ki peddaga use ledu).

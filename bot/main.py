@@ -17,7 +17,7 @@ Usage:
   python -m bot radar --hunt             # find + queue the top ones right now
   python -m bot playbook                 # 📕 2026 content playbook the bot follows
   python -m bot handle [name]            # 🔗 handle taken? → ranked fallbacks + save
-  python -m bot handle check             # 🔎 live: which handles are free?
+  python -m bot handle check [names]     # 🔎 live: which handles are free?
   python -m bot onboard                  # 📋 every Pinterest screen → what to select
   python -m bot claim [token]            # 🔖 claim your website (Rich Pins)
   python -m bot brand ["Name | Niche"]   # 🏷️ profile name/bio/boards for reach
@@ -916,11 +916,13 @@ def cmd_handle(cfg, rest: list[str]) -> int:
     """🔗 Pinterest/IG handle: rules, ranked fallbacks, save the choice."""
     from . import handles as _handles
     arg = " ".join(rest).strip().lstrip("@")
-    if arg.lower() in ("check", "--check", "verify"):
+    words = arg.split()
+    if words and words[0].lower() in ("check", "--check", "verify"):
         from . import handles as _h
-        cands = [i["handle"] for i in _h.handle_ideas()] + _h.plan_c()
+        given = [_h.clean_handle(w) for w in words[1:] if w.strip()]
+        cands = given or ([i["handle"] for i in _h.handle_ideas()] + _h.plan_c())
         print()
-        print("\n".join(_h.check_lines(cands)))
+        print("\n".join(_h.check_lines(cands, limit=len(cands) if given else 6)))
         print()
         return 0
     saved_line = ""
@@ -935,6 +937,10 @@ def cmd_handle(cfg, rest: list[str]) -> int:
                       f"(Pinterest + Instagram rendu chotla ide vaadandi)")
         if res.get("warnings"):
             saved_line += "   ⚠️ " + res["warnings"][0]
+        if res.get("polish"):
+            saved_line += ("\n   🔧 Cleaner alternative: "
+                           + " / ".join(res["polish"][:3])
+                           + "  (paina list lo free unte adi better)")
     print()
     if saved_line:
         print(saved_line)
