@@ -441,8 +441,12 @@ def cmd_doctor(cfg) -> int:
     if cfg.token_path.exists():
         _pin_ok, _pin_how = True, "OAuth refresh token saved"
     elif _trial_tok:
-        _pin_ok, _pin_how = True, ("trial token in .env — testing only; public "
-                                   "pins ki: auth-url + auth --code")
+        from .tokencheck import token_age_warning
+        _warn = token_age_warning(cfg)
+        _expired = "expire avutayi" in _warn and "puratana" in _warn
+        _pin_ok = not _expired
+        _pin_how = (_warn + "  ·  public pins ki: python -m bot auth-url"
+                    if _warn else "trial token in .env — testing only")
     else:
         _pin_ok, _pin_how = False, "python -m bot auth-url  +  auth --code"
     ck("Pinterest token (auth done)", _pin_ok, _pin_how)

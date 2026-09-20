@@ -19,6 +19,85 @@ SCOPE_NOTE = (
 
 TEST_BOARD = "gharvanaa-connection-test"
 
+# Dashboard ("Generate token") tokens are short-lived — community + Pinterest
+# docs put them at ~24 h. We never store the token itself, only a hash + when
+# it was first seen, so `token-check` and `doctor` can warn BEFORE a post fails.
+TOKEN_STAMP = "pinterest_token_seen.json"
+TOKEN_TTL_HOURS = 24
+TOKEN_WARN_HOURS = 20
+
+
+def _stamp_path(cfg) -> "pathlib.Path":
+    """Sits next to the media folder — same resolution as Config.media_dir."""
+    import pathlib
+    try:
+        media = pathlib.Path(str(cfg.media_dir))
+    except Exception:                                   # noqa: BLE001
+        media = pathlib.Path(str(cfg.get("storage.media_dir", "data/media")))
+    return media.parent / TOKEN_STAMP
+
+
+def token_fingerprint(cfg) -> str:
+    """sha1 prefix of the current token — never the token itself."""
+    import hashlib
+    tok = str(getattr(cfg, "pinterest_access_token", "") or "").strip()
+    return hashlib.sha1(tok.encode()).hexdigest()[:8] if tok else ""
+
+
+def note_token_use(cfg) -> float:
+    """Record/lookup when THIS token was first seen. Returns age in hours."""
+    import datetime
+    import json
+    fp = token_fingerprint(cfg)
+    if not fp:
+        return 0.0
+    path = _stamp_path(cfg)
+    data = {}
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        data = {}
+    now = datetime.datetime.now().isoformat(timespec="seconds")
+    if data.get("fingerprint") != fp:
+        data = {"fingerprint": fp, "first_seen": now}
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data))
+        except OSError:
+            pass
+        return 0.0
+    try:
+        first = datetime.datetime.fromisoformat(str(data.get("first_seen")))
+        return max(0.0, (datetime.datetime.now() - first).total_seconds() / 3600.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def token_age_warning(cfg) -> str:
+    """'' when the token is fresh, else the exact warning line to print."""
+    if not token_fingerprint(cfg):
+        return ""                       # no token at all → nothing to age
+    hours = note_token_use(cfg)
+    if hours >= TOKEN_WARN_HOURS:
+        return (f"⚠️  Dashboard token ~{hours:.0f}h puratana — ivi ~"
+                f"{TOKEN_TTL_HOURS}h lo expire avutayi. Malli 'Generate token' "
+                f"cheyyi (leda OAuth complete chesi permanent refresh token "
+                f"pettu).")
+    if hours > 0:
+        return f"ℹ️  Token first seen {hours:.1f}h ago (dashboard tokens ~{TOKEN_TTL_HOURS}h)."
+    return "ℹ️  Token ippude add chesav — ~24h window start ayyindi."
+
+
+def expiry_hint(err_text: str) -> str:
+    """Turn an opaque 401 into the one action that fixes it."""
+    low = (err_text or "").lower()
+    if "401" in low or "unauthor" in low or "invalid_token" in low or "expired" in low:
+        return ("   ➡️ Idi EXPIRY la undi: dashboard token ~24h ke pani "
+                "chestundi. App page → 'Generate Access Tokens' → Production "
+                "Limited → Generate token → copy → .env lo "
+                "PINTEREST_ACCESS_TOKEN='<new>' → malli token-check.")
+    return ""
+
 
 def _err_text(exc: Exception) -> str:
     return str(exc)[:200]
@@ -50,6 +129,7 @@ def verify(cfg, write_test: bool = False) -> list[str]:
         ]
         return out
 
+    out += ["", token_age_warning(cfg)]
     read_ok = False
     try:
         account = api.user_account()
@@ -70,6 +150,9 @@ def verify(cfg, write_test: bool = False) -> list[str]:
             "   Fix: dashboard → Generate token (Trial) → copy → .env lo",
             "        PINTEREST_ACCESS_TOKEN='...'   (tokens expire avutayi)",
         ]
+        hint = expiry_hint(_err_text(exc))
+        if hint:
+            out.append(hint)
 
     if read_ok:
         try:

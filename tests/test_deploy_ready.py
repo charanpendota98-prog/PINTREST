@@ -481,3 +481,90 @@ class TestLowRamVMDeploy(unittest.TestCase):
         busy, rest = keepalive_plan(1, 13.0, 60.0)      # E2.1.Micro = 1 OCPU
         self.assertGreaterEqual(busy / 60.0, 0.10)
         self.assertLess(rest, 60.0)
+
+
+class TestTokenAge(unittest.TestCase):
+    """R79 — dashboard tokens live ~24 h; the bot must say so BEFORE a post
+    fails, and a 401 must be explained instead of dumping an API error."""
+
+    def setUp(self):
+        import os
+        import tempfile
+        from unittest import mock
+        from bot.config import Config
+        self.tmp = tempfile.TemporaryDirectory()
+        media = Path(self.tmp.name) / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        self._env = mock.patch.dict(os.environ,
+                                    {"PINTEREST_ACCESS_TOKEN": "tok-abc123"})
+        self._env.start()
+        self.cfg = Config(raw={"storage": {"db_path": f"{self.tmp.name}/t.db",
+                                           "media_dir": str(media)}})
+
+    def tearDown(self):
+        self._env.stop()
+        self.tmp.cleanup()
+
+    def test_no_token_means_no_age_line(self):
+        import os
+        from unittest import mock
+        from bot.config import Config
+        from bot.tokencheck import token_age_warning, token_fingerprint
+        bare = Config(raw={"storage": {"db_path": f"{self.tmp.name}/t2.db",
+                                       "media_dir": f"{self.tmp.name}/m2"}})
+        with mock.patch.dict(os.environ, {"PINTEREST_ACCESS_TOKEN": ""}):
+            self.assertEqual(token_fingerprint(bare), "")
+            self.assertEqual(token_age_warning(bare), "")
+
+    def test_stamp_stores_a_hash_never_the_token(self):
+        import json
+        from bot.tokencheck import _stamp_path, note_token_use, token_fingerprint
+        note_token_use(self.cfg)
+        raw = _stamp_path(self.cfg).read_text()
+        self.assertNotIn("tok-abc123", raw)                 # secret never stored
+        self.assertEqual(json.loads(raw)["fingerprint"],
+                         token_fingerprint(self.cfg))
+        self.assertIn("first_seen", raw)
+
+    def test_fresh_token_is_informational(self):
+        from bot.tokencheck import token_age_warning
+        line = token_age_warning(self.cfg)
+        self.assertIn("ippude", line)
+        self.assertNotIn("puratana", line)
+
+    def test_old_token_warns_about_expiry(self):
+        import datetime
+        import json
+        from bot.tokencheck import (_stamp_path, note_token_use,
+                                    token_age_warning, token_fingerprint)
+        note_token_use(self.cfg)
+        old = (datetime.datetime.now() - datetime.timedelta(hours=23)).isoformat()
+        _stamp_path(self.cfg).write_text(
+            json.dumps({"fingerprint": token_fingerprint(self.cfg),
+                        "first_seen": old}))
+        line = token_age_warning(self.cfg)
+        self.assertIn("puratana", line)
+        self.assertIn("expire", line)
+
+    def test_rotating_the_token_restarts_the_clock(self):
+        import json
+        from bot.config import Config
+        from bot.tokencheck import _stamp_path, note_token_use
+        note_token_use(self.cfg)
+        import os
+        from unittest import mock
+        cfg2 = Config(raw={"storage": {
+            "db_path": f"{self.tmp.name}/t.db",
+            "media_dir": str(Path(self.tmp.name) / "media")}})
+        with mock.patch.dict(os.environ,
+                             {"PINTEREST_ACCESS_TOKEN": "brand-new-token"}):
+            self.assertEqual(note_token_use(cfg2), 0.0)
+            stamp = _stamp_path(cfg2).read_text()
+        self.assertNotIn("brand-new-token", stamp)      # secret never stored
+
+    def test_expiry_hint_recognises_401_shapes(self):
+        from bot.tokencheck import expiry_hint
+        for bad in ("401 Unauthorized", "invalid_token", "token expired"):
+            self.assertIn("Generate Access Tokens", expiry_hint(bad))
+        self.assertEqual(expiry_hint("404 not found"), "")
+        self.assertEqual(expiry_hint(""), "")

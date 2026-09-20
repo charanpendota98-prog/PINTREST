@@ -105,6 +105,10 @@ FEATURES = [
      "instagram_stories / facebook token+campaign chosen per surface",
      lambda cfg: bool(cfg.get("affiliate.meesho_template_link")),
      "paste your af_invite link(s) in MEESHO_TEMPLATE_LINK"),
+    ("Dashboard-token age guard", "money",
+     "Pinterest dashboard token ~24h lo expire avutundi — bot age ni track "
+     "cheyyi, 20h tarvata doctor lo warning, 401 ki exact fix cheptundi",
+     lambda cfg: True, "always on (tokencheck.note_token_use)"),
     ("Pinterest approval timeline + demo pack", "reach",
      "app approval eppudu vastundi (researched, honest) + standard access ki "
      "video demo shot list — emi email radu, escalation link, community data",
@@ -557,7 +561,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   742 automated tests.
+   748 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
