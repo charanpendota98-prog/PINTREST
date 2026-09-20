@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Secrets & local data — NEVER commit tokens/keys or downloaded media
+.env
+data/
+!data/.gitkeep
+
+# OS junk
+.DS_Store
+logs/
+
+# scratch: demo photos pulled for one-off renders (never shipped)
+image-search/

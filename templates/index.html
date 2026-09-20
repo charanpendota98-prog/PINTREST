@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PinDrop Pro — Pinterest Affiliate Bot</title>
+<style>
+  :root{
+    --bg:#141416; --panel:#1e1e22; --panel2:#26262c; --line:#333340;
+    --red:#E60023; --red2:#ff5247; --text:#f3f3f5; --muted:#9b9ba5;
+    --green:#2ecc71; --amber:#f5a623; --blue:#4aa3ff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,-apple-system,sans-serif; min-height:100vh;}
+  header{display:flex; align-items:center; gap:14px; padding:18px 28px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10;}
+  .logo{width:38px;height:38px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;}
+  header h1{font-size:20px; font-weight:700;}
+  header h1 span{color:var(--red2); font-weight:800;}
+  .pill{margin-left:auto; padding:6px 14px; border-radius:999px; font-size:12.5px; font-weight:600; background:#2a2a31; border:1px solid var(--line);}
+  .pill.ok{color:var(--green); border-color:#1e4d33;}
+  .pill.bad{color:var(--red2); border-color:#5c2126;}
+  main{max-width:1180px; margin:0 auto; padding:26px 22px 80px;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:24px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px;}
+  .card .num{font-size:32px; font-weight:800;}
+  .card .lbl{color:var(--muted); font-size:13px; margin-top:4px; text-transform:uppercase; letter-spacing:.6px;}
+  .card.red .num{color:var(--red2);} .card.green .num{color:var(--green);}
+  .card.amber .num{color:var(--amber);} .card.blue .num{color:var(--blue);}
+  .tabs{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
+  .tab{padding:10px 20px; border-radius:10px; background:var(--panel); border:1px solid var(--line); color:var(--muted); cursor:pointer; font-weight:600; font-size:14px; user-select:none;}
+  .tab.active{background:var(--red); color:#fff; border-color:var(--red);}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px;}
+  textarea{width:100%; min-height:130px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:12px; font-family:ui-monospace,monospace; font-size:13px; resize:vertical;}
+  button.btn{background:var(--red); color:#fff; border:none; border-radius:10px; padding:12px 22px; font-size:14.5px; font-weight:700; cursor:pointer; margin-top:12px;}
+  button.btn:hover{background:var(--red2);}
+  button.btn.ghost{background:var(--panel2); border:1px solid var(--line);}
+  button.btn:disabled{opacity:.5; cursor:not-allowed;}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th{color:var(--muted); text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.8px; padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:10px; border-bottom:1px solid #2a2a31; vertical-align:middle;}
+  tr:hover td{background:#222228;}
+  .thumb{width:52px;height:70px;object-fit:cover;border-radius:8px;background:#333;}
+  .badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:700;}
+  .b-queued{background:#2c3550;color:#8ab4ff;} .b-posted{background:#1e4d33;color:var(--green);}
+  .b-failed{background:#5c2126;color:var(--red2);} .b-skipped{background:#3a3a40;color:var(--muted);}
+  .b-amazon{background:#3d2f13;color:#ffb84d;} .b-meesho{background:#4a2040;color:#f98bc9;}
+  .b-flipkart{background:#1c3a55;color:#7cc4ff;} .b-other{background:#333;color:#bbb;}
+  a{color:var(--blue); text-decoration:none;} a:hover{text-decoration:underline;}
+  .console{background:#0d0d10; border-radius:10px; padding:14px; max-height:420px; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; line-height:1.75;}
+  .console .ERROR{color:var(--red2);} .console .WARN{color:var(--amber);} .console .INFO{color:#8f8f9a;}
+  .hint{color:var(--muted); font-size:13px; margin-top:10px; line-height:1.6;}
+  .toast{position:fixed; bottom:22px; right:22px; background:var(--panel2); border:1px solid var(--line); border-left:4px solid var(--green); padding:14px 20px; border-radius:10px; font-size:14px; max-width:420px; display:none; z-index:99; box-shadow:0 8px 30px rgba(0,0,0,.5);}
+  .toast.err{border-left-color:var(--red);}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .row-actions button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;margin-right:6px;}
+  .row-actions button:hover{color:#fff;border-color:#666;}
+  .empty{color:var(--muted); text-align:center; padding:40px 0; font-size:14px;}
+  .inp{width:100%; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:11px 13px; font-size:13.5px;}
+  .inp:focus, textarea:focus{outline:none; border-color:var(--red);}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">P</div>
+  <h1>PinDrop <span>Pro</span> <small style="color:var(--muted);font-weight:400;font-size:12px">— Pinterest Affiliate Bot</small></h1>
+  <div class="pill" id="credPill">checking…</div>
+</header>
+<main>
+  <div class="cards">
+    <div class="card blue"><div class="num" id="stTotal">–</div><div class="lbl">Total Products</div></div>
+    <div class="card amber"><div class="num" id="stQueued">–</div><div class="lbl">In Queue</div></div>
+    <div class="card green"><div class="num" id="stPosted">–</div><div class="lbl">Posted to Pinterest</div></div>
+    <div class="card red"><div class="num" id="stFailed">–</div><div class="lbl">Failed</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="add">➕ Add Products</div>
+    <div class="tab" data-tab="queue">📋 Queue</div>
+    <div class="tab" data-tab="posted">📌 Posted</div>
+    <div class="tab" data-tab="logs">🧾 Logs</div>
+    <div class="tab" data-tab="analytics">📊 Analytics</div>
+    <div class="tab" data-tab="radar">🧭 Radar</div>
+    <div class="tab" data-tab="money">💰 Money</div>
+    <div class="tab" data-tab="setup">🎯 Setup</div>
+  </div>
+
+  <div class="panel" id="tab-add">
+    <h3 style="margin-bottom:10px">Paste product links (one per line)</h3>
+    <textarea id="urls" placeholder="https://www.amazon.in/dp/B0XXXXXXX&#10;https://www.meesho.com/product-name/p/abc123&#10;https://www.flipkart.com/product/p/itmx&#10;https://anyshop.com/product/xyz"></textarea>
+    <button class="btn" id="addBtn" onclick="addProducts()">🔍 Scrape & Add to Queue</button>
+    <button class="btn ghost" onclick="postNow(1)">⚡ Post 1 Now</button>
+    <button class="btn ghost" onclick="postNow(5)">🚀 Post 5 Now</button>
+    <div class="hint">Bot scrapes title/price/image → converts to YOUR affiliate link (Amazon tag / Meesho affid / EarnKaro / Cuelinks) → designs a 1000×1500 pin → posts to Pinterest. Amazon can sometimes block scrapers — if a link fails, use the manual form below.</div>
+    <div id="addResults" style="margin-top:14px"></div>
+
+    <h3 style="margin:26px 0 12px">✍️ Manual add (when scrape is blocked)</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <input id="mTitle" placeholder="Product title *" class="inp">
+      <input id="mPrice" placeholder="Deal price (e.g. 1099)" class="inp">
+      <input id="mMrp" placeholder="MRP / list price (for % OFF badge)" class="inp" style="grid-column:1/-1">
+      <input id="mUrl" placeholder="Product page URL *" class="inp" style="grid-column:1/-1">
+      <input id="mImg" placeholder="Product image URL *" class="inp" style="grid-column:1/-1">
+      <input id="mVideo" placeholder="Video URL (optional, for video pins)" class="inp" style="grid-column:1/-1">
+    </div>
+    <button class="btn" onclick="addManual()">➕ Add to Queue (Manual)</button>
+
+    <h3 style="margin:26px 0 12px">🎬 Your videos (post as video pins + reels — 100% auto)</h3>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+      <input type="file" id="videoFile" accept=".mp4,.mov,.webm,.mkv" class="inp" style="max-width:320px">
+      <button class="btn" onclick="uploadVideo()">🎬 Upload Video</button>
+    </div>
+    <div class="hint">Mee own videos unte ikkada pettandi — bot avi Pinterest video pins +
+      IG reels ga automatic ga post chestundi (audio kuda mix avtundi). Files: <code>data/videos/</code></div>
+
+    <h3 style="margin:26px 0 12px">🎵 Add trending audio (your manual step — rest is auto)</h3>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+      <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.aac" class="inp" style="max-width:320px">
+      <button class="btn" onclick="uploadAudio()">🎵 Upload Audio</button>
+    </div>
+    <div class="hint">Upload your favourite trending/BGM audio once — the bot automatically mixes it
+      (ducked under the voiceover) into every new reel it generates. Files live in <code>data/music/</code>.</div>
+  </div>
+
+  <div class="panel" id="tab-queue" style="display:none">
+    <table><thead><tr><th></th><th>Product</th><th>Source</th><th>Price</th><th>Status</th><th></th></tr></thead>
+    <tbody id="queueBody"></tbody></table>
+    <div class="empty" id="queueEmpty" style="display:none">Queue is empty — add product links above.</div>
+  </div>
+
+  <div class="panel" id="tab-posted" style="display:none">
+    <table><thead><tr><th></th><th>Pin</th><th>Pin ID</th><th>When</th><th>👆 Clicks</th></tr></thead>
+    <tbody id="postedBody"></tbody></table>
+    <div class="empty" id="postedEmpty" style="display:none">Nothing posted yet.</div>
+    <div class="hint">💡 <b>Bridge mode</b> (config.yaml → link.bridge: true + your domain) makes every pin link go through <code>/go/&lt;id&gt;</code> so clicks are counted here — you'll know exactly which pins earn.</div>
+  </div>
+
+  <div class="panel" id="tab-logs" style="display:none">
+    <div class="console" id="console"></div>
+  </div>
+
+  <div class="panel" id="tab-analytics" style="display:none">
+    <div class="cards" style="margin-bottom:18px">
+      <div class="card"><div class="num" id="anClicks">0</div><div class="lbl">Total Clicks</div></div>
+      <div class="card blue"><div class="num" id="anSubs">0</div><div class="lbl">Subscribers</div></div>
+      <div class="card"><div class="num" id="anTpl">–</div><div class="lbl">Best Template</div></div>
+    </div>
+    <h3 style="margin:6px 0 10px">🕐 Clicks by hour (UTC) — bot posts denser in YOUR proven hours</h3>
+    <div id="hourChart" style="display:flex; align-items:flex-end; gap:3px; height:110px; margin-bottom:22px"></div>
+    <h3 style="margin:0 0 10px">🏆 Top pins by clicks (winners get auto re-posted)</h3>
+    <table><thead><tr><th>Pin</th><th>Source</th><th>👆 Clicks</th></tr></thead>
+    <tbody id="topBody"></tbody></table>
+  </div>
+  <div class="panel" id="tab-setup" style="display:none">
+    <h3 style="margin:6px 0 4px">🎯 Readiness <span id="readyPct" class="pill ok">…</span></h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 14px">
+      Only a few things can't be automated (they need YOUR login/OTP). Everything
+      below that is done once — after that the bot runs itself.</p>
+    <h4 style="margin:14px 0 6px">You do (one time)</h4>
+    <div id="readyYou"></div>
+    <h4 style="margin:16px 0 6px">Recommended (money-optimizing)</h4>
+    <div id="readyRec"></div>
+    <h4 style="margin:16px 0 6px">Optional platforms</h4>
+    <div id="readyOpt"></div>
+    <h4 style="margin:18px 0 6px">🤖 The bot does this forever — no humans</h4>
+    <ul id="readyAuto" style="font-size:13px;line-height:1.7;color:#333"></ul>
+  </div>
+  <div class="panel" id="tab-money" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px">
+      <button id="ctlBtn" onclick="togglePause()">⏸ Pause posting</button>
+      <span id="ctlState" style="color:#666;font-size:13px"></span>
+    </div>
+    <div class="cards" style="margin-bottom:16px">
+      <div class="card blue"><div class="num" id="mCommission">₹0</div><div class="lbl">Est. commission (30d)</div></div>
+      <div class="card"><div class="num" id="mClicks">0</div><div class="lbl">Clicks (30d)</div></div>
+      <div class="card"><div class="num" id="mOrders">0</div><div class="lbl">Est. orders</div></div>
+      <div class="card"><div class="num" id="mPayout">–</div><div class="lbl">Payout around</div></div>
+    </div>
+    <p id="mAssump" style="color:#666;font-size:12.5px;margin:0 0 4px"></p>
+    <p style="color:#8a6d3b;font-size:12.5px;margin:0 0 18px" id="mDisc"></p>
+    <h3 style="margin:0 0 8px">💸 Link health
+      <button style="float:right;font-size:12px" id="linkBtn"
+              onclick="checkLinks()">🔎 Check links</button></h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 8px">
+      A dead link or a missing tracking tag = silent money loss. This follows
+      each link and verifies your tag survives the redirect.</p>
+    <table><thead><tr><th>#</th><th>Product</th><th>Status</th><th>Tagged</th><th>Note</th></tr></thead>
+    <tbody id="linkBody"></tbody></table>
+    <h3 style="margin:20px 0 8px">🎯 Revenue target — honest math</h3>
+    <div class="cards" style="margin-bottom:10px">
+      <div class="card"><div class="num" id="scTarget">₹0</div><div class="lbl">Monthly target</div></div>
+      <div class="card blue"><div class="num" id="scNow">₹0</div><div class="lbl">Projected now</div></div>
+      <div class="card"><div class="num" id="scPct">0%</div><div class="lbl">Of target</div></div>
+      <div class="card"><div class="num" id="scEta">–</div><div class="lbl">ETA (at growth)</div></div>
+    </div>
+    <pre id="scaleBox" style="background:#f7f7f9;border-radius:8px;padding:12px;font-size:12.5px;white-space:pre-wrap"></pre>
+    <h3 style="margin:20px 0 8px">📊 Last 7 days</h3>
+    <pre id="reportBox" style="background:#f7f7f9;border-radius:8px;padding:12px;font-size:12.5px;white-space:pre-wrap"></pre>
+  </div>
+  <div class="panel" id="tab-radar" style="display:none">
+    <h3 style="margin:6px 0 4px">🧭 Radar — most USEFUL products (0-100)
+      <button id="radarHunt" style="float:right;font-size:12px"
+              onclick="huntNow()">🔍 Hunt now</button></h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 12px">
+      Problem-solvers, impulse prices (₹299-999), repeat-purchase items rank high.
+      The queue posts the highest score first, so these go out before fillers.</p>
+    <div id="radarBest"></div>
+    <h3 style="margin:18px 0 8px">📦 Queue (ranked)</h3>
+    <table><thead><tr><th>Score</th><th>Product</th></tr></thead>
+    <tbody id="radarQueue"></tbody></table>
+    <h3 style="margin:18px 0 8px">🧠 Hook learning — clicks per hook style</h3>
+    <p style="color:#666;font-size:12.5px;margin:0 0 8px">
+      The bot favours the hook that earns clicks (and keeps testing the others).</p>
+    <table><thead><tr><th>Hook</th><th>Posts</th><th>Clicks</th><th>Clicks/post</th></tr></thead>
+    <tbody id="radarHooks"></tbody></table>
+    <p id="radarNotes" style="color:#8a6d3b;font-size:12.5px;margin:12px 0 0"></p>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastTimer;
+function toast(msg, isErr){
+  const t = $('#toast'); t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : ''); t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=> t.style.display='none', 4200);
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  ['add','queue','posted','logs','analytics','radar','money','setup'].forEach(n => $('#tab-'+n).style.display = (n===t.dataset.tab?'block':'none'));
+  refresh(); refreshRadar(); refreshMoney(); refreshReady();
+});
+
+async function api(path, opts){
+  // NEVER throws: server restart / network blip / bad JSON all become {ok:false}
+  let r;
+  try { r = await fetch(path, opts); }
+  catch(e){ return {ok:false, error:'network error — server reachable ga ledu'}; }
+  if (r.status === 401) { location.href = '/login'; return {ok:false, error:'locked — login cheyandi'}; }
+  try { return await r.json(); }
+  catch(e){ return {ok:false, error:'bad response (HTTP '+r.status+')'}; }
+}
+async function refresh(){
+  try{
+    const st = await api('/api/status');
+    const pill = $('#credPill');
+    if(st.credentials_ok && st.account && !st.account.error){
+      pill.textContent = `✔ Pinterest: @${st.account.username}`; pill.className='pill ok';
+    } else if (st.credentials_ok){
+      pill.textContent = '⚠ credentials set — check token'; pill.className='pill bad';
+    } else {
+      pill.textContent = '✖ Pinterest not connected (run: python -m bot auth)'; pill.className='pill bad';
+    }
+    if(st.instagram && st.instagram.enabled){
+      pill.textContent += st.instagram.configured ? (st.instagram.username?` • IG @${st.instagram.username}`:' • IG ✔') : ' • IG ✖';
+    }
+    $('#stTotal').textContent = st.stats.total;
+    $('#stQueued').textContent = st.stats.queued;
+    $('#stPosted').textContent = st.stats.posted;
+    $('#stFailed').textContent = st.stats.failed;
+
+    const active = document.querySelector('.tab.active').dataset.tab;
+    if(active==='queue'){
+      const prods = await api('/api/products');
+      const rows = prods.map(p => `<tr>
+        <td>${p.pin_image ? `<img class="thumb" loading="lazy" onerror="this.style.display='none'" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
+        <td><a href="${p.url}" target="_blank">${esc(p.title.slice(0,70))}</a><br><span style="color:var(--muted);font-size:11.5px">${esc(p.affiliate_url.slice(0,80))}</span></td>
+        <td><span class="badge b-${p.source}">${p.source}</span></td>
+        <td>${esc(p.price)}<br><span class="badge" style="background:#3a2f13;color:#ffd166" title="winner score — higher posts first">🏆 ${p.score||0}</span></td>
+        <td><span class="badge b-${p.status}">${p.status}</span></td>
+        <td class="row-actions">${p.status==='queued'?`<button onclick="skipP(${p.id})">skip</button>`:''}</td>
+      </tr>`).join('');
+      $('#queueBody').innerHTML = rows;
+      $('#queueEmpty').style.display = prods.length ? 'none':'block';
+    }
+    if(active==='posted'){
+      const posts = await api('/api/posts');
+      $('#postedBody').innerHTML = posts.map(p => `<tr>
+        <td>${p.pin_image ? `<img class="thumb" loading="lazy" onerror="this.style.display='none'" src="/media/${p.pin_image.split('/').pop()}">` : ''}</td>
+        <td><a href="https://www.pinterest.com/pin/${p.pin_id}/" target="_blank">${esc(p.title.slice(0,70))}</a><br>
+            <span class="badge b-${p.status}">${p.status}</span> ${p.error?`<span style="color:var(--red2);font-size:11.5px">${esc(p.error.slice(0,90))}</span>`:''}</td>
+        <td>${p.pin_id||'—'}</td>
+        <td>${(p.posted_at||p.scheduled_for||'').replace('T',' ').slice(0,19)}</td>
+        <td style="font-weight:800; color:${(p.clicks||0)>0?'var(--green)':'var(--muted)'}">${p.clicks||0}</td>
+      </tr>`).join('');
+      $('#postedEmpty').style.display = posts.length ? 'none':'block';
+    }
+    if(active==='logs'){
+      const logs = await api('/api/logs');
+      $('#console').innerHTML = logs.map(l =>
+        `<div class="${l.level}">[${l.ts.slice(11,19)}] ${l.level.padEnd(5)} ${esc(l.message)}</div>`).join('');
+    }
+    if(active==='analytics'){
+      const a = await api('/api/analytics');
+      $('#anClicks').textContent = a.clicks_total;
+      $('#anSubs').textContent = a.subscribers;
+      const tc = Object.entries(a.templates_ctr||{});
+      $('#anTpl').textContent = tc.length ? tc.sort((x,y)=>y[1]-x[1])[0][0] : '–';
+      const max = Math.max(1, ...a.clicks_by_hour);
+      $('#hourChart').innerHTML = a.clicks_by_hour.map((v,h)=>
+        `<div title="${h}:00 → ${v} clicks" style="flex:1;background:${v?'#E60023':'#3a3a45'};height:${Math.max(4, v/max*100)}%;border-radius:4px 4px 0 0"></div>`).join('');
+      $('#topBody').innerHTML = a.top_pins.filter(p=>p.clicks>0).map(p=>`<tr>
+        <td>${esc(p.title)}</td><td><span class="badge b-${p.source}">${p.source}</span></td>
+        <td style="font-weight:800;color:var(--green)">${p.clicks}</td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">No clicks yet — pins start earning once posted.</td></tr>';
+    }
+  }catch(e){ console.error(e); }
+}
+
+async function addProducts(){
+  const urls = $('#urls').value.trim();
+  if(!urls) return toast('Paste at least one product link', true);
+  const btn = $('#addBtn'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Scraping…';
+  $('#addResults').innerHTML = '';
+  try{
+    const r = await api('/api/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({urls})});
+    $('#addResults').innerHTML = r.results.map(x =>
+      `<div class="hint">${x.ok?'✅':'❌'} <a href="${esc(x.url)}" target="_blank">${esc(x.url.slice(0,70))}</a> — ${esc(x.note || x.error || '')}</div>`).join('');
+    $('#urls').value = '';
+    toast(`${r.results.filter(x=>x.ok).length} product(s) added to queue`);
+    refresh(); refreshRadar();
+  }catch(e){ toast('Failed: '+e, true); }
+  btn.disabled = false; btn.innerHTML = '🔍 Scrape & Add to Queue';
+}
+async function huntNow(){
+  const b = $('#radarHunt');
+  if(b) { b.disabled = true; b.textContent = '🔎 hunting…'; }
+  try{
+    const r = await api('/api/radar/hunt', {method:'POST'});
+    toast(r.message || 'Hunting…');
+    for(let i = 0; i < 60; i++){
+      await new Promise(res => setTimeout(res, 3000));
+      const st = await api('/api/radar/hunt/status');
+      if(!st.running){
+        if(st.added) toast(`🧭 ${st.added} top product(s) queued — best ${st.best}/100`);
+        else toast(st.error || 'Nothing new found', true);
+        break;
+      }
+    }
+  }catch(e){ toast('Hunt failed: ' + e, true); }
+  if(b) { b.disabled = false; b.textContent = '🔍 Hunt now'; }
+  refreshRadar();
+}
+
+function readyRow(i, mark){
+  const how = (i.how || '').split('\n').map(l => esc(l)).join('<br>');
+  return `<div class="card" style="text-align:left;width:auto;margin-bottom:8px">
+    <b>${mark} ${esc(i.label)}</b>
+    ${i.minutes ? `<span style="color:#888;font-size:12px"> · ~${i.minutes} min</span>` : ''}
+    ${how ? `<div style="color:#666;font-size:12.5px;margin-top:4px">${how}</div>` : ''}
+  </div>`;
+}
+
+async function refreshReady(){
+  const r = await api('/api/ready');
+  if(!r || !r.ok) return;
+  $('#readyPct').textContent = r.percent + '% ready' +
+    (r.ready ? ' — all set 🎉' : ` · ~${r.minutes_left} min left`);
+  const you = (r.you_must_do || []);
+  $('#readyYou').innerHTML = you.length
+    ? you.map(i => readyRow(i, '❌')).join('')
+    : '<p style="color:#1a7f37">✅ Nothing left for you — done forever.</p>';
+  $('#readyRec').innerHTML = (r.recommended_left || []).map(i => readyRow(i, '⭐')).join('')
+    || '<p style="color:#999">all done</p>';
+  $('#readyOpt').innerHTML = (r.optional_left || []).map(i => readyRow(i, '○')).join('')
+    || '<p style="color:#999">all done</p>';
+  $('#readyAuto').innerHTML = (r.automatic || []).map(l => `<li>${esc(l)}</li>`).join('');
+}
+
+async function refreshMoney(){
+  const c = await api('/api/control');
+  if(c && c.ok){
+    $('#ctlBtn').textContent = c.paused ? '▶️ Resume posting' : '⏸ Pause posting';
+    const d = c.daily || {};
+    $('#ctlState').textContent = c.paused
+      ? `PAUSED — ${c.reason}`
+      : (c.gate ? `waiting: ${c.gate}` : 'posting normally') +
+        ` · today ${d.posted || 0}/${d.cap || 0}`;
+  }
+  const e = await api('/api/earnings');
+  if(e && e.ok){
+    $('#mCommission').textContent = '₹' + Math.round(e.commission);
+    $('#mClicks').textContent = e.clicks;
+    $('#mOrders').textContent = e.orders;
+    $('#mPayout').textContent = e.expected_payout_on;
+    const a = e.assumptions || {};
+    const nets = Object.entries(e.per_network || {})
+      .map(([k, v]) => `${k} ×${v.rate}%`).join(' · ');
+    $('#mAssump').textContent =
+      `Assumptions: ${(a.click_to_order * 100).toFixed(1)}% clicks→orders · ₹${a.aov} avg order · ${nets}`;
+    $('#mDisc').textContent = e.disclaimer || '';
+  }
+  const sc = await api('/api/scale');
+  if(sc && sc.ok){
+    const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+    $('#scTarget').textContent = inr(sc.target_monthly);
+    $('#scNow').textContent = inr(sc.projected_monthly);
+    $('#scPct').textContent = (sc.percent || 0).toFixed(1) + '%';
+    $('#scEta').textContent = (sc.eta_months === null || sc.eta_months === undefined)
+      ? '–' : (sc.eta_months ? sc.eta_months + ' mo' : 'now!');
+    $('#scaleBox').textContent = (sc.lines || []).join('\n');
+  }
+  const rep = await api('/api/report?days=7');
+  if(rep && rep.ok) $('#reportBox').textContent = (rep.lines || []).join('\n');
+}
+
+async function togglePause(){
+  const btn = $('#ctlBtn');
+  const pausing = btn.textContent.indexOf('Pause') >= 0;
+  btn.disabled = true;
+  try{
+    const r = await api('/api/control', {method:'POST', body:{
+      action: pausing ? 'pause' : 'resume',
+      reason: pausing ? 'panel' : ''}});
+    toast(r.message || 'done');
+  }catch(e){ toast('Failed: ' + e, true); }
+  btn.disabled = false;
+  refreshMoney();
+}
+
+async function checkLinks(){
+  const btn = $('#linkBtn');
+  btn.disabled = true; btn.textContent = '🔎 checking…';
+  try{
+    const r = await api('/api/links/check', {method:'POST', body:{limit:8}});
+    toast(r.message || 'checking…');
+    for(let i = 0; i < 40; i++){
+      await new Promise(res => setTimeout(res, 2000));
+      const st = await api('/api/links/status');
+      if(!st.running){
+        const rows = (st.results || []).map(x => `
+          <tr><td>${x.product_id ?? ''}</td><td>${esc(x.title)}</td>
+          <td>${x.ok ? '✅ ' + x.status : '❌ ' + (x.status || 'fail')}</td>
+          <td>${x.monetized ? '✅' : '⚠️'}</td><td>${esc(x.note || '')}</td></tr>`).join('');
+        $('#linkBody').innerHTML = rows || '<tr><td colspan="5" style="color:#999">nothing to check (queue empty)</td></tr>';
+        toast(st.checked ? `checked ${st.checked} · issues ${st.broken}` : (st.error || 'no links'));
+        break;
+      }
+    }
+  }catch(e){ toast('Check failed: ' + e, true); }
+  btn.disabled = false; btn.textContent = '🔎 Check links';
+}
+
+async function refreshRadar(){
+  const r = await api('/api/radar');
+  if(!r.ok) return;
+  const best = (r.best || []).map(p => `
+    <div class="card" style="text-align:left;margin-bottom:8px;width:auto">
+      <b>${esc(p.title)}</b>
+      <span class="pill ok" style="margin-left:6px">${p.usefulness}/100</span>
+      ${p.price ? `<span style="color:#666;margin-left:6px">${esc(p.price)}</span>` : ''}
+      <div style="color:#666;font-size:12px;margin-top:4px">${(p.why||[]).map(esc).join(' · ')}</div>
+    </div>`).join('');
+  $('#radarBest').innerHTML = best || '<p style="color:#999">Nothing scored yet — add products or run: <code>python -m bot radar --hunt</code></p>';
+  $('#radarQueue').innerHTML = (r.queued || []).map(p =>
+    `<tr><td>${p.usefulness}</td><td>${esc(p.title)}</td></tr>`).join('')
+    || '<tr><td colspan="2" style="color:#999">queue empty</td></tr>';
+  const hooks = Object.entries(r.hooks || {});
+  $('#radarHooks').innerHTML = hooks.map(([k,v]) =>
+    `<tr><td>${esc(k)}</td><td>${v.posts}</td><td>${v.clicks}</td><td>${v.cpc}</td></tr>`).join('')
+    || '<tr><td colspan="4" style="color:#999">no data yet — posts will teach it</td></tr>';
+  $('#radarNotes').textContent = (r.notes || []).join(' ');
+}
+
+async function postNow(count){
+  try{
+    const r = await api('/api/post', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});
+    if(!r.ok){ toast(r.error || 'Something went wrong', true); return; }
+    toast(r.message || `Posting ${count} pin(s) in the background…`);
+    refresh();
+    // poll the job: the panel never hangs waiting for Pinterest
+    let ticks = 0;
+    const t = setInterval(async () => {
+      ticks++;
+      const s = await api('/api/post/status');
+      if(!s.running){
+        clearInterval(t);
+        if(s.error) toast('Posting failed: ' + s.error, true);
+        else toast(`🎉 ${s.done} pin(s) posted to Pinterest!`);
+        refresh();
+      } else if(ticks === 20){
+        clearInterval(t);
+        toast(`Still posting… ${s.done}/${s.total} done (watch the logs tab)`);
+      }
+    }, 3000);
+  }catch(e){ toast('Failed: '+e.message, true); }
+}
+async function skipP(id){
+  await api(`/api/products/${id}/skip`, {method:'POST'}); refresh();
+}
+async function uploadVideo(){
+  const inp = $('#videoFile');
+  if(!inp.files.length) return toast('Choose a video first', true);
+  const fd = new FormData(); fd.append('file', inp.files[0]);
+  try{
+    const r = await api('/api/upload-video', {method:'POST', body: fd});
+    if(r.ok){ toast('🎬 Video saved — bot will post it automatically!'); inp.value=''; refresh(); }
+    else toast(r.error || 'Something went wrong', true);
+  }catch(e){ toast('Upload failed: '+e, true); }
+}
+async function uploadAudio(){
+  const inp = $('#audioFile');
+  if(!inp.files.length) return toast('Choose an audio file first', true);
+  const fd = new FormData(); fd.append('file', inp.files[0]);
+  try{
+    const r = await api('/api/upload-audio', {method:'POST', body: fd});
+    if(r.ok){ toast('🎵 Audio saved — reels will use it automatically!'); inp.value=''; refresh(); }
+    else toast(r.error || 'Something went wrong', true);
+  }catch(e){ toast('Upload failed: '+e, true); }
+}
+async function addManual(){
+  const body = {title: $('#mTitle').value.trim(), price: $('#mPrice').value.trim(),
+    mrp: $('#mMrp').value.trim(),
+    product_url: $('#mUrl').value.trim(), image_url: $('#mImg').value.trim(),
+    video_url: $('#mVideo').value.trim()};
+  if(!body.product_url || !body.title || !body.image_url) return toast('Fill title, product URL and image URL', true);
+  try{
+    const r = await api('/api/add-manual', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(r.ok){ toast('✅ Added to queue (id '+r.id+')'); ['mTitle','mPrice','mMrp','mUrl','mImg','mVideo'].forEach(i=>$('#'+i).value=''); refresh(); }
+    else toast(r.error || 'Something went wrong', true);
+  }catch(e){ toast('Failed: '+e, true); }
+}
+refresh(); setInterval(refresh, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+# ═══════════════════════════════════════════════════════════════
+#  PinDrop Pro — behavior config (SECRETS go in .env, not here)
+# ═══════════════════════════════════════════════════════════════
+
+pinterest:
+  board_name: "Best Deals"            # pins go into this board (auto-created)
+  redirect_uri: "http://localhost:8888/callback"
+  upload_images: true     # ship the DESIGNED pin via API upload (no CDN fetch fails)
+  carousel: true          # 2+ product photos → carousel pin (highest engagement)
+  sections: false         # true → organise the board into per-niche sections
+  analytics: true         # daily REAL Pinterest metrics (impressions/saves/clicks)
+
+trends:
+  live: true              # official Pinterest Trends API keywords → SEO
+  region: IN
+  cache_hours: 24
+
+posting:
+  pins_per_day: 8          # how many pins per day
+  start_hour: 9            # posting window start (IST)
+  end_hour: 22             # posting window end (IST)
+  min_gap_minutes: 40      # minimum gap between pins (human-like)
+  jitter_minutes: 25       # extra random delay added on top
+  manual_gap_seconds: 6    # gap between pins for panel "Post now" (background job)
+  schedule_days_ahead: 0   # 0 = post instantly, 1..14 = schedule ahead
+  pins_per_product: 3      # pin variations per product (different photo + design)
+  peak_mode: true          # post only in peak IST traffic windows (viral trick)
+  board_strategy: niche    # niche keyword boards per category = more search surfaces
+  platform_order: [instagram, facebook, youtube, pinterest]  # IG+FB buzz first, Pinterest after
+
+link:
+  bridge: false            # true → pins point at YOUR domain /go/<id> (click tracking
+                           # + Pinterest never sees a flagged affiliate domain)
+  public_base: ""          # e.g. https://yourdeals.in — host the dashboard there
+  landing: true            # warm-up landing page (converts 3-8× raw links)
+  verify_meesho_landing: true  # R69: fetch the built Meesho link before publishing and
+                               # quarantine it if Meesho answers "Not Found" (a link can
+                               # look monetized and still 404). Offline check = no block.
+
+scraping:
+  delay_seconds: 4         # pause between scrapes (be polite, avoid blocks)
+  timeout_seconds: 25
+  max_retries: 2
+  max_images: 3            # gallery photos to download per product
+
+reshare:
+  min_clicks: 3            # proven winners = products with ≥ this many clicks
+  rest_days: 7             # let a winner rest this long before a fresh re-pin
+  max_shares: 3            # never spam: max total posts per product
+
+video:
+  # daily reel cap. 0/absent = auto (2 on a 1 GB VM, unlimited
+  # on a bigger one). Skipping a reel never blocks the pin.
+  max_reels_per_day: 0
+  auto_reel: true          # no product video on the page? auto-generate a
+                           # viral 6s reel from the photos (hook → zoom → CTA)
+  lang: en-IN              # voiceover: en-IN | hi-IN | te-IN (free neural TTS)
+  music: ""                # optional BGM mp3 path, ducked under the voiceover
+
+posting:
+  max_per_day: 25          # hard cap per day (anti-spam; 0 disables)
+  quiet_hours: "0-6"       # no posting while you sleep (your local time)
+
+money:
+  # 💰 honest estimator inputs — see: python -m bot earnings
+  click_to_order: 0.02     # 2% of clicks become orders (adjust with real data)
+  aov: 599                 # average order value, ₹
+  confirm_days: 45         # typical Meesho payout confirmation cycle
+  rates:                   # your real commission % per network
+    meesho: 8
+    amazon: 3
+    flipkart: 5
+    cuelinks: 6
+    earnkaro: 6
+
+target:
+  # 🎯 your revenue goal — the bot converts it into clicks/posts/day (honest math)
+  monthly_commission: 100000   # ₹ per month (this is a BIG number: ~4,500 clicks/day)
+  months: 6                    # ramp runway you are willing to give it
+  auto_scale: false            # true → bot raises volume itself toward the goal
+  ceiling_per_day: 30          # hard safety ceiling for auto-scale (never above)
+
+autopilot:
+  auto_source: true        # ZERO-TOUCH: hunt trending products when queue is low
+  min_queue: 5
+  discover_limit: 4        # products per store per hunt cycle
+
+radar:
+  enabled: true
+  budget_seconds: 120      # a hunt can never stall the run loop longer than this
+  min_score: 40            # 🧭 hunt → SCORE (0-100) → queue only useful products            # below this = filler; radar prefers problem-solvers,
+                           # impulse prices (₹299-999), repeat-purchase items
+  hunt_count: 3            # how many top products to queue per hunt
+
+design:
+  # sticker wording on pins/reels: "JUST ₹299" ("" = plain price)
+  price_prefix: "JUST"
+  width: 1000
+  height: 1500             # Pinterest's ideal 2:3 vertical ratio
+  accent_color: "#E60023"
+  brand_name: Gharvanaa  # your page/brand strip on every pin ("" = off)
+  cta_text: "Shop Now ➜"
+
+affiliate:
+  amazon_tag: ""           # Amazon Associates tag, e.g. mydeals-21 (or set AMAZON_TAG in .env)
+  meesho_affid: ""         # Meesho affiliate id
+  flipkart_affid: ""       # Flipkart affiliate id (empty = wraps via earnkaro/cuelinks)
+  earnkaro_prefix: ""      # e.g. https://ekaro.in/enkr20240101s123456
+  cuelinks_template: ""    # template with {url} placeholder
+  generic_template: ""     # fallback wrapper with {url} for any other shop
+  default_wrapper: earnkaro  # wrapper for non-amazon/meesho/flipkart links
+  meesho_template_link: ""   # paste your af_invite share link(s) — comma-separated.
+                             # Each platform gets its own source token+campaign.
+  meesho_per_platform: true  # build a platform-correct link per post (recommended)
+  # Meesho has no Pinterest token — map it to any of YOUR tokens so the
+  # Meesho report is not muddied (commission is unaffected either way:
+  # the publisher id decides where the money lands).
+  meesho_platform_tokens:
+    pinterest: instagram_stories          # Meesho has no Pinterest surface
+    instagram: instagram_product_tag      # feed/carousel/reel/bio/DM link
+    instagram_stories: instagram_stories  # story surface link
+    youtube: youtube_long_form            # Shorts/videos token
+
+seo:
+  hashtags: true
+  max_hashtags: 8
+  extra_hashtags:
+    - "#onlineshopping"
+    - "#bestdeals"
+    - "#dealsindia"
+  description_template: |
+    🔥 {title}
+    💰 Price: {price}
+    ✅ Best price guarantee — tap to grab this deal before it's gone!
+    {hashtags}
+
+instagram:
+  enabled: false            # true → every product also posts to your IG page
+  ig_user_id: ""            # or IG_USER_ID in .env
+  mode: carousel            # single | carousel | reel
+  posts_per_day: 3
+  private_dm: true          # 🔥 ManyChat move: comment "link" → DM with the
+                            #    DIRECT product link (official private reply)
+  public_reply: true        #    also leave a public reply (reach + proof)
+  reply_delay_seconds: 3    #    human-ish pause between answers (0 = instant)
+  auto_dm: true             # answer keyword DMs (link/price/buy…)
+  auto_bio_link: true       # bio website auto-updates to the latest deal
+  triggers:                 # keywords people type → what they get
+    link: "🔥 {title} — only {price}! 😍 Link in bio — grab it now!"
+    price: "💰 {title} is just {price} right now — link in bio!"
+    buy: "🛒 To buy {title}: tap the LINK IN BIO — checkout on the official store!"
+    deal: "⚡ Yes! {title} at {price} is live — link in bio!"
+    cost: "💸 Cost of {title}: only {price}! Link in bio to order."
+    rate: "📦 Rate of {title}: {price} — link in bio to order!"
+    order: "🛒 Ordering {title}? Tap the LINK IN BIO — official store checkout!"
+    dm: "📩 Sent you the link for {title} — check your DM!"
+    send: "📩 Link for {title} sent — check your DM!"
+    interested: "😍 Great choice! {title} — link in bio!"
+    chahiye: "😍 Sending {title} ({price}) — link in bio!"
+    kitna: "💰 {title} price: {price} — link in bio!"
+    kitne: "💰 {title} price: {price} — link in bio!"
+youtube:
+  enabled: false            # true → publish each reel as a YouTube Short
+  privacy: public           # public | unlisted | private
+  category_id: 26           # 26 = Howto & Style (deals/fashion fits)
+  made_for_kids: false
+  redirect_uri: http://localhost:8080/
+  token_file: data/yt_token.json
+
+telegram:
+  # optional: broadcast every deal to your own Telegram deals channel
+  # (set TELEGRAM_TOKEN + TELEGRAM_DEALS_CHANNEL in .env — off by default)
+  enabled: false
+
+storage:
+  db_path: data/pindrop.db
+  media_dir: data/media
+
+dashboard:
+  host: 0.0.0.0
+  port: 5000
+  # Owner lock. Leave password empty = auto-generated on first run and saved in
+  # data/dashboard_password.txt (see it with: python -m bot dashboard-pass).
+  # The public money pages (/go/…, /deals/today, /subscribe/…) never need login.
+  password: ""
+  require_password: true
+  secret_key: ""
+
+timezone: Asia/Kolkata
+
+brand:
+  display_name: "Gharvanaa | Home Deals & Finds"
+  bio: "Gharvanaa shares hand-picked deals — home, kitchen, fashion & beauty finds under ₹999. Organizers, gadgets & kurtas. New drops daily. Tap the pin to shop."
+  handle: gharvanaa
+  contact_email: ""        # optional — /about & /privacy pages lo kanipistundi (khali unte Pinterest profile contact ga vaadutundi)
+
