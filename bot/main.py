@@ -19,6 +19,8 @@ Usage:
   python -m bot app [--site URL]         # 📝 Pinterest app form — exact answers
   python -m bot app --where              # 🧭 app page open cheyyadam ela (click path)
   python -m bot app --pending            # ⏳ trial pending lo emi lock, emi cheyyochu
+  python -m bot app --timeline           # ⏳ approval eppudu? (honest, researched)
+  python -m bot app --demo               # 🎬 standard-access video demo shot list
   python -m bot creds [--amazon T --earnkaro-token JWT …]  # 🔑 validate + save creds
   python -m bot earnkaro                 # 🏷  EarnKaro API: status (every store)
   python -m bot earnkaro probe           # 🔎 live proof: token → API → link
@@ -1042,6 +1044,12 @@ def cmd_app(cfg, rest: list[str]) -> int:
         print()
         print("\n".join(_appform.where_lines(cfg)))
         print()
+        return 0
+    if any(w in ("--timeline", "timeline", "--when") for w in rest):
+        print("\n".join(_appform.timeline_lines(cfg)))
+        return 0
+    if any(w in ("--demo", "demo", "--video") for w in rest):
+        print("\n".join(_appform.demo_lines(cfg)))
         return 0
     if any(w in ("--upgrade", "--standard") for w in rest):
         print()

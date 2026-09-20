@@ -231,6 +231,109 @@ def pending_lines(cfg=None) -> list[str]:
     ]
 
 
+def timeline_lines(cfg=None) -> list[str]:
+    """Honest answer to "approve eppudu avuddi?" — researched, not guessed.
+
+    Sources: Pinterest's own developer-community replies (staff say there is no
+    published turnaround time and that 2026 approvals are delayed), the Blotato
+    2026 API guide (trial reviewed each business day; standard review "inside a
+    week when the application is clean and inside three to four weeks when
+    reviewers want changes"), plus community threads (11 days trial pending,
+    26 days standard pending).
+    """
+    site_url, privacy_url = urls(cfg) if cfg is not None else (
+        "https://yourdomain.com/about", "https://yourdomain.com/privacy")
+    return [
+        "═" * 70,
+        "⏳ 'APPROVE EPPUDU AVUDDI?' — nijamaina timeline (2026-09)",
+        "═" * 70,
+        "   Rendu separate approvals unnayi — total wait ee rendu kalipi:",
+        "",
+        "   1) TRIAL ACCESS  (nuvvu ippudu unnadi: 'Trial access pending')",
+        "      • Rule: trial applications 'reviewed each business day'",
+        "      • Reality 2026: Pinterest staff post chesaru (May-Aug 2026)",
+        "        'we are aware of current delays in the app approval process'",
+        "      • Community: mostly 1-3 days, kani 11+ days pending cases kuda",
+        "      • Expected: 2 dinam - 3 weeks",
+        "",
+        "   2) STANDARD ACCESS  (trial approve ayyaka request cheyyali)",
+        "      • Manual review + VIDEO DEMO kavali (OAuth + real pin create)",
+        "      • Pinterest public timeline ivvaledu ('no published turnaround')",
+        "      • Clean application: ~1 week · changes adigithe: 3-4 weeks",
+        "      • Recent community report: 26 days pending, no reply",
+        "",
+        "   ⚠️ MUKHYAM: approval ki EMAIL RADU. Nuvve app page ni prati 2-3",
+        "      rojulu okasari open chesi chudali.",
+        "",
+        "   📈 ESCALATION (2-3 weeks datithe):",
+        "      • Status adagandi: https://help.pinterest.com/en/contact",
+        "        (Developer/API access category) — app id 1613412 pettu",
+        "      • App profile complete ga undali: name, description, logo,",
+        "        website, privacy policy URL — half-filled apps ki reply late",
+        f"      • Nee URLs: {site_url}  |  {privacy_url}",
+        "      • 3 weeks datithe inka detail tho re-apply",
+        "",
+        "   ✅ ILOPU AAGAKU — Pinterest wait lo migilinavi ippude live avutayi:",
+        "      • Telegram deals channel (bot admin ✅) → nijam ga pani chestundi",
+        "      • Instagram + Facebook + YouTube tokens iste aa posting automatic",
+        "      • Bot Pinterest ni 'pending' ga mark chesi, token vachina ventane",
+        "        pins start chestundi — nuvvu em cheyyalsina avasaram ledu",
+        "",
+        "   👉 Next: python -m bot app --pending  (emi lock, emi cheyyochu)",
+        "             python -m bot app --demo     (standard access video script)",
+    ]
+
+
+def demo_lines(cfg=None) -> list[str]:
+    """The exact recording Pinterest asks for at the Standard-access upgrade.
+
+    Pinterest's own requirement: 'Prepare a video recording of your app
+    completing an action using the Pinterest API.' Reviewers reject on missing
+    screens, so this is the shot list — record once, ~3 minutes.
+    """
+    site_url, privacy_url = urls(cfg) if cfg is not None else (
+        "https://yourdomain.com/about", "https://yourdomain.com/privacy")
+    return [
+        "═" * 70,
+        "🎬 STANDARD ACCESS VIDEO DEMO — exact shot list (~3 nimushalu)",
+        "═" * 70,
+        "   Pinterest adigedi: 'video recording of your app completing an",
+        "   action using the Pinterest API'. Ee order lo record cheyyi:",
+        "",
+        "   SHOT 1 (0:00-0:20) — App profile",
+        "     • developers.pinterest.com → My apps → app page",
+        "     • Kanipinchali: app name, logo, description, website,",
+        f"       privacy policy ({privacy_url})",
+        "",
+        "   SHOT 2 (0:20-1:10) — OAuth flow (FULL, cuts levu)",
+        "     • Terminal:  python -m bot auth-url",
+        "     • URL ni browser lo open → Pinterest login → 'Give access'",
+        "     • Redirect avvadam (localhost:8888/callback) chupinchali",
+        "     • Tarvata:  python -m bot auth --code <CODE>",
+        "     • Terminal lo 'token saved' line kanipinchali",
+        "",
+        "   SHOT 3 (1:10-2:30) — REAL pin create (ide main proof)",
+        "     • Terminal:  python -m bot run   (leda  python -m bot post 1)",
+        "     • Logs: scrape → link build → pin design → upload",
+        "     • Pinterest profile lo aa pin LIVE ga undadam chupinchali",
+        "",
+        "   SHOT 4 (2:30-3:00) — Boards + own pins read",
+        "     • Terminal:  python -m bot pin-stats",
+        "     • Boards list + created pins kanipinchali",
+        "",
+        "   NAAPU TIPS (reviewers ivanni chustaru):",
+        "     • Oka take lo cheyyi — cuts unte reject avvochu",
+        "     • Narration English lo: 'this is our own account, our own",
+        "       products, single user, no third parties'",
+        "     • Recording: OBS / Windows Game Bar (Win+G) / QuickTime",
+        f"     • Naatu lo site open pettu: {site_url}",
+        "     • Demo mundu 'python -m bot doctor' → anni green ga undali",
+        "",
+        "   📤 SUBMIT: app page → 'Upgrade to Standard access' → video link",
+        "      (YouTube unlisted best) + `bot app --upgrade` answers",
+    ]
+
+
 def upgrade_lines(cfg=None) -> list[str]:
     """Standard access request — the step that makes pins PUBLIC.
 

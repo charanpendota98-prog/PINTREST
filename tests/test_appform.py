@@ -319,3 +319,41 @@ class TestPendingState(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestApprovalTimeline(unittest.TestCase):
+    """R78 — "approve eppudu avuddi?" must have a researched, honest answer."""
+
+    def test_timeline_states_both_gates_and_the_email_trap(self):
+        from bot.appform import timeline_lines
+        text = "\n".join(timeline_lines(None))
+        self.assertIn("TRIAL ACCESS", text)
+        self.assertIn("STANDARD ACCESS", text)
+        self.assertIn("EMAIL RADU", text)                # no email on approval
+        self.assertIn("help.pinterest.com/en/contact", text)
+        self.assertIn("1613412", text)                   # own app id
+        self.assertIn("26 days", text)                   # real community report
+
+    def test_timeline_urls_come_from_config(self):
+        from unittest import mock
+        from bot import appform
+        with mock.patch.object(appform, "urls",
+                               return_value=("https://gharvanaa.example/about",
+                                             "https://gharvanaa.example/privacy")):
+            text = "\n".join(appform.timeline_lines(object()))
+        self.assertIn("gharvanaa.example/privacy", text)
+
+    def test_demo_shot_list_has_the_four_shots_and_no_cuts_rule(self):
+        from bot.appform import demo_lines
+        text = "\n".join(demo_lines(None))
+        for shot in ("SHOT 1", "SHOT 2", "SHOT 3", "SHOT 4"):
+            self.assertIn(shot, text)
+        self.assertIn("auth-url", text)
+        self.assertIn("auth --code", text)
+        self.assertIn("cuts unte reject", text)           # one-take advice
+        self.assertIn("Upgrade to Standard access", text)
+
+    def test_commands_wired(self):
+        src = (Path(__file__).resolve().parent.parent / "bot/main.py").read_text()
+        self.assertIn("timeline_lines(cfg)", src)
+        self.assertIn("demo_lines(cfg)", src)

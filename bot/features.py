@@ -105,6 +105,10 @@ FEATURES = [
      "instagram_stories / facebook token+campaign chosen per surface",
      lambda cfg: bool(cfg.get("affiliate.meesho_template_link")),
      "paste your af_invite link(s) in MEESHO_TEMPLATE_LINK"),
+    ("Pinterest approval timeline + demo pack", "reach",
+     "app approval eppudu vastundi (researched, honest) + standard access ki "
+     "video demo shot list — emi email radu, escalation link, community data",
+     lambda cfg: True, "python -m bot app --timeline | --demo"),
     ("Telegram CONTROL bot (two-way)", "reach",
      "phone nunchi machine ni control: /status /deals /link <url> /post <url> "
      "/surfaces /pause /resume — owner chat matrame (scheduler lo auto-start)",
@@ -553,7 +557,7 @@ def print_how_it_works() -> None:
    single-instance lock (rendu autopilot okate product rendu saarlu post
    cheyyavu — duplicate = spam signal), crash-net (edaina fail aithe loop
    continue), housekeep daily, panel password lock, doctor command,
-   738 automated tests.
+   742 automated tests.
 
 NI ONE-TIME PANI (idi tappadu — creds tappadu):
    python -m bot setup  → Pinterest app, Amazon tag, Meesho af_invite,
